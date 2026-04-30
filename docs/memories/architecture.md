@@ -1,44 +1,67 @@
-# 项目架构
+---
+title: 项目架构
+created: 2026-04-30T20:58:38
+modified: 2026-04-30T20:58:38
+description: 当前 export-to-obsidian 项目的实际结构、入口、模块边界与数据流摘要。
+tags:
+  - ai-notes
+---
 
-## 前置要求：项目结构与含义
+这是一个单仓库 Python CLI 工具，用来把多个平台的已保存内容导出为
+Obsidian 友好的 Markdown 文件。
 
-架构需要对项目的整体结构进行说明，明确每个文件夹和文件的作用，以及它们之间的关系。以下是项目的部分架构设计，要求有：
+## 架构概览
 
-1) 通过 Tree 结构展示每个文件的作用。
-2) 每个文件的作用要清晰、具体，最好列出调用结构。
+- 单一 CLI 入口：src/export_to_obsidian.py
+- 模块按平台拆分：bangumi、bilibili、cnblog、qireader、v2ex、weibo、zhihu
+- 通用能力放在 utils、entity
+- 输出目标是本地文件系统，不依赖数据库
+- 文档与长期上下文放在 docs/memories
 
-## 项目结构
+## 关键目录
 
-```shell
-.
-├── config # 配置文件夹，存放一些平台的模板文件等
-│   └── bangumi_template.md # 这个是bangumi平台的模板文件，用户可以根据自己的需求修改这个文件来改变导出的markdown文件的格式
-├── docs # 文档文件夹，存放一些项目相关的文档
-│   ├── implementation-plans # 实现计划，记录一些功能的实现思路和计划
-│   └── memories # 记忆文件夹，记录一些项目的设计思路、架构等
-├── export-env.sh # 导出环境变量的脚本，用户可以运行这个脚本来导出`.env`文件中的环境变量
-├── LICENCE 
-├── poetry.lock
-├── publish.sh # 发布脚本，用户可以运行这个脚本来发布这个项目到PyPI
-├── pyproject.toml # Poetry的配置文件，记录项目的依赖和一些项目信息
-├── README.md 
-├── requirements.txt
-├── src
-│   ├── bangumi # bangumi平台接口，获取相关分页数据；
-│   ├── bilibili # bilibili平台接口，获取相关分页数据；
-│   ├── cnblog # 博客园平台接口，获取相关分页数据；
-│   ├── demo # demo文件夹，存放一些demo代码，新增一个平台可以从这里复制开始；
-│   ├── entity # 实体类文件夹（待改造）
-│   ├── export_to_obsidian.py # 导出主程序，用户可以运行这个程序来导出数据到markdown文件
-│   ├── qireader # qireader平台接口，获取相关分页数据；
-│   ├── utils # 工具类文件夹，存放一些公共的工具函数
-│   ├── v2ex # v2ex平台接口，获取相关分页数据；
-│   ├── weibo # 微博平台接口，获取相关分页数据；
-│   └── zhihu # 知乎平台接口，获取相关分页数据；
-└── tests
-    ├── test_bangumi.py # bangumi平台的测试文件，测试bangumi平台接口的功能是否正常
-    ├── test_cnblog.py # 博客园平台的测试文件，测试博客园平台接口的功能是否正常
-    ├── test_qireader.py # qireader平台的测试文件，测试qireader平台接口的功能是否正常
-    └── test_utils.py # 工具类的测试文件，测试工具类函数的功能是否正常
-```
+- src: 业务代码
+- src/export_to_obsidian.py: click CLI 入口，注册所有子命令与顶层参数
+- src/<platform>: 各平台客户端、拉取逻辑、内容转换逻辑
+- src/utils: 文件写入、Markdown 转换、模板渲染等通用能力
+- config/bangumi_template.md: Bangumi 导出模板
+- tests: 当前测试集，覆盖 bangumi、cnblog、qireader、utils
+- docs/implementation-plans: 功能计划与执行记录
+- docs/memories: 提供给后续对话的稳定上下文
+- output: 导出结果样例
+
+## 运行时数据流
+
+1. 用户执行 eto 顶层命令。
+2. click 解析顶层参数与子命令。
+3. 顶层上下文创建 IndexWriter，并把 --index-file 配置注入根上下文。
+4. 子命令调用对应平台模块，分页拉取远端数据。
+5. 每条数据转换为 WebPage 或 Video 前言加 Markdown 内容。
+6. utils.file_utils 将内容写入 output 目录。
+7. IndexWriter 将本轮导出条目打印到终端或写入一个 Markdown 索引文件。
+
+## 已实现命令边界
+
+- cnblog: 导出博客园收藏
+- bangumi: 导出 Bangumi 收藏，可按 subject_type 或 collection_type 过滤
+- qireader: 导出稍后读列表
+- v2ex: 导出收藏主题
+- zhihu: 导出收藏夹内容
+- weibo: 导出点赞微博
+- bilibili: 导出收藏夹视频
+
+## 输出模型
+
+- 统一输出 Markdown 文件
+- 文件名通常带 ~ 前缀，避免与普通笔记混淆
+- front matter 由 utils.template 与 utils.md_utils 生成
+- Bangumi 使用模板文件
+- Bilibili 输出 iframe 嵌入块和基础说明
+
+## 当前约束
+
+- 没有数据库，没有任务队列，没有服务端进程
+- 主要是同步分页抓取，失败处理以跳过或提前结束为主
+- 多个模块用“检测到已存在文件即结束同步”做增量剪枝
+- 索引写入逻辑集中在 IndexWriter，位于 src/export_to_obsidian.py
 
