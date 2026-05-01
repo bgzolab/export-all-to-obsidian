@@ -36,7 +36,7 @@ pipx install export_to_obsidian
 Or install from this repo:
 
 ```shell
-pip install -e .
+pipx install -e .
 ```
 
 Put your token or cookie values in .env, then load them:
@@ -96,6 +96,14 @@ You can also set one collection type:
 ```shell
 eto bangumi -t config/bangumi_template.md -s 2 -c 3 -o output/bangumi
 ```
+
+`-c` means the status of the subject:
+
+- 1: 想看
+- 2: 看过
+- 3: 在看
+- 4: 搁置
+- 5: 抛弃
 
 ### qireader
 
