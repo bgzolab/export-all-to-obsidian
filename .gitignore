@@ -82,3 +82,4 @@ Gopkg.lock
 
 # AI export folder
 ai_export/
+docs/implementation-plans/*.md
