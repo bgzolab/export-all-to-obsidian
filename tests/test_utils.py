@@ -76,6 +76,38 @@ def test_index_writer_flush_file(tmp_path):
     )
 
 
+def test_exporter_support_helpers(tmp_path, capsys):
+    from export_runtime.exporter_support import add_index_entry
+    from export_runtime.exporter_support import build_output_path
+    from export_runtime.exporter_support import stop_if_output_exists
+    from export_runtime.exporter_support import write_markdown_output
+    from export_to_obsidian import IndexWriter
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    metadata = {"title": "测试标题", "date": "2025-07-27"}
+
+    assert build_output_path(str(tmp_path), "demo") == str(tmp_path / "~demo.md")
+
+    write_markdown_output(str(tmp_path), "demo", metadata, "正文")
+    target = tmp_path / "~demo.md"
+    assert target.exists()
+    assert "title: 测试标题" in target.read_text(encoding="utf-8")
+
+    add_index_entry(writer, link_target="~demo", title="测试标题")
+    assert writer.render() == "- [[~demo|测试标题]]"
+
+    assert stop_if_output_exists(
+        str(tmp_path),
+        "demo",
+        index_writer=writer,
+        section_name="demo",
+    )
+
+    captured = capsys.readouterr()
+    assert "已存在: demo.md，同步结束" in captured.out
+    assert "导出index已写入" in captured.out
+
+
 def test_cli_accepts_index_file_without_output_mode():
     from export_to_obsidian import eto
 

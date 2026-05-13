@@ -117,6 +117,7 @@ def _dict_to_subject_character(data: dict) -> SubjectRelatedCharacter:
     )
 
 def get_subject_character(subject_id: int) -> list[SubjectRelatedCharacter]:
+    """获取条目角色列表。"""
     client = BangumiClient()
     res = client.session.get(
         SUBJECT_CHARACTER_QUERY % subject_id
@@ -125,5 +126,8 @@ def get_subject_character(subject_id: int) -> list[SubjectRelatedCharacter]:
         result = res.json()
         return [_dict_to_subject_character(item) for item in result]
     else:
-        print(f"Error fetching character of {subject} with response: {res.status_code} {res[res.status_code]}")
+        print(
+            "Error fetching character of "
+            f"{subject_id} with response: {res.status_code} {res.text}"
+        )
         return []
