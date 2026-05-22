@@ -5,6 +5,14 @@ from typing import Optional
 import click
 
 from app.context import get_index_writer, initialize_context
+from app.credential_guard import probe_bangumi_credentials
+from app.credential_guard import probe_bilibili_credentials
+from app.credential_guard import probe_cnblog_credentials
+from app.credential_guard import probe_qireader_credentials
+from app.credential_guard import probe_v2ex_credentials
+from app.credential_guard import probe_weibo_credentials
+from app.credential_guard import probe_zhihu_credentials
+from app.credential_guard import run_with_credential_guard
 from bangumi.exporter import export as export_bangumi
 from bangumi.exporter import sync_all_collections
 from bilibili.exporter import export as export_bilibili
@@ -31,7 +39,11 @@ def eto(ctx: click.Context, index_file: Optional[str]) -> None:
 @click.option("--output", "-o", required=True, help="输出目录")
 def cnblog(output: str) -> None:
     """导出博客园收藏。"""
-    export_cnblog(output, get_index_writer())
+    run_with_credential_guard(
+        "cnblog",
+        probe_cnblog_credentials,
+        lambda: export_cnblog(output, get_index_writer()),
+    )
 
 
 @eto.command()
@@ -48,24 +60,27 @@ def bangumi(
     force: bool,
 ) -> None:
     """导出 Bangumi 收藏。"""
-    index_writer = get_index_writer()
-    if collection_type:
-        export_bangumi(
-            subject_type,
-            collection_type,
-            output,
-            template,
-            index_writer,
-            force,
-        )
-    else:
-        sync_all_collections(
-            subject_type,
-            output,
-            template,
-            index_writer,
-            force,
-        )
+    def export_action() -> None:
+        index_writer = get_index_writer()
+        if collection_type:
+            export_bangumi(
+                subject_type,
+                collection_type,
+                output,
+                template,
+                index_writer,
+                force,
+            )
+        else:
+            sync_all_collections(
+                subject_type,
+                output,
+                template,
+                index_writer,
+                force,
+            )
+
+    run_with_credential_guard("bangumi", probe_bangumi_credentials, export_action)
 
 
 @eto.command()
@@ -73,14 +88,22 @@ def bangumi(
 @click.option("--output", "-o", required=True, help="输出目录")
 def qireader(tag: str, output: str) -> None:
     """导出稍后读列表。"""
-    export_qireader(tag, output, get_index_writer())
+    run_with_credential_guard(
+        "qireader",
+        lambda: probe_qireader_credentials(tag),
+        lambda: export_qireader(tag, output, get_index_writer()),
+    )
 
 
 @eto.command()
 @click.option("--output", "-o", required=True, help="输出目录")
 def v2ex(output: str) -> None:
     """导出 V2EX 收藏主题。"""
-    export_v2ex(output, get_index_writer())
+    run_with_credential_guard(
+        "v2ex",
+        probe_v2ex_credentials,
+        lambda: export_v2ex(output, get_index_writer()),
+    )
 
 
 @eto.command()
@@ -88,7 +111,11 @@ def v2ex(output: str) -> None:
 @click.option("--output", "-o", required=True, help="输出目录")
 def zhihu(collection: str, output: str) -> None:
     """导出知乎收藏夹。"""
-    export_zhihu(collection, output, get_index_writer())
+    run_with_credential_guard(
+        "zhihu",
+        lambda: probe_zhihu_credentials(collection),
+        lambda: export_zhihu(collection, output, get_index_writer()),
+    )
 
 
 @eto.command()
@@ -97,7 +124,11 @@ def zhihu(collection: str, output: str) -> None:
 @click.option("--force", required=False, is_flag=True, help="是否强制覆盖")
 def weibo(uid: int, output: str, force: bool) -> None:
     """导出微博点赞。"""
-    export_weibo(uid, output, get_index_writer(), force)
+    run_with_credential_guard(
+        "weibo",
+        lambda: probe_weibo_credentials(uid),
+        lambda: export_weibo(uid, output, get_index_writer(), force),
+    )
 
 
 @eto.command()
@@ -106,4 +137,8 @@ def weibo(uid: int, output: str, force: bool) -> None:
 @click.option("--force", required=False, is_flag=True, help="是否强制覆盖")
 def bilibili(fid: int, output: str, force: bool) -> None:
     """导出 Bilibili 收藏夹。"""
-    export_bilibili(fid, output, get_index_writer(), force)
+    run_with_credential_guard(
+        "bilibili",
+        lambda: probe_bilibili_credentials(fid),
+        lambda: export_bilibili(fid, output, get_index_writer(), force),
+    )

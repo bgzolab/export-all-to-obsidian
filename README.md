@@ -57,6 +57,11 @@ Main env vars used by the current modules:
 - ZHIHU_COOKIE
 - BILIBILI_COOKIE
 
+Optional reminder env vars:
+
+- TELEGRAM_BOT_TOKEN
+- TELEGRAM_CHAT_ID
+
 ## Basic usage
 
 ```shell
@@ -134,6 +139,14 @@ eto weibo -u your-user-id -o output/weibo
 ```shell
 eto bilibili -f your-fav-id -o output/bilibili
 ```
+
+## Credential health check
+
+Before each module export, the CLI runs a lightweight credential probe.
+
+- If the cookie or token is confirmed expired, the export is skipped.
+- If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are both configured, the tool sends a Telegram bot reminder with the affected module name.
+- If the probe cannot confirm whether the credential is invalid because of a transient network or service problem, the export still continues.
 
 ## Index file
 
