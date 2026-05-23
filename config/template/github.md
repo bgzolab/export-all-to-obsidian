@@ -3,7 +3,7 @@ title: "{{authors}}/{{name}}"
 aliases: {{name}}
 released: {{created_time}}
 modified: {{export_time}}
-created: {{starred_at}}}
+created: {{starred_at}}
 description: "{{description}}"
 source: "{{url}}"
 tags:
