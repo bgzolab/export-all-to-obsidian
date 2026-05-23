@@ -144,6 +144,28 @@
       "justMyCode": false
     },
     {
+      "name": "CLI: github 导出",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/export_to_obsidian.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "args": [
+        "github",
+        "-t",
+        "config/template/github.md",
+        "--output",
+        "output/github",
+        "--prefix",
+        "_"
+      ],
+      "justMyCode": false
+    },
+    {
       "name": "Pytest: 当前测试文件",
       "type": "debugpy",
       "request": "launch",

@@ -25,7 +25,7 @@ tags:
 
 - 顶层命令: eto
 - 顶层可选参数: --index-file
-- 子命令: cnblog、bangumi、qireader、v2ex、zhihu、weibo、bilibili
+- 子命令: cnblog、bangumi、github、qireader、v2ex、zhihu、weibo、bilibili
 - --index-file 必须出现在子命令前
 
 ## 子命令输入
@@ -33,6 +33,7 @@ tags:
 - cnblog: -o/--output
 - bangumi: -t/--template、-s/--subject_type、-o/--output、可选 -c/--collection_type、--force
 - qireader: -t/--tag、-o/--output
+- github: -t/--template、-o/--output、可选 --force、可选 --prefix
 - v2ex: -o/--output
 - zhihu: -c/--collection、-o/--output
 - weibo: -u/--uid、-o/--output、可选 --force
@@ -48,12 +49,14 @@ tags:
 - WEIBO_COOKIE
 - ZHIHU_COOKIE
 - BILIBILI_COOKIE
+- GITHUB_TOKEN
 
 ## 输出约定
 
 - 输出目录由各子命令的 --output 指定
 - 每个条目输出一个 Markdown 文件
 - 内容包含 front matter
+- GitHub 模块允许直接按模板输出完整 Markdown 文本，并由模板自身承载 front matter
 - 索引默认打印到终端，也可写入单个 Markdown 文件
 - 索引文件按模块分组，模块标题为 ##，每轮导出块为 ###
 
@@ -62,6 +65,7 @@ tags:
 - 多数模块在发现目标文件已存在时直接结束本轮同步
 - 这是一种基于本地文件存在性的剪枝，而不是远端游标持久化
 - --force 只在部分模块可用，目前主要是 bangumi、weibo、bilibili
+- GitHub 默认输出无文件名前缀，可通过 `--prefix "~"` 回退到旧命名风格
 
 ## 已知设计现实
 

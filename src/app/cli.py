@@ -17,6 +17,7 @@ from bangumi.exporter import export as export_bangumi
 from bangumi.exporter import sync_all_collections
 from bilibili.exporter import export as export_bilibili
 from cnblog.exporter import export as export_cnblog
+from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
 from v2ex.exporter import export as export_v2ex
 from weibo.exporter import export as export_weibo
@@ -142,3 +143,13 @@ def bilibili(fid: int, output: str, force: bool) -> None:
         lambda: probe_bilibili_credentials(fid),
         lambda: export_bilibili(fid, output, get_index_writer(), force),
     )
+
+
+@eto.command()
+@click.option("--template", "-t", required=True, type=str, help="模板文件")
+@click.option("--output", "-o", required=True, help="输出目录")
+@click.option("--force", required=False, is_flag=True, help="是否强制覆盖")
+@click.option("--prefix", required=False, default="", type=str, help="输出文件名前缀")
+def github(template: str, output: str, force: bool, prefix: str) -> None:
+    """导出 GitHub stars。"""
+    export_github(output, template, get_index_writer(), force, prefix)

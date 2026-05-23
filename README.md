@@ -20,10 +20,11 @@ Now this tool had supported following modules:
 1. bangumi
 2. bilibili
 3. cnblog
-4. qireader
-5. v2ex
-6. weibo
-7. zhihu
+4. github
+5. qireader
+6. v2ex
+7. weibo
+8. zhihu
 
 ## Quick start
 
@@ -56,6 +57,7 @@ Main env vars used by the current modules:
 - WEIBO_COOKIE
 - ZHIHU_COOKIE
 - BILIBILI_COOKIE
+- GITHUB_TOKEN
 
 Optional reminder env vars:
 
@@ -116,6 +118,15 @@ eto bangumi -t config/bangumi_template.md -s 2 -c 3 -o output/bangumi
 eto qireader -t your-tag -o output/qireader
 ```
 
+### github
+
+Use `config/template/github.md` as the default template file.
+
+```shell
+eto github -t config/template/github.md -o output/github
+eto github -t config/template/github.md --prefix "~" -o output/github
+```
+
 ### v2ex
 
 ```shell
@@ -155,6 +166,7 @@ Example:
 ```shell
 eto --index-file output/index/export-index.md zhihu -c your-collection-id -o output/zhihu
 eto --index-file output/index/export-index.md bilibili -f your-fav-id -o output/bilibili
+eto --index-file output/index/export-index.md github -t config/template/github.md -o output/github
 ```
 
 The file is grouped by module name.

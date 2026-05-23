@@ -50,6 +50,7 @@ PYTHONPATH=src pytest tests/test_utils.py -q
 ## 测试现状
 
 - 当前已有测试文件: test_bangumi.py、test_cnblog.py、test_qireader.py、test_utils.py
+- 当前已有测试文件: test_bangumi.py、test_cnblog.py、test_github.py、test_qireader.py、test_utils.py
 - 尚未看到独立的 bilibili、weibo、zhihu、v2ex 测试文件
 - 变更后优先跑受影响切片的最小 pytest 命令
 
