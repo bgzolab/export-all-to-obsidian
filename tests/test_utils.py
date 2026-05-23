@@ -78,8 +78,10 @@ def test_index_writer_flush_file(tmp_path):
 
 def test_exporter_support_helpers(tmp_path, capsys):
     from export_runtime.exporter_support import add_index_entry
+    from export_runtime.exporter_support import build_link_target
     from export_runtime.exporter_support import build_output_path
     from export_runtime.exporter_support import stop_if_output_exists
+    from export_runtime.exporter_support import write_raw_markdown_output
     from export_runtime.exporter_support import write_markdown_output
     from export_to_obsidian import IndexWriter
 
@@ -87,11 +89,16 @@ def test_exporter_support_helpers(tmp_path, capsys):
     metadata = {"title": "测试标题", "date": "2025-07-27"}
 
     assert build_output_path(str(tmp_path), "demo") == str(tmp_path / "~demo.md")
+    assert build_link_target("demo") == "~demo"
+    assert build_output_path(str(tmp_path), "demo", prefix="~") == str(tmp_path / "~demo.md")
 
     write_markdown_output(str(tmp_path), "demo", metadata, "正文")
     target = tmp_path / "~demo.md"
     assert target.exists()
     assert "title: 测试标题" in target.read_text(encoding="utf-8")
+
+    write_raw_markdown_output(str(tmp_path), "raw", "# Raw", prefix="~")
+    assert (tmp_path / "~raw.md").read_text(encoding="utf-8") == "# Raw"
 
     add_index_entry(writer, link_target="~demo", title="测试标题")
     assert writer.render() == "- [[~demo|测试标题]]"
@@ -116,6 +123,7 @@ def test_cli_accepts_index_file_without_output_mode():
 
     assert result.exit_code == 0
     assert "--index-file" in result.output
+    assert "--prefix" in result.output
 
 
 def test_cli_rejects_removed_index_output_option():

@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from export_runtime.exporter_support import add_index_entry
+from export_runtime.exporter_support import build_link_target
 from export_runtime.exporter_support import stop_if_output_exists
 from export_runtime.exporter_support import write_markdown_output
 from export_runtime.index_writer import IndexWriter
@@ -97,7 +98,7 @@ def export(uid: int, output_dir: str, index_writer: IndexWriter,
                 print(f"Done: {title}")
                 add_index_entry(
                     index_writer,
-                    link_target=f"~{filename}",
+                    link_target=build_link_target(filename),
                     title=title,
                 )
 

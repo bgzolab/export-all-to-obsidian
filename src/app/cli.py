@@ -4,7 +4,7 @@ from typing import Optional
 
 import click
 
-from app.context import get_index_writer, initialize_context
+from app.context import get_index_writer, get_output_prefix, initialize_context
 from app.credential_guard import probe_bangumi_credentials
 from app.credential_guard import probe_bilibili_credentials
 from app.credential_guard import probe_cnblog_credentials
@@ -30,10 +30,16 @@ from zhihu.exporter import export as export_zhihu
     type=click.Path(dir_okay=False, path_type=str),
     help="索引输出文件路径；未指定时直接打印到控制台",
 )
+@click.option(
+    "--prefix",
+    default="~",
+    show_default=True,
+    help="所有导出文件的统一名前缀；必须放在子命令前",
+)
 @click.pass_context
-def eto(ctx: click.Context, index_file: Optional[str]) -> None:
+def eto(ctx: click.Context, index_file: Optional[str], prefix: str) -> None:
     """导出命令组。"""
-    initialize_context(ctx, index_file)
+    initialize_context(ctx, index_file, prefix)
 
 
 @eto.command()
@@ -149,7 +155,6 @@ def bilibili(fid: int, output: str, force: bool) -> None:
 @click.option("--template", "-t", required=True, type=str, help="模板文件")
 @click.option("--output", "-o", required=True, help="输出目录")
 @click.option("--force", required=False, is_flag=True, help="是否强制覆盖")
-@click.option("--prefix", required=False, default="", type=str, help="输出文件名前缀")
-def github(template: str, output: str, force: bool, prefix: str) -> None:
+def github(template: str, output: str, force: bool) -> None:
     """导出 GitHub stars。"""
-    export_github(output, template, get_index_writer(), force, prefix)
+    export_github(output, template, get_index_writer(), force, get_output_prefix())

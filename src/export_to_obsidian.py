@@ -7,6 +7,7 @@ from bangumi.exporter import write_subject_markdown as write_bangumi_data_from_i
 from bilibili.exporter import export as bilibili_export
 from cnblog.exporter import export as cnblog_export
 from export_runtime.index_writer import IndexWriter
+from github.exporter import export as github_export
 from qireader.exporter import export as qireader_export
 from v2ex.exporter import export as v2ex_export
 from weibo.exporter import export as weibo_export

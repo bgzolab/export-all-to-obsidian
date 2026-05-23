@@ -3,6 +3,7 @@
 from cnblog.blog_post import get_cnblog_post_body_by_url
 from cnblog.bookmark import get_bookmark_list
 from export_runtime.exporter_support import add_index_entry
+from export_runtime.exporter_support import build_link_target
 from export_runtime.exporter_support import stop_if_output_exists
 from export_runtime.exporter_support import write_markdown_output
 from export_runtime.index_writer import IndexWriter
@@ -55,7 +56,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 print(f"Skip: {bookmark.Title}")
             add_index_entry(
                 index_writer,
-                link_target=f"~{filename}",
+                link_target=build_link_target(filename),
                 title=bookmark.Title,
             )
         page_index += 1

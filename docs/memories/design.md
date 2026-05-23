@@ -24,16 +24,16 @@ tags:
 ## CLI 契约
 
 - 顶层命令: eto
-- 顶层可选参数: --index-file
+- 顶层可选参数: --index-file、--prefix
 - 子命令: cnblog、bangumi、github、qireader、v2ex、zhihu、weibo、bilibili
-- --index-file 必须出现在子命令前
+- --index-file 和 --prefix 必须出现在子命令前
 
 ## 子命令输入
 
 - cnblog: -o/--output
 - bangumi: -t/--template、-s/--subject_type、-o/--output、可选 -c/--collection_type、--force
 - qireader: -t/--tag、-o/--output
-- github: -t/--template、-o/--output、可选 --force、可选 --prefix
+- github: -t/--template、-o/--output、可选 --force
 - v2ex: -o/--output
 - zhihu: -c/--collection、-o/--output
 - weibo: -u/--uid、-o/--output、可选 --force
@@ -65,7 +65,7 @@ tags:
 - 多数模块在发现目标文件已存在时直接结束本轮同步
 - 这是一种基于本地文件存在性的剪枝，而不是远端游标持久化
 - --force 只在部分模块可用，目前主要是 bangumi、weibo、bilibili
-- GitHub 默认输出无文件名前缀，可通过 `--prefix "~"` 回退到旧命名风格
+- 所有模块共享顶层 `--prefix` 选项，默认值为 `~`，也可以显式传空字符串以取消前缀
 
 ## 已知设计现实
 

@@ -7,6 +7,9 @@ from bangumi.client import BangumiClient
 from bangumi.collection import get_all_collections_by_pages
 from bangumi.enum import CollectionType, SubjectType
 from bangumi.subject import get_subject_character, get_subject_info
+from export_runtime.exporter_support import build_link_target
+from export_runtime.exporter_support import build_output_path
+from export_runtime.exporter_support import resolve_output_prefix
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 
@@ -115,14 +118,22 @@ def write_subject_markdown(
         + datetime.now().strftime("T%H:%M:%S%z")
     )
     title = subject.name_cn or subject.name or ""
-    filename = (
-        "~"
-        + str(subject_id)
+    prefix = resolve_output_prefix()
+    filename_without_extension = (
+        str(subject_id)
         + "-"
         + get_clean_filename(title or str(subject.id))
-        + ".md"
     )
-    output_path = os.path.join(output_dir, subject_type_en, filename)
+    filename = build_link_target(
+        filename_without_extension,
+        prefix=prefix,
+        include_extension=True,
+    )
+    output_path = build_output_path(
+        os.path.join(output_dir, subject_type_en),
+        filename_without_extension,
+        prefix,
+    )
     if os.path.exists(output_path) and not force:
         print(f"已存在，提前结束: {filename}")
         return False, "", ""

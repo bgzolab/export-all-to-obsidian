@@ -4,6 +4,7 @@ from datetime import datetime
 
 from bilibili.favlist import get_bilibili_favlistd
 from export_runtime.exporter_support import add_index_entry
+from export_runtime.exporter_support import build_link_target
 from export_runtime.exporter_support import stop_if_output_exists
 from export_runtime.exporter_support import write_markdown_output
 from export_runtime.index_writer import IndexWriter
@@ -90,7 +91,7 @@ def export(fid: int, output_dir: str, index_writer: IndexWriter,
                 print(f"Done: {item.title}")
                 add_index_entry(
                     index_writer,
-                    link_target=f"~{filename}",
+                    link_target=build_link_target(filename),
                     title=item.title,
                 )
 

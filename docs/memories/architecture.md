@@ -13,7 +13,6 @@ Obsidian 友好的 Markdown 文件。
 ## 架构概览
 
 - 薄 CLI 入口：src/export_to_obsidian.py -> src/app/cli.py
-- 模块按平台拆分：bangumi、bilibili、cnblog、qireader、v2ex、weibo、zhihu
 - 模块按平台拆分：bangumi、bilibili、cnblog、github、qireader、v2ex、weibo、zhihu
 - 各平台导出编排位于各自 exporter.py
 - 导出运行时对象位于 export_runtime
@@ -63,7 +62,7 @@ Obsidian 友好的 Markdown 文件。
 ## 输出模型
 
 - 统一输出 Markdown 文件
-- 文件名通常带 ~ 前缀，避免与普通笔记混淆
+- 文件名前缀由顶层 `--prefix` 统一控制，默认值为 `~`
 - front matter 由 utils.template 与 utils.md_utils 生成
 - Bangumi 使用模板文件
 - Bilibili 输出 iframe 嵌入块和基础说明
@@ -74,7 +73,7 @@ Obsidian 友好的 Markdown 文件。
 - 没有数据库，没有任务队列，没有服务端进程
 - 主要是同步分页抓取，失败处理以跳过或提前结束为主
 - 多个模块用“检测到已存在文件即结束同步”做增量剪枝
-- GitHub 模块支持 `--prefix` 控制输出文件名前缀，默认无前缀；旧模块继续显式使用 `~`
+- 所有模块通过顶层 `--prefix` 共享统一文件名前缀配置
 - 已抽出轻量 exporter helper，但尚未引入 BaseExporter 一类更高层抽象
 - bangumi.bangumi 目前保留为历史兼容导入层
 

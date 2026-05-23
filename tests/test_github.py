@@ -233,10 +233,13 @@ def test_cli_registers_github_command():
 
     runner = CliRunner()
 
+    root_help_result = runner.invoke(eto, ["--help"])
     help_result = runner.invoke(eto, ["github", "--help"])
     missing_template_result = runner.invoke(eto, ["github", "-o", "output/github"])
 
+    assert root_help_result.exit_code == 0
+    assert "--prefix" in root_help_result.output
     assert help_result.exit_code == 0
     assert "--template" in help_result.output
-    assert "--prefix" in help_result.output
+    assert "--prefix" not in help_result.output
     assert missing_template_result.exit_code != 0

@@ -4,6 +4,8 @@ from datetime import datetime
 import re
 
 from export_runtime.exporter_support import add_index_entry
+from export_runtime.exporter_support import build_link_target
+from export_runtime.exporter_support import resolve_output_prefix
 from export_runtime.exporter_support import stop_if_output_exists
 from export_runtime.exporter_support import write_raw_markdown_output
 from export_runtime.index_writer import IndexWriter
@@ -69,9 +71,10 @@ def export(
     template_path: str,
     index_writer: IndexWriter,
     force: bool = False,
-    prefix: str = "",
+    prefix: str | None = None,
 ) -> None:
     """导出当前认证用户的 GitHub star 仓库。"""
+    resolved_prefix = resolve_output_prefix(prefix)
     with open(template_path, "r", encoding="utf-8") as file:
         template_content = file.read()
 
@@ -91,17 +94,26 @@ def export(
                 index_writer=index_writer,
                 section_name="github",
                 force=force,
-                prefix=prefix,
+                prefix=resolved_prefix,
             ):
                 return
 
             readme = get_repository_readme(item.owner_login, item.repo_name)
-            context = build_template_context(item, readme, export_time, prefix)
+            context = build_template_context(
+                item,
+                readme,
+                export_time,
+                resolved_prefix,
+            )
             content = render_github_template(template_content, context)
-            write_raw_markdown_output(output_dir, repo_slug, content, prefix)
+            write_raw_markdown_output(output_dir, repo_slug, content, resolved_prefix)
             add_index_entry(
                 index_writer,
-                link_target=f"{prefix}{repo_slug}.md",
+                link_target=build_link_target(
+                    repo_slug,
+                    prefix=resolved_prefix,
+                    include_extension=True,
+                ),
                 title=item.full_name,
             )
             print(f"Done: {item.full_name}")

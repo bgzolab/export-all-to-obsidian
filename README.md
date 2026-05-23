@@ -68,10 +68,11 @@ Optional reminder env vars:
 
 ```shell
 eto <command> [options]
+eto --prefix <prefix> <command> [options]
 eto --index-file <path> <command> [options]
 ```
 
-`--index-file` is a top-level option. Put it before the subcommand.
+`--index-file` and `--prefix` are top-level options. Put them before the subcommand.
 
 If you do not use `--index-file`, the index is printed to the terminal.
 
@@ -124,7 +125,7 @@ Use `config/template/github.md` as the default template file.
 
 ```shell
 eto github -t config/template/github.md -o output/github
-eto github -t config/template/github.md --prefix "~" -o output/github
+eto --prefix "" github -t config/template/github.md -o output/github
 ```
 
 ### v2ex
