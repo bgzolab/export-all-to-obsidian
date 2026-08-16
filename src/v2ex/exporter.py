@@ -22,7 +22,12 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
             break
         page += 1
         for topic_id in id_list:
-            result = get_v2ex_topic_info(topic_id)
+            try:
+                result = get_v2ex_topic_info(topic_id)
+            except Exception as exc:
+                # 重试耗尽后仍失败则跳过该条目，避免单条故障中断整批同步
+                print(f"Skip v2ex topic {topic_id}: {exc}")
+                continue
             if not result:
                 continue
             topic = result.result
