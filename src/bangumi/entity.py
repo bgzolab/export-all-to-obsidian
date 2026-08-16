@@ -35,7 +35,7 @@ class SubjectTag:
     # 根据实际结构补充字段
     name: str
     count: int
-    total_cont: int
+    total_count: int
 
 
 # https://github.com/bangumi/server/blob/fb44e70f9fac931fc29964cab9c5b5aec41433b0/web/res/subject.go#L66C1-L81C2
