@@ -86,3 +86,4 @@ tests/import-from-github-url/import-report.json
 ai_export/
 docs/implementation-plans/*.md
 debug/
+tests/import-from-github-url/
