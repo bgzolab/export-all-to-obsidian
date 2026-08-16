@@ -85,3 +85,4 @@ tests/import-from-github-url/import-report.json
 # AI export folder
 ai_export/
 docs/implementation-plans/*.md
+debug/
