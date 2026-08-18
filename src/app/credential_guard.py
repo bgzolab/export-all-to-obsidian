@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Callable, Literal
@@ -17,6 +18,10 @@ from cnblog.api_endpoints import USER as CNBLOG_USER
 from cnblog.client import CnblogClient
 from qireader.api_endpoints import READ_LATER as QIREADER_READ_LATER
 from qireader.cilent import QiReaderClient
+from twitter.api_endpoints import TWITTER_LIKES_FEATURES
+from twitter.api_endpoints import TWITTER_LIKES_FIELD_TOGGLES
+from twitter.api_endpoints import TWITTER_LIKES_PATH
+from twitter.cilent import TwitterClient
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
 from weibo.api_endpoints import WEIBO_LIKE_URL
@@ -190,6 +195,46 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
     return CredentialProbeResult.valid(module)
+
+
+def probe_twitter_credentials() -> CredentialProbeResult:
+    module = "twitter"
+    try:
+        client = TwitterClient()
+        response = client.session.get(
+            TWITTER_LIKES_PATH,
+            params={
+                "features": json.dumps(TWITTER_LIKES_FEATURES),
+                "fieldToggles": json.dumps(TWITTER_LIKES_FIELD_TOGGLES),
+                "variables": json.dumps(
+                    {
+                        "userId": client.user_id,
+                        "count": 1,
+                        "includePromotedContent": False,
+                        "withClientEventToken": False,
+                        "withBirdwatchNotes": False,
+                        "withVoice": True,
+                    }
+                ),
+            },
+        )
+    except ValueError as exc:
+        return CredentialProbeResult.invalid(module, str(exc))
+    except requests.RequestException as exc:
+        return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
+
+    if response.status_code in {401, 403}:
+        return CredentialProbeResult.invalid(module, "TWITTER_COOKIE 已过期或无效")
+    if response.status_code != 200:
+        return CredentialProbeResult.unknown(module, _http_failure_reason(response))
+
+    payload = response.json()
+    if payload.get("data"):
+        return CredentialProbeResult.valid(module)
+    return CredentialProbeResult.invalid(
+        module,
+        "TWITTER_COOKIE 已过期或接口未返回有效登录态",
+    )
 
 
 def probe_zhihu_credentials(collection: str) -> CredentialProbeResult:

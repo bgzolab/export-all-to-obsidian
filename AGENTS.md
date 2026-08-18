@@ -51,13 +51,16 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 - `--index-file` is a **top-level option and must come before the subcommand**; when
   omitted, the index is printed to the terminal.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
-  `v2ex(-o)`, `zhihu(-c -o)`, `weibo(-u -o [--force])`, `bilibili(-f -o [--force])`.
-- `--force` currently only affects bangumi, weibo, and bilibili.
+  `v2ex(-o)`, `twitter(-o [--force])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
+  `bilibili(-f -o [--force])`.
+- `--force` currently only affects bangumi, weibo, bilibili, and twitter.
 
 ## Environment variables (required by module exports)
 
 `CNBLOG_ACCESS_TOKEN`, `BGM_ACCESS_TOKEN`, `QIREADER_COOKIE`, `V2EX_ACCESS_TOKEN`,
-`V2EX_COOKIE`, `WEIBO_COOKIE`, `ZHIHU_COOKIE`, `BILIBILI_COOKIE`. Optional
+`V2EX_COOKIE`, `WEIBO_COOKIE`, `ZHIHU_COOKIE`, `BILIBILI_COOKIE`, `TWITTER_COOKIE`,
+`TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID` fall
+back to deriving from the Cookie (`ct0` / `twid`). Optional
 notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. (`GITHUB_TOKEN` no longer has
 a corresponding implementation; ignore it.)
 
@@ -78,8 +81,8 @@ a corresponding implementation; ignore it.)
 
 ## Test status
 
-- Existing tests: `test_bangumi.py`, `test_cnblog.py`, `test_qireader.py`,
-  `test_v2ex.py`, `test_utils.py`.
+- Existing tests: `test_bangumi.py`, `test_cnblog.py`, `test_credential_guard.py`,
+  `test_github.py`, `test_qireader.py`, `test_twitter.py`, `test_utils.py`, `test_v2ex.py`.
 - No dedicated test files yet for `bilibili`, `weibo`, `zhihu` (prioritize adding them
   when touching those modules).
 
