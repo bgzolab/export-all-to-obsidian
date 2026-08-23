@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Callable, Literal, cast
 
 import click
 import requests
@@ -199,12 +199,10 @@ def probe_twitter_credentials() -> CredentialProbeResult:
     module = "twitter"
     try:
         client = TwitterClient()
-        user_id = client.user_id
-        if not user_id:
-            return CredentialProbeResult.invalid(module, "TWITTER_USER_ID 未配置")
         response = client.session.get(
             TWITTER_LIKES_PATH,
-            params=build_likes_params(user_id, 1),
+            params=build_likes_params(cast(str, client.user_id), 1),
+            timeout=30,
         )
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
