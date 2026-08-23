@@ -43,7 +43,11 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
     cursor: str | None = None
 
     while True:
-        page = get_twitter_like_list(client, cursor=cursor)
+        try:
+            page = get_twitter_like_list(client, cursor=cursor)
+        except Exception as error:
+            print(f"获取 Twitter 点赞列表异常: {error}")
+            break
         if page is None:
             print("获取 Twitter 点赞列表失败，请检查接口")
             break
@@ -53,7 +57,8 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
 
         for tweet in page.tweets:
             try:
-                filename = f"{tweet.author.screen_name}-{tweet.id_str}"
+                author_key = tweet.author.screen_name or tweet.author.id or "i"
+                filename = f"{author_key}-{tweet.id_str}"
 
                 if stop_if_output_exists(
                     output_dir,
