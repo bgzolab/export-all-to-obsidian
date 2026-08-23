@@ -33,6 +33,21 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Configure opencode CI permissions (deny rm)
+        run: |
+          mkdir -p "$HOME/.config/opencode"
+          cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
+          {
+            "permission": {
+              "bash": {
+                "rm *": "deny",
+                "rmdir *": "deny",
+                "shred *": "deny",
+                "truncate *": "deny"
+              }
+            }
+          }
+          EOF
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
