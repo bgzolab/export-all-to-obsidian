@@ -25,7 +25,7 @@ tags:
 
 - 顶层命令: eto
 - 顶层可选参数: --index-file、--prefix
-- 子命令: cnblog、bangumi、github、qireader、twitter、v2ex、zhihu、weibo、bilibili
+- 子命令: cnblog、bangumi、qireader、v2ex、twitter、zhihu、weibo、bilibili、github
 - --index-file 和 --prefix 必须出现在子命令前
 
 ## 子命令输入
@@ -33,12 +33,12 @@ tags:
 - cnblog: -o/--output
 - bangumi: -t/--template、-s/--subject_type、-o/--output、可选 -c/--collection_type、--force
 - qireader: -t/--tag、-o/--output
-- github: -t/--template、-o/--output、可选 --force
 - v2ex: -o/--output
+- twitter: -o/--output、可选 --force
 - zhihu: -c/--collection、-o/--output
 - weibo: -u/--uid、-o/--output、可选 --force
-- twitter: -o/--output、可选 --force
 - bilibili: -f/--fid、-o/--output、可选 --force
+- github: -t/--template、-o/--output、可选 --force
 
 ## 环境变量依赖
 

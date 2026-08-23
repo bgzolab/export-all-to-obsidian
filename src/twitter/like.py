@@ -14,7 +14,7 @@ import json
 from twitter.api_endpoints import TWITTER_LIKES_FEATURES
 from twitter.api_endpoints import TWITTER_LIKES_FIELD_TOGGLES
 from twitter.api_endpoints import TWITTER_LIKES_PATH
-from twitter.cilent import TwitterClient
+from twitter.client import TwitterClient
 from twitter.entity import LikesPage
 
 
@@ -61,7 +61,3 @@ def get_twitter_like_list(
     if not data:
         return None
     return LikesPage.from_dict(data)
-
-
-if __name__ == "__main__":
-    print(get_twitter_like_list(TwitterClient(), 5))

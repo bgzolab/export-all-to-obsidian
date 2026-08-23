@@ -18,7 +18,7 @@ from cnblog.client import CnblogClient
 from qireader.api_endpoints import READ_LATER as QIREADER_READ_LATER
 from qireader.cilent import QiReaderClient
 from twitter.api_endpoints import TWITTER_LIKES_PATH
-from twitter.cilent import TwitterClient
+from twitter.client import TwitterClient
 from twitter.like import build_likes_params
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
@@ -214,7 +214,12 @@ def probe_twitter_credentials() -> CredentialProbeResult:
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("data"):
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(

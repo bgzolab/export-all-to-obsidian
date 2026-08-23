@@ -8,6 +8,9 @@ Twitter 点赞导出流程。
 @Links : https://github.com/bGZo
 """
 from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
+import re
 
 from export_runtime.exporter_support import add_index_entry
 from export_runtime.exporter_support import build_link_target
@@ -16,21 +19,47 @@ from export_runtime.exporter_support import write_markdown_output
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 from utils.template import WebPage
-from twitter.cilent import TwitterClient
+from twitter.client import TwitterClient
 from twitter.like import get_twitter_like_list
 
-TWITTER_CREATED_AT_FORMAT = "%a %b %d %H:%M:%S %z %Y"
+TWITTER_MAX_PAGES = 50
+
+_EN_MONTHS = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
 
 
 def _parse_created_at(value: str) -> str:
-    """解析 Twitter 时间字符串为 ISO 时间。"""
+    """解析 Twitter 时间字符串为 ISO 时间，不依赖运行环境 locale。"""
     if not value:
         return ""
+    # 形如 "Thu Aug 15 12:00:00 +0000 2024"
+    match = re.fullmatch(
+        r"\w+ (\w+) (\d{1,2}) (\d{1,2}):(\d{2}):(\d{2}) ([+-]\d{4}) (\d{4})",
+        value,
+    )
+    if not match:
+        return value
+    month_name, day, hour, minute, second, tz, year = match.groups()
+    month = _EN_MONTHS.get(month_name)
+    if month is None:
+        return value
     try:
-        dt_obj = datetime.strptime(value, TWITTER_CREATED_AT_FORMAT)
-        return dt_obj.strftime("%Y-%m-%dT%H:%M:%S")
+        tz_seconds = int(tz[1:3]) * 3600 + int(tz[3:]) * 60
+        tz_sign = 1 if tz[0] == "+" else -1
+        dt_obj = datetime(
+            int(year),
+            month,
+            int(day),
+            int(hour),
+            int(minute),
+            int(second),
+            tzinfo=timezone(timedelta(seconds=tz_sign * tz_seconds)),
+        )
     except ValueError:
         return value
+    return dt_obj.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> None:
@@ -39,10 +68,15 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
         client = TwitterClient()
     except ValueError as exc:
         print(exc)
+        index_writer.flush("twitter")
         return
     cursor: str | None = None
+    seen_cursors: set[str] = set()
 
     while True:
+        if len(seen_cursors) >= TWITTER_MAX_PAGES:
+            print(f"Twitter 点赞分页已达上限 {TWITTER_MAX_PAGES}，停止导出")
+            break
         try:
             page = get_twitter_like_list(client, cursor=cursor)
         except Exception as error:
@@ -67,6 +101,7 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
                     section_name="twitter",
                     force=force,
                 ):
+                    index_writer.flush("twitter")
                     return
 
                 author_name = tweet.author.name or tweet.author.screen_name or tweet.author.id or "i"
@@ -102,6 +137,12 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
 
         if page.cursor_bottom is None or not page.cursor_bottom.value:
             break
-        cursor = page.cursor_bottom.value
+        next_cursor = page.cursor_bottom.value
+        # 游标未推进时视为接口异常或已到末尾，避免 --force 下死循环
+        if next_cursor in seen_cursors:
+            print("Twitter 点赞游标未推进，停止导出")
+            break
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
 
     index_writer.flush("twitter")

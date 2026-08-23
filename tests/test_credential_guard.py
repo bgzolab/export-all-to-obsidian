@@ -10,7 +10,7 @@ def _fake_twitter_probe(monkeypatch, status_code=200, payload=None, get_error=No
     class FakeResponse:
         def __init__(self, status_code, payload):
             self._status = status_code
-            self._payload = payload or {}
+            self._payload = payload
 
         @property
         def status_code(self):
@@ -59,8 +59,16 @@ def test_probe_twitter_http_error_unknown(monkeypatch):
     assert "HTTP 500" in result.reason
 
 
-def test_probe_twitter_no_data_invalid(monkeypatch):
+def test_probe_twitter_non_json_payload_unknown(monkeypatch):
+    """response.json() 返回 None（非 dict）时应判为 unknown 而非崩溃。"""
     guard = _fake_twitter_probe(monkeypatch, status_code=200, payload=None)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "unknown"
+    assert "解析失败" in result.reason
+
+
+def test_probe_twitter_no_data_invalid(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, status_code=200, payload={})
     result = guard.probe_twitter_credentials()
     assert result.status == "invalid"
 
@@ -175,3 +183,30 @@ def test_cli_runs_export_when_probe_valid(monkeypatch):
 
     assert result.exit_code == 0
     assert called["export"] is True
+
+
+def test_cli_twitter_passes_force_to_export(monkeypatch):
+    from export_to_obsidian import eto
+
+    called = {}
+
+    monkeypatch.setattr(
+        "app.cli.probe_twitter_credentials",
+        lambda: CredentialProbeResult.valid("twitter"),
+    )
+
+    def fake_export(output, index_writer, force=False):
+        called["output"] = output
+        called["force"] = force
+
+    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+    monkeypatch.setattr(
+        "app.credential_guard.notify_invalid_credentials", lambda results: False
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--force"])
+
+    assert result.exit_code == 0
+    assert called["output"] == "output/twitter"
+    assert called["force"] is True

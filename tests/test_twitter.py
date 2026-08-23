@@ -90,7 +90,7 @@ def _sample_response(tweets: list, cursor: dict | None = None) -> dict:
 
 
 def _make_client(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
     monkeypatch.delenv("TWITTER_USER_ID", raising=False)
@@ -99,7 +99,7 @@ def _make_client(monkeypatch):
 
 
 def test_twitter_client_headers_configured(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     client = _make_client(monkeypatch)
     headers = client.session.headers
@@ -113,14 +113,46 @@ def test_twitter_client_headers_configured(monkeypatch):
 
 
 def test_twitter_client_derives_user_id_from_twid(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     client = _make_client(monkeypatch)
     assert client.user_id == "123456789012345678"
 
 
+def test_twitter_client_derives_user_id_from_decoded_twid(monkeypatch):
+    from twitter.client import TwitterClient
+
+    monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; twid=u=987654321098765432; ct0=abc")
+    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    client = TwitterClient()
+    assert client.user_id == "987654321098765432"
+
+
+def test_twitter_client_strips_ct0_trailing_whitespace(monkeypatch):
+    from twitter.client import TwitterClient
+
+    monkeypatch.setenv(
+        "TWITTER_COOKIE", "guest_id=1; twid=u%3D123456789012345678; ct0=csrfabc \n"
+    )
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
+    client = TwitterClient()
+    assert client.session.headers["x-csrf-token"] == "csrfabc"
+
+
+def test_twitter_client_missing_ct0_raises(monkeypatch):
+    from twitter.client import TwitterClient
+
+    monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; twid=u%3D123456789012345678")
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
+    try:
+        TwitterClient()
+        assert False, "应抛出 ValueError"
+    except ValueError as exc:
+        assert "ct0" in str(exc)
+
+
 def test_twitter_client_uses_user_id_env(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
     monkeypatch.setenv("TWITTER_USER_ID", "999")
@@ -129,7 +161,7 @@ def test_twitter_client_uses_user_id_env(monkeypatch):
 
 
 def test_twitter_client_csrf_from_env(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
     monkeypatch.setenv("TWITTER_CSRF_TOKEN", "csrf-from-env")
@@ -138,7 +170,7 @@ def test_twitter_client_csrf_from_env(monkeypatch):
 
 
 def test_twitter_client_missing_cookie_raises(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     monkeypatch.delenv("TWITTER_COOKIE", raising=False)
     try:
@@ -149,7 +181,7 @@ def test_twitter_client_missing_cookie_raises(monkeypatch):
 
 
 def test_twitter_client_missing_user_id_raises(monkeypatch):
-    from twitter.cilent import TwitterClient
+    from twitter.client import TwitterClient
 
     monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; ct0=abc")
     monkeypatch.delenv("TWITTER_USER_ID", raising=False)
@@ -202,6 +234,39 @@ def test_tweet_parsing_legacy_nested_structure():
     assert tweet is not None
     assert tweet.id_str == "222"
     assert tweet.author.screen_name == "bob"
+
+
+def test_tweet_parsing_realistic_legacy_author():
+    """贴近 X 真实响应：作者字段位于 legacy、rest_id 位于顶层。"""
+    from twitter.entity import Tweet
+
+    result = {
+        "__typename": "Tweet",
+        "rest_id": "444",
+        "legacy": {
+            "id_str": "444",
+            "created_at": "Thu Aug 15 12:00:00 +0000 2024",
+            "full_text": "Realistic tweet",
+            "favorite_count": 7,
+            "retweet_count": 3,
+            "reply_count": 1,
+        },
+        "core": {
+            "user_results": {
+                "result": {
+                    "rest_id": "42",
+                    "legacy": {"screen_name": "alice", "name": "Alice"},
+                }
+            }
+        },
+    }
+    tweet = Tweet.from_dict(result)
+    assert tweet is not None
+    assert tweet.id_str == "444"
+    assert tweet.author.screen_name == "alice"
+    assert tweet.author.name == "Alice"
+    assert tweet.author.id == "42"
+    assert tweet.url == "https://x.com/alice/status/444"
 
 
 def test_likes_page_parsing_legacy_timeline_v2():
@@ -272,6 +337,24 @@ def test_likes_page_parsing_tweets_and_cursor():
     assert page.cursor_bottom is not None
     assert page.cursor_bottom.value == "NEXT_CURSOR"
     assert page.cursor_bottom.cursor_type == "Bottom"
+
+
+def test_likes_page_ignores_non_bottom_cursor():
+    from twitter.entity import LikesPage
+
+    tweet = _sample_tweet()
+    top_cursor = {
+        "entryId": "cursor-top-abc",
+        "content": {
+            "entryType": "TimelineTimelineCursor",
+            "value": "TOP_CURSOR",
+            "cursorType": "Top",
+        },
+    }
+    payload = _sample_response([tweet], cursor=top_cursor)
+    page = LikesPage.from_dict(payload["data"])
+    assert len(page.tweets) == 1
+    assert page.cursor_bottom is None
 
 
 def test_get_twitter_like_list_builds_params(monkeypatch):
@@ -486,12 +569,100 @@ def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
 
     exporter_module.get_twitter_like_list = fake_get_like_list
     exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    exporter_module.stop_if_output_exists = lambda *a, **k: False
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
 
     assert (tmp_path / "~alice-111.md").exists()
     assert calls == [None]
+
+
+def test_exporter_stops_when_cursor_repeats(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+    from twitter.entity import LikesPage
+    from twitter.entity import TimelineCursor
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+
+    page = LikesPage(
+        tweets=[
+            Tweet(
+                id_str="111",
+                created_at="Thu Aug 15 12:00:00 +0000 2024",
+                full_text="Hello Twitter",
+                author=TwitterUser(screen_name="alice", name="Alice"),
+            )
+        ],
+        cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
+    )
+
+    calls = []
+
+    def fake_get_like_list(client, count=20, cursor=None):
+        calls.append(cursor)
+        return page
+
+    exporter_module.get_twitter_like_list = fake_get_like_list
+    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    exporter_module.stop_if_output_exists = lambda *a, **k: False
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer)
+
+    assert (tmp_path / "~alice-111.md").exists()
+    assert calls == [None, "NEXT"]
+
+
+def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+    from twitter.entity import LikesPage
+    from twitter.entity import TimelineCursor
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    exporter_module.TWITTER_MAX_PAGES = 3
+
+    page = LikesPage(
+        tweets=[
+            Tweet(
+                id_str="111",
+                created_at="Thu Aug 15 12:00:00 +0000 2024",
+                full_text="Hello Twitter",
+                author=TwitterUser(screen_name="alice", name="Alice"),
+            )
+        ],
+        cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
+    )
+
+    calls = []
+
+    def fake_get_like_list(client, count=20, cursor=None):
+        calls.append(cursor)
+        return LikesPage(
+            tweets=[
+                Tweet(
+                    id_str=f"{len(calls)}",
+                    created_at="Thu Aug 15 12:00:00 +0000 2024",
+                    full_text="Hello",
+                    author=TwitterUser(screen_name=f"alice{len(calls)}", name="A"),
+                )
+            ],
+            cursor_bottom=TimelineCursor(value=f"cursor-{len(calls)}", cursor_type="Bottom"),
+        )
+
+    exporter_module.get_twitter_like_list = fake_get_like_list
+    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    exporter_module.stop_if_output_exists = lambda *a, **k: False
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer)
+
+    assert len(calls) == 3
+    assert (tmp_path / "~alice1-1.md").exists()
 
 
 def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
