@@ -70,7 +70,7 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
                     return
 
                 author_name = tweet.author.name or tweet.author.screen_name
-                context_digest = get_clean_filename(tweet.full_text[:10])
+                context_digest = get_clean_filename(tweet.full_text[:10]) or tweet.id_str
                 title = f"{author_name}:{context_digest}"
 
                 created = _parse_created_at(tweet.created_at)
