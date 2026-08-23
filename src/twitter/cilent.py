@@ -11,6 +11,8 @@ import os
 import re
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from twitter.api_endpoints import TWITTER_BEARER_TOKEN
 from twitter.api_endpoints import TWITTER_COOKIE_ENV
@@ -60,6 +62,19 @@ class TwitterClient:
             )
 
         self.session = requests.Session()
+        # 配置重试：X GraphQL 偶发 429/503 / 连接中断，自动重试并退避
+        retry = Retry(
+            total=5,
+            connect=5,
+            read=5,
+            other=5,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"],
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self.session.headers.update(
             {
                 "Authorization": f"Bearer {TWITTER_BEARER_TOKEN}",
