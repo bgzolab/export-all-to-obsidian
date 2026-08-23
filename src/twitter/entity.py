@@ -7,8 +7,10 @@ Twitter Likes 接口返回的数据模型。
 @Date : 2026-08-19
 @Links : https://github.com/bGZo
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -20,7 +22,7 @@ class TwitterUser:
     id: str = ""
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> "TwitterUser":
+    def from_dict(data: dict[str, Any]) -> "TwitterUser":
         legacy = data.get("legacy") or {}
         core = data.get("core") or {}
         return TwitterUser(
@@ -50,7 +52,7 @@ class Tweet:
         return f"https://x.com/{screen_name}/status/{self.id_str}"
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> Optional["Tweet"]:
+    def from_dict(data: dict[str, Any]) -> "Tweet" | None:
         if data.get("__typename") == "TweetWithVisibilityResults":
             data = data.get("tweet") or {}
 
@@ -89,7 +91,7 @@ class TimelineCursor:
     cursor_type: str
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> "TimelineCursor":
+    def from_dict(data: dict[str, Any]) -> "TimelineCursor":
         return TimelineCursor(
             value=data.get("value", ""),
             cursor_type=data.get("cursorType", ""),
@@ -100,13 +102,13 @@ class TimelineCursor:
 class LikesPage:
     """单页 Likes 结果。"""
 
-    tweets: List[Tweet] = field(default_factory=list)
-    cursor_bottom: Optional[TimelineCursor] = None
+    tweets: list[Tweet] = field(default_factory=list)
+    cursor_bottom: TimelineCursor | None = None
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> "LikesPage":
-        tweets: List[Tweet] = []
-        cursor_bottom: Optional[TimelineCursor] = None
+    def from_dict(data: dict[str, Any]) -> "LikesPage":
+        tweets: list[Tweet] = []
+        cursor_bottom: TimelineCursor | None = None
 
         user_result = (data.get("user") or {}).get("result") or {}
         nested = user_result.get("timeline_v2") or user_result.get("timeline") or {}
