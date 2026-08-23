@@ -93,6 +93,8 @@ def _make_client(monkeypatch):
     from twitter.cilent import TwitterClient
 
     monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
     return TwitterClient()
 
 
@@ -490,3 +492,32 @@ def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
 
     assert (tmp_path / "~alice-111.md").exists()
     assert calls == [None]
+
+
+def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+    from twitter.entity import LikesPage
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+
+    page = LikesPage(
+        tweets=[
+            Tweet(
+                id_str="111",
+                created_at="",
+                full_text="",
+                author=TwitterUser(screen_name="alice", name="Alice"),
+            )
+        ]
+    )
+    exporter_module.get_twitter_like_list = lambda client, count=20, cursor=None: page
+    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer)
+
+    content = (tmp_path / "~alice-111.md").read_text(encoding="utf-8")
+    assert "Alice:111" in content
+    assert "Alice:" not in content.replace("Alice:111", "")
