@@ -56,7 +56,11 @@ def get_twitter_like_list(
         print(f"Twitter Likes 请求失败: HTTP {response.status_code}")
         return None
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError) as exc:
+        print(f"Twitter Likes 响应解析失败: {exc}")
+        return None
     if not isinstance(payload, dict):
         print("Twitter Likes 响应解析失败: 非 JSON 对象")
         return None

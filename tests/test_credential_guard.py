@@ -217,7 +217,7 @@ def test_cli_twitter_passes_force_to_export(monkeypatch):
         lambda: CredentialProbeResult.valid("twitter"),
     )
 
-    def fake_export(output, index_writer, force=False, max_pages=50):
+    def fake_export(output, index_writer, force=False, max_pages=None):
         called["output"] = output
         called["force"] = force
         called["max_pages"] = max_pages
@@ -246,7 +246,7 @@ def test_cli_twitter_passes_max_pages(monkeypatch):
         lambda: CredentialProbeResult.valid("twitter"),
     )
 
-    def fake_export(output, index_writer, force=False, max_pages=50):
+    def fake_export(output, index_writer, force=False, max_pages=None):
         called["max_pages"] = max_pages
 
     monkeypatch.setattr("app.cli.export_twitter", fake_export)

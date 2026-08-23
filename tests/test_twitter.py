@@ -449,6 +449,27 @@ def test_get_twitter_like_list_returns_none_on_non_dict_payload(monkeypatch):
     assert get_twitter_like_list(client) is None
 
 
+def test_get_twitter_like_list_returns_none_on_json_decode_error(monkeypatch):
+    from twitter.like import get_twitter_like_list
+
+    client = _make_client(monkeypatch)
+
+    class FakeSession:
+        def get(self, url, params, **kwargs):
+            return FakeResponse()
+
+    class FakeResponse:
+        @property
+        def status_code(self):
+            return 200
+
+        def json(self):
+            raise json.JSONDecodeError("Expecting value", "doc", 0)
+
+    client.session = FakeSession()
+    assert get_twitter_like_list(client) is None
+
+
 def test_get_twitter_like_list_returns_none_on_non_dict_data(monkeypatch):
     from twitter.like import get_twitter_like_list
 
