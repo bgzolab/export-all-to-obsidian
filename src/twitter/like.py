@@ -10,6 +10,7 @@ Twitter Likes 接口拉取逻辑。
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from twitter.api_endpoints import TWITTER_LIKES_FEATURES
 from twitter.api_endpoints import TWITTER_LIKES_FIELD_TOGGLES
@@ -47,8 +48,7 @@ def get_twitter_like_list(
     cursor: str | None = None,
 ) -> LikesPage | None:
     """拉取指定用户的一页点赞 Tweet。"""
-    user_id = client.user_id
-    assert user_id, "TwitterClient 应保证 user_id 非空"
+    user_id = cast(str, client.user_id)
 
     response = client.session.get(
         TWITTER_LIKES_PATH,
