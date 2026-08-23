@@ -35,14 +35,15 @@ def _parse_created_at(value: str) -> str:
 
 def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> None:
     """导出当前用户点赞 Tweet。"""
-    user_id = TwitterClient().user_id
-    if not user_id:
-        print("TWITTER_USER_ID 未配置且 Cookie 中缺少 twid")
+    try:
+        client = TwitterClient()
+    except ValueError as exc:
+        print(exc)
         return
     cursor: str | None = None
 
     while True:
-        page = get_twitter_like_list(user_id, cursor=cursor)
+        page = get_twitter_like_list(client, cursor=cursor)
         if page is None:
             print("获取 Twitter 点赞列表失败，请检查接口")
             break

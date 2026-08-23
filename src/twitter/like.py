@@ -7,7 +7,7 @@ Twitter Likes 接口拉取逻辑。
 @Date : 2026-08-19
 @Links : https://github.com/bGZo
 """
-from typing import Optional
+from __future__ import annotations
 
 import json
 
@@ -18,13 +18,12 @@ from twitter.cilent import TwitterClient
 from twitter.entity import LikesPage
 
 
-def get_twitter_like_list(
+def build_likes_params(
     user_id: str,
-    count: int = 20,
-    cursor: Optional[str] = None,
-) -> Optional[LikesPage]:
-    """拉取指定用户的一页点赞 Tweet。"""
-    client = TwitterClient()
+    count: int,
+    cursor: str | None = None,
+) -> dict[str, str]:
+    """构造 Likes GraphQL 查询参数。"""
     variables = {
         "userId": user_id,
         "count": count,
@@ -35,14 +34,26 @@ def get_twitter_like_list(
     }
     if cursor:
         variables["cursor"] = cursor
+    return {
+        "features": json.dumps(TWITTER_LIKES_FEATURES),
+        "fieldToggles": json.dumps(TWITTER_LIKES_FIELD_TOGGLES),
+        "variables": json.dumps(variables),
+    }
+
+
+def get_twitter_like_list(
+    client: TwitterClient,
+    count: int = 20,
+    cursor: str | None = None,
+) -> LikesPage | None:
+    """拉取指定用户的一页点赞 Tweet。"""
+    user_id = client.user_id
+    if not user_id:
+        return None
 
     response = client.session.get(
         TWITTER_LIKES_PATH,
-        params={
-            "features": json.dumps(TWITTER_LIKES_FEATURES),
-            "fieldToggles": json.dumps(TWITTER_LIKES_FIELD_TOGGLES),
-            "variables": json.dumps(variables),
-        },
+        params=build_likes_params(user_id, count, cursor),
     )
     if response.status_code != 200:
         return None
@@ -55,4 +66,4 @@ def get_twitter_like_list(
 
 
 if __name__ == "__main__":
-    print(get_twitter_like_list("123456789012345678", 5))
+    print(get_twitter_like_list(TwitterClient(), 5))

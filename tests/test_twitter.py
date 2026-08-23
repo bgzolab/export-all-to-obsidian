@@ -260,11 +260,10 @@ def test_likes_page_parsing_tweets_and_cursor():
 
 
 def test_get_twitter_like_list_builds_params(monkeypatch):
-    from twitter import like as like_module
     from twitter.entity import LikesPage
     from twitter.like import get_twitter_like_list
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    client = _make_client(monkeypatch)
 
     captured = {}
 
@@ -272,8 +271,7 @@ def test_get_twitter_like_list_builds_params(monkeypatch):
         def get(self, url, params):
             captured["url"] = url
             captured["params"] = params
-            fake = FakeResponse(json.loads(json.dumps(_sample_response([]))))
-            return fake
+            return FakeResponse(json.loads(json.dumps(_sample_response([]))))
 
     class FakeResponse:
         def __init__(self, payload):
@@ -286,10 +284,8 @@ def test_get_twitter_like_list_builds_params(monkeypatch):
         def json(self):
             return self._payload
 
-    like_module.TwitterClient = lambda: type(
-        "C", (), {"session": FakeSession()}
-    )()
-    page = get_twitter_like_list("123456789012345678", count=5, cursor="CURSOR")
+    client.session = FakeSession()
+    page = get_twitter_like_list(client, count=5, cursor="CURSOR")
     assert isinstance(page, LikesPage)
     assert captured["url"].endswith("/Likes")
     variables = json.loads(captured["params"]["variables"])
@@ -297,6 +293,25 @@ def test_get_twitter_like_list_builds_params(monkeypatch):
     assert variables["count"] == 5
     assert variables["cursor"] == "CURSOR"
     assert "features" in captured["params"]
+
+
+def test_build_likes_params_no_cursor():
+    from twitter.like import build_likes_params
+
+    params = build_likes_params("123", 3)
+    variables = json.loads(params["variables"])
+    assert variables["userId"] == "123"
+    assert variables["count"] == 3
+    assert "cursor" not in variables
+    assert "features" in params
+    assert "fieldToggles" in params
+
+
+def test_build_likes_params_with_cursor():
+    from twitter.like import build_likes_params
+
+    params = build_likes_params("123", 3, cursor="NEXT")
+    assert json.loads(params["variables"])["cursor"] == "NEXT"
 
 
 def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
@@ -322,7 +337,7 @@ def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_get_like_list(user_id, count=20, cursor=None):
+    def fake_get_like_list(client, count=20, cursor=None):
         calls.append(cursor)
         if cursor == "NEXT":
             return LikesPage(tweets=[])
@@ -367,7 +382,7 @@ def test_exporter_stops_on_existing_file(monkeypatch, tmp_path):
             )
         ]
     )
-    exporter_module.get_twitter_like_list = lambda user_id, count=20, cursor=None: page
+    exporter_module.get_twitter_like_list = lambda client, count=20, cursor=None: page
     exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))

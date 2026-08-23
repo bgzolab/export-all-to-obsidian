@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
 from typing import Callable, Literal
@@ -18,10 +17,9 @@ from cnblog.api_endpoints import USER as CNBLOG_USER
 from cnblog.client import CnblogClient
 from qireader.api_endpoints import READ_LATER as QIREADER_READ_LATER
 from qireader.cilent import QiReaderClient
-from twitter.api_endpoints import TWITTER_LIKES_FEATURES
-from twitter.api_endpoints import TWITTER_LIKES_FIELD_TOGGLES
 from twitter.api_endpoints import TWITTER_LIKES_PATH
 from twitter.cilent import TwitterClient
+from twitter.like import build_likes_params
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
 from weibo.api_endpoints import WEIBO_LIKE_URL
@@ -201,22 +199,12 @@ def probe_twitter_credentials() -> CredentialProbeResult:
     module = "twitter"
     try:
         client = TwitterClient()
+        user_id = client.user_id
+        if not user_id:
+            return CredentialProbeResult.invalid(module, "TWITTER_USER_ID 未配置")
         response = client.session.get(
             TWITTER_LIKES_PATH,
-            params={
-                "features": json.dumps(TWITTER_LIKES_FEATURES),
-                "fieldToggles": json.dumps(TWITTER_LIKES_FIELD_TOGGLES),
-                "variables": json.dumps(
-                    {
-                        "userId": client.user_id,
-                        "count": 1,
-                        "includePromotedContent": False,
-                        "withClientEventToken": False,
-                        "withBirdwatchNotes": False,
-                        "withVoice": True,
-                    }
-                ),
-            },
+            params=build_likes_params(user_id, 1),
         )
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
