@@ -170,6 +170,19 @@ def test_tweet_parsing():
     assert tweet.url == "https://x.com/alice/status/111"
 
 
+def test_tweet_url_falls_back_to_i_status_when_no_screen_name():
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    tweet = Tweet(
+        id_str="111",
+        created_at="",
+        full_text="x",
+        author=TwitterUser(screen_name="", name=""),
+    )
+    assert tweet.url == "https://x.com/i/status/111"
+
+
 def test_tweet_parsing_legacy_nested_structure():
     """兼容旧版 timeline_v2 深层嵌套结构。"""
     from twitter.entity import Tweet

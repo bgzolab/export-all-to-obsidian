@@ -48,11 +48,11 @@ class Tweet:
     @property
     def url(self) -> str:
         """构造 Tweet 链接。"""
-        screen_name = self.author.screen_name or "x"
+        screen_name = self.author.screen_name or "i"
         return f"https://x.com/{screen_name}/status/{self.id_str}"
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> "Tweet" | None:
+    def from_dict(data: dict[str, Any]) -> Tweet | None:
         if data.get("__typename") == "TweetWithVisibilityResults":
             data = data.get("tweet") or {}
 
