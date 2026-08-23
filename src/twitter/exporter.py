@@ -100,7 +100,7 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
             except Exception as error:
                 print(f"处理报文发生错误: {error}，跳过处理")
 
-        if page.cursor_bottom is None:
+        if page.cursor_bottom is None or not page.cursor_bottom.value:
             break
         cursor = page.cursor_bottom.value
 

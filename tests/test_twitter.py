@@ -453,3 +453,40 @@ def test_exporter_filename_falls_back_to_author_id(monkeypatch, tmp_path):
     exporter_module.export(str(tmp_path), writer)
 
     assert (tmp_path / "~42-111.md").exists()
+
+
+def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+    from twitter.entity import LikesPage
+    from twitter.entity import TimelineCursor
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+
+    page = LikesPage(
+        tweets=[
+            Tweet(
+                id_str="111",
+                created_at="Thu Aug 15 12:00:00 +0000 2024",
+                full_text="Hello Twitter",
+                author=TwitterUser(screen_name="alice", name="Alice"),
+            )
+        ],
+        cursor_bottom=TimelineCursor(value="", cursor_type="Bottom"),
+    )
+
+    calls = []
+
+    def fake_get_like_list(client, count=20, cursor=None):
+        calls.append(cursor)
+        return page
+
+    exporter_module.get_twitter_like_list = fake_get_like_list
+    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer)
+
+    assert (tmp_path / "~alice-111.md").exists()
+    assert calls == [None]
