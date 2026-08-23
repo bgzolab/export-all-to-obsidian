@@ -52,14 +52,13 @@ class TwitterClient:
                 "or Cookie missing ct0."
             )
 
-        self.user_id = os.getenv(TWITTER_USER_ID_ENV) or _derive_user_id_from_cookie(
-            cookie
-        )
-        if not self.user_id:
+        user_id = os.getenv(TWITTER_USER_ID_ENV) or _derive_user_id_from_cookie(cookie)
+        if not user_id:
             raise ValueError(
                 f"{TWITTER_USER_ID_ENV} environment variable is not set "
                 "or Cookie missing twid."
             )
+        self.user_id: str = user_id
 
         self.session = requests.Session()
         # 配置重试：X GraphQL 偶发 429/503 / 连接中断，自动重试并退避
