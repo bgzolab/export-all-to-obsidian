@@ -61,6 +61,6 @@ def get_twitter_like_list(
         print("Twitter Likes 响应解析失败: 非 JSON 对象")
         return None
     data = payload.get("data")
-    if not data:
+    if not isinstance(data, dict) or not data:
         return None
     return LikesPage.from_dict(data)

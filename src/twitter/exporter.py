@@ -66,9 +66,11 @@ def export(
     output_dir: str,
     index_writer: IndexWriter,
     force: bool = False,
-    max_pages: int = TWITTER_MAX_PAGES,
+    max_pages: int | None = None,
 ) -> None:
     """导出当前用户点赞 Tweet。"""
+    # None 或非法值回退到默认上限，避免误传 0/负数导致静默无输出
+    max_pages = max_pages if max_pages and max_pages > 0 else TWITTER_MAX_PAGES
     try:
         client = TwitterClient()
     except ValueError as exc:

@@ -233,7 +233,7 @@ def test_cli_twitter_passes_force_to_export(monkeypatch):
     assert result.exit_code == 0
     assert called["output"] == "output/twitter"
     assert called["force"] is True
-    assert called["max_pages"] == 50
+    assert called["max_pages"] is None
 
 
 def test_cli_twitter_passes_max_pages(monkeypatch):
@@ -259,3 +259,23 @@ def test_cli_twitter_passes_max_pages(monkeypatch):
 
     assert result.exit_code == 0
     assert called["max_pages"] == 5
+
+
+def test_cli_twitter_rejects_max_pages_zero(monkeypatch):
+    from export_to_obsidian import eto
+
+    monkeypatch.setattr(
+        "app.cli.probe_twitter_credentials",
+        lambda: CredentialProbeResult.valid("twitter"),
+    )
+
+    def fake_export(output, index_writer, force=False, max_pages=None):
+        raise AssertionError("不应调用 export")
+
+    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+
+    runner = CliRunner()
+    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--max-pages", "0"])
+
+    assert result.exit_code != 0
+    assert "Invalid value" in result.output

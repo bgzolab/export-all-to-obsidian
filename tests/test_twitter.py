@@ -449,6 +449,27 @@ def test_get_twitter_like_list_returns_none_on_non_dict_payload(monkeypatch):
     assert get_twitter_like_list(client) is None
 
 
+def test_get_twitter_like_list_returns_none_on_non_dict_data(monkeypatch):
+    from twitter.like import get_twitter_like_list
+
+    client = _make_client(monkeypatch)
+
+    class FakeSession:
+        def get(self, url, params, **kwargs):
+            return FakeResponse()
+
+    class FakeResponse:
+        @property
+        def status_code(self):
+            return 200
+
+        def json(self):
+            return {"data": ["not", "a", "dict"]}
+
+    client.session = FakeSession()
+    assert get_twitter_like_list(client) is None
+
+
 def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
     from twitter.entity import LikesPage
@@ -478,8 +499,8 @@ def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
             return LikesPage(tweets=[])
         return page
 
-    exporter_module.get_twitter_like_list = fake_get_like_list
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", fake_get_like_list)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
@@ -517,8 +538,8 @@ def test_exporter_stops_on_existing_file(monkeypatch, tmp_path):
             )
         ]
     )
-    exporter_module.get_twitter_like_list = lambda client, count=20, cursor=None: page
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", lambda client, count=20, cursor=None: page)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
@@ -534,9 +555,9 @@ def test_exporter_stops_on_fetch_exception_and_flushes(monkeypatch, tmp_path):
     def boom(client, count=20, cursor=None):
         raise RuntimeError("network down")
 
-    exporter_module.get_twitter_like_list = boom
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
-    exporter_module.add_index_entry = lambda *a, **k: None
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", boom)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
+    monkeypatch.setattr(exporter_module, "add_index_entry", lambda *a, **k: None)
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
@@ -566,8 +587,8 @@ def test_exporter_filename_falls_back_to_author_id(monkeypatch, tmp_path):
         cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
     )
 
-    exporter_module.get_twitter_like_list = lambda client, count=20, cursor=None: page
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", lambda client, count=20, cursor=None: page)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
@@ -602,9 +623,9 @@ def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
         calls.append(cursor)
         return page
 
-    exporter_module.get_twitter_like_list = fake_get_like_list
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
-    exporter_module.stop_if_output_exists = lambda *a, **k: False
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", fake_get_like_list)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
+    monkeypatch.setattr(exporter_module, "stop_if_output_exists", lambda *a, **k: False)
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
@@ -640,9 +661,9 @@ def test_exporter_stops_when_cursor_repeats(monkeypatch, tmp_path):
         calls.append(cursor)
         return page
 
-    exporter_module.get_twitter_like_list = fake_get_like_list
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
-    exporter_module.stop_if_output_exists = lambda *a, **k: False
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", fake_get_like_list)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
+    monkeypatch.setattr(exporter_module, "stop_if_output_exists", lambda *a, **k: False)
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)
@@ -688,15 +709,59 @@ def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
             cursor_bottom=TimelineCursor(value=f"cursor-{len(calls)}", cursor_type="Bottom"),
         )
 
-    exporter_module.get_twitter_like_list = fake_get_like_list
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
-    exporter_module.stop_if_output_exists = lambda *a, **k: False
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", fake_get_like_list)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
+    monkeypatch.setattr(exporter_module, "stop_if_output_exists", lambda *a, **k: False)
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer, max_pages=3)
 
     assert len(calls) == 3
     assert (tmp_path / "~alice1-1.md").exists()
+
+
+def test_exporter_falls_back_to_default_when_max_pages_zero(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+    from twitter.entity import LikesPage
+    from twitter.entity import TimelineCursor
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+
+    page = LikesPage(
+        tweets=[
+            Tweet(
+                id_str="111",
+                created_at="Thu Aug 15 12:00:00 +0000 2024",
+                full_text="Hello Twitter",
+                author=TwitterUser(screen_name="alice", name="Alice"),
+            )
+        ],
+        cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
+    )
+
+    calls = []
+
+    def fake_get_like_list(client, count=20, cursor=None):
+        calls.append(cursor)
+        return page
+
+    monkeypatch.setattr(
+        exporter_module, "get_twitter_like_list", fake_get_like_list
+    )
+    monkeypatch.setattr(
+        exporter_module,
+        "TwitterClient",
+        lambda: type("C", (), {"user_id": "123456789012345678"})(),
+    )
+    monkeypatch.setattr(exporter_module, "stop_if_output_exists", lambda *a, **k: False)
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer, max_pages=0)
+
+    # 若 max_pages 未回退到默认值，则会在 0 >= 0 时立即停止，calls 为空
+    assert calls == [None, "NEXT"]
 
 
 def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
@@ -717,8 +782,8 @@ def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
             )
         ]
     )
-    exporter_module.get_twitter_like_list = lambda client, count=20, cursor=None: page
-    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    monkeypatch.setattr(exporter_module, "get_twitter_like_list", lambda client, count=20, cursor=None: page)
+    monkeypatch.setattr(exporter_module, "TwitterClient", lambda: type("C", (), {"user_id": "123456789012345678"})())
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
     exporter_module.export(str(tmp_path), writer)

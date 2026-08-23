@@ -21,6 +21,7 @@ from cnblog.exporter import export as export_cnblog
 from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
 from twitter.exporter import export as export_twitter
+from twitter.exporter import TWITTER_MAX_PAGES
 from v2ex.exporter import export as export_v2ex
 from weibo.exporter import export as export_weibo
 from zhihu.exporter import export as export_zhihu
@@ -121,21 +122,17 @@ def v2ex(output: str) -> None:
 @click.option(
     "--max-pages",
     required=False,
-    type=int,
+    type=click.IntRange(min=1),
     default=None,
-    help="Twitter 点赞最大分页数（默认 50，即约 1000 条）",
+    help=f"Twitter 点赞最大分页数（默认 {TWITTER_MAX_PAGES}，即约 "
+    f"{TWITTER_MAX_PAGES * 20} 条）",
 )
 def twitter(output: str, force: bool, max_pages: int | None) -> None:
     """导出 Twitter 点赞。"""
     run_with_credential_guard(
         "twitter",
         probe_twitter_credentials,
-        lambda: export_twitter(
-            output,
-            get_index_writer(),
-            force,
-            max_pages if max_pages is not None else 50,
-        ),
+        lambda: export_twitter(output, get_index_writer(), force, max_pages),
     )
 
 
