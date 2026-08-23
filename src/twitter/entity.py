@@ -28,7 +28,7 @@ class TwitterUser:
         return TwitterUser(
             screen_name=legacy.get("screen_name") or core.get("screen_name") or "",
             name=legacy.get("name") or core.get("name") or "",
-            id=legacy.get("id") or data.get("id") or data.get("rest_id") or "",
+            id=legacy.get("id_str") or data.get("id") or data.get("rest_id") or "",
         )
 
 
