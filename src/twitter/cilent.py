@@ -27,7 +27,7 @@ USER_AGENT = (
 
 def _derive_user_id_from_cookie(cookie: str) -> str | None:
     """从 Cookie 的 twid=u%3D<id> 推导用户 ID。"""
-    match = re.search(r"twid=u%3D(\d+)", cookie)
+    match = re.search(r"twid=u%3D(\d+)", cookie, flags=re.IGNORECASE)
     if match:
         return match.group(1)
     return None
@@ -43,7 +43,7 @@ class TwitterClient:
 
         csrf_token = os.getenv(TWITTER_CSRF_ENV)
         if not csrf_token:
-            match = re.search(r"ct0=([^;]+)", cookie)
+            match = re.search(r"ct0=([^;]+)", cookie, flags=re.IGNORECASE)
             if match:
                 csrf_token = match.group(1)
         if not csrf_token:
