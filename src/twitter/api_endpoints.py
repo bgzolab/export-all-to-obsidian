@@ -7,6 +7,8 @@
 """
 
 # Likes GraphQL 接口（网页端，Cookie 鉴权）
+# 注意：路径中的 queryId（I9w8GfWYSc6gIt4k5CVfSg）会被 X 周期性轮换，
+# 轮换后需从网页请求中重新抓取并更新此值，否则接口将返回错误。
 TWITTER_LIKES_PATH = "https://x.com/i/api/graphql/I9w8GfWYSc6gIt4k5CVfSg/Likes"
 
 # 与 bruno/twitter.sh 一致的 GraphQL 查询参数
