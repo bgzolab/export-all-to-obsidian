@@ -11,7 +11,7 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
 
 - Thin entry: `src/export_to_obsidian.py` -> `src/app/cli.py`
 - Platform modules (all registered in the CLI): `bangumi`, `bilibili`, `cnblog`,
-  `qireader`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
+  `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
 - Shared runtime: `src/export_runtime/` (index_writer, exporter_support)
 - Common utilities: `src/utils/`, `src/entity/`
 - `src/demo/` is scaffolding; `src/github/` is an empty dir and not registered as a
