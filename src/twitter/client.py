@@ -64,11 +64,12 @@ class TwitterClient:
         # 配置重试：X GraphQL 偶发 503 / 连接中断自动重试并退避。
         # 注意：429（限流）窗口长达约 15 分钟，短退避重试只会徒增耗时，
         # 因此不列入 status_forcelist，交由上层直接结束本轮导出。
+        # 重试次数刻意压低，避免持续性 5xx 时单页阻塞过久（2 次退避 1+2=3s）。
         retry = Retry(
-            total=5,
-            connect=5,
-            read=5,
-            other=5,
+            total=2,
+            connect=2,
+            read=2,
+            other=2,
             backoff_factor=1,
             status_forcelist=[500, 502, 503, 504],
             allowed_methods=["GET", "POST"],

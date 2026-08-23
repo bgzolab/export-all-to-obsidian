@@ -51,7 +51,7 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 - `--index-file` is a **top-level option and must come before the subcommand**; when
   omitted, the index is printed to the terminal.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
-  `v2ex(-o)`, `twitter(-o [--force])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
+  `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
   `bilibili(-f -o [--force])`.
 - `--force` currently only affects bangumi, weibo, bilibili, and twitter.
 

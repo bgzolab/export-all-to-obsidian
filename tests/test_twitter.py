@@ -144,11 +144,8 @@ def test_twitter_client_missing_ct0_raises(monkeypatch):
 
     monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; twid=u%3D123456789012345678")
     monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
-    try:
+    with pytest.raises(ValueError, match="ct0"):
         TwitterClient()
-        assert False, "应抛出 ValueError"
-    except ValueError as exc:
-        assert "ct0" in str(exc)
 
 
 def test_twitter_client_uses_user_id_env(monkeypatch):
@@ -173,11 +170,8 @@ def test_twitter_client_missing_cookie_raises(monkeypatch):
     from twitter.client import TwitterClient
 
     monkeypatch.delenv("TWITTER_COOKIE", raising=False)
-    try:
+    with pytest.raises(ValueError, match="TWITTER_COOKIE"):
         TwitterClient()
-        assert False, "应抛出 ValueError"
-    except ValueError as exc:
-        assert "TWITTER_COOKIE" in str(exc)
 
 
 def test_twitter_client_missing_user_id_raises(monkeypatch):
@@ -185,11 +179,8 @@ def test_twitter_client_missing_user_id_raises(monkeypatch):
 
     monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; ct0=abc")
     monkeypatch.delenv("TWITTER_USER_ID", raising=False)
-    try:
+    with pytest.raises(ValueError, match="TWITTER_USER_ID"):
         TwitterClient()
-        assert False, "应抛出 ValueError"
-    except ValueError as exc:
-        assert "TWITTER_USER_ID" in str(exc)
 
 
 def test_tweet_parsing():
@@ -357,6 +348,29 @@ def test_likes_page_ignores_non_bottom_cursor():
     assert page.cursor_bottom is None
 
 
+def test_parse_created_at_preserves_timezone():
+    from twitter.exporter import _parse_created_at
+
+    assert (
+        _parse_created_at("Thu Aug 15 12:00:00 +0000 2024")
+        == "2024-08-15T12:00:00+0000"
+    )
+    assert (
+        _parse_created_at("Fri Aug 16 09:30:00 +0800 2024")
+        == "2024-08-16T09:30:00+0800"
+    )
+
+
+def test_parse_created_at_returns_raw_on_invalid():
+    from twitter.exporter import _parse_created_at
+
+    assert _parse_created_at("") == ""
+    assert _parse_created_at("not a date") == "not a date"
+    assert _parse_created_at("Foo Bar 99 99:99:99 +0000 2024") == (
+        "Foo Bar 99 99:99:99 +0000 2024"
+    )
+
+
 def test_get_twitter_like_list_builds_params(monkeypatch):
     from twitter.entity import LikesPage
     from twitter.like import get_twitter_like_list
@@ -412,6 +426,27 @@ def test_build_likes_params_with_cursor():
 
     params = build_likes_params("123", 3, cursor="NEXT")
     assert json.loads(params["variables"])["cursor"] == "NEXT"
+
+
+def test_get_twitter_like_list_returns_none_on_non_dict_payload(monkeypatch):
+    from twitter.like import get_twitter_like_list
+
+    client = _make_client(monkeypatch)
+
+    class FakeSession:
+        def get(self, url, params, **kwargs):
+            return FakeResponse()
+
+    class FakeResponse:
+        @property
+        def status_code(self):
+            return 200
+
+        def json(self):
+            return ["not", "a", "dict"]
+
+    client.session = FakeSession()
+    assert get_twitter_like_list(client) is None
 
 
 def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
@@ -624,7 +659,6 @@ def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
     from twitter.entity import TwitterUser
 
     monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
-    exporter_module.TWITTER_MAX_PAGES = 3
 
     page = LikesPage(
         tweets=[
@@ -659,7 +693,7 @@ def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
     exporter_module.stop_if_output_exists = lambda *a, **k: False
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))
-    exporter_module.export(str(tmp_path), writer)
+    exporter_module.export(str(tmp_path), writer, max_pages=3)
 
     assert len(calls) == 3
     assert (tmp_path / "~alice1-1.md").exists()

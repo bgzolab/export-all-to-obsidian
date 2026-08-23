@@ -59,10 +59,15 @@ def _parse_created_at(value: str) -> str:
         )
     except ValueError:
         return value
-    return dt_obj.strftime("%Y-%m-%dT%H:%M:%S")
+    return dt_obj.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
-def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> None:
+def export(
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+    max_pages: int = TWITTER_MAX_PAGES,
+) -> None:
     """导出当前用户点赞 Tweet。"""
     try:
         client = TwitterClient()
@@ -74,8 +79,8 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
     seen_cursors: set[str] = set()
 
     while True:
-        if len(seen_cursors) >= TWITTER_MAX_PAGES:
-            print(f"Twitter 点赞分页已达上限 {TWITTER_MAX_PAGES}，停止导出")
+        if len(seen_cursors) >= max_pages:
+            print(f"Twitter 点赞分页已达上限 {max_pages}，停止导出")
             break
         try:
             page = get_twitter_like_list(client, cursor=cursor)
@@ -101,7 +106,6 @@ def export(output_dir: str, index_writer: IndexWriter, force: bool = False) -> N
                     section_name="twitter",
                     force=force,
                 ):
-                    index_writer.flush("twitter")
                     return
 
                 author_name = tweet.author.name or tweet.author.screen_name or tweet.author.id or "i"

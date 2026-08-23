@@ -34,7 +34,7 @@ tags:
 - bangumi: -t/--template、-s/--subject_type、-o/--output、可选 -c/--collection_type、--force
 - qireader: -t/--tag、-o/--output
 - v2ex: -o/--output
-- twitter: -o/--output、可选 --force
+- twitter: -o/--output、可选 --force、可选 --max-pages
 - zhihu: -c/--collection、-o/--output
 - weibo: -u/--uid、-o/--output、可选 --force
 - bilibili: -f/--fid、-o/--output、可选 --force

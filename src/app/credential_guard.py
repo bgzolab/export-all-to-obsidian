@@ -197,6 +197,8 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
 
 def probe_twitter_credentials() -> CredentialProbeResult:
     module = "twitter"
+    # 注意：此处对 Likes 接口发起一次真实请求用于验活，会消耗 X 的限流配额。
+    # 每次导出启动都会少掉一条配额，排障时留意为何一启动即触发 429。
     try:
         client = TwitterClient()
         response = client.session.get(

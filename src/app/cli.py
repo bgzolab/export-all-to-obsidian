@@ -118,12 +118,24 @@ def v2ex(output: str) -> None:
 @eto.command()
 @click.option("--output", "-o", required=True, help="输出目录")
 @click.option("--force", required=False, is_flag=True, help="是否强制覆盖")
-def twitter(output: str, force: bool) -> None:
+@click.option(
+    "--max-pages",
+    required=False,
+    type=int,
+    default=None,
+    help="Twitter 点赞最大分页数（默认 50，即约 1000 条）",
+)
+def twitter(output: str, force: bool, max_pages: int | None) -> None:
     """导出 Twitter 点赞。"""
     run_with_credential_guard(
         "twitter",
         probe_twitter_credentials,
-        lambda: export_twitter(output, get_index_writer(), force),
+        lambda: export_twitter(
+            output,
+            get_index_writer(),
+            force,
+            max_pages if max_pages is not None else 50,
+        ),
     )
 
 
