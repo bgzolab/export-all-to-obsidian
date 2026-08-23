@@ -48,14 +48,15 @@ def get_twitter_like_list(
 ) -> LikesPage | None:
     """拉取指定用户的一页点赞 Tweet。"""
     user_id = client.user_id
-    if not user_id:
-        return None
+    assert user_id, "TwitterClient 应保证 user_id 非空"
 
     response = client.session.get(
         TWITTER_LIKES_PATH,
         params=build_likes_params(user_id, count, cursor),
+        timeout=30,
     )
     if response.status_code != 200:
+        print(f"Twitter Likes 请求失败: HTTP {response.status_code}")
         return None
 
     payload = response.json()

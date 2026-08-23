@@ -268,9 +268,10 @@ def test_get_twitter_like_list_builds_params(monkeypatch):
     captured = {}
 
     class FakeSession:
-        def get(self, url, params):
+        def get(self, url, params, **kwargs):
             captured["url"] = url
             captured["params"] = params
+            captured["timeout"] = kwargs.get("timeout")
             return FakeResponse(json.loads(json.dumps(_sample_response([]))))
 
     class FakeResponse:
@@ -293,6 +294,7 @@ def test_get_twitter_like_list_builds_params(monkeypatch):
     assert variables["count"] == 5
     assert variables["cursor"] == "CURSOR"
     assert "features" in captured["params"]
+    assert captured["timeout"] == 30
 
 
 def test_build_likes_params_no_cursor():
@@ -389,3 +391,52 @@ def test_exporter_stops_on_existing_file(monkeypatch, tmp_path):
     exporter_module.export(str(tmp_path), writer)
 
     assert (tmp_path / "~alice-111.md").read_text(encoding="utf-8") == "existing"
+
+
+def test_exporter_stops_on_fetch_exception_and_flushes(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+
+    def boom(client, count=20, cursor=None):
+        raise RuntimeError("network down")
+
+    exporter_module.get_twitter_like_list = boom
+    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+    exporter_module.add_index_entry = lambda *a, **k: None
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer)
+
+    index = (tmp_path / "index.md").read_text(encoding="utf-8")
+    assert "## twitter" in index
+
+
+def test_exporter_filename_falls_back_to_author_id(monkeypatch, tmp_path):
+    from twitter import exporter as exporter_module
+    from twitter.entity import LikesPage
+    from twitter.entity import TimelineCursor
+    from twitter.entity import Tweet
+    from twitter.entity import TwitterUser
+
+    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+
+    page = LikesPage(
+        tweets=[
+            Tweet(
+                id_str="111",
+                created_at="Thu Aug 15 12:00:00 +0000 2024",
+                full_text="Hello Twitter",
+                author=TwitterUser(screen_name="", name="", id="42"),
+            )
+        ],
+        cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
+    )
+
+    exporter_module.get_twitter_like_list = lambda client, count=20, cursor=None: page
+    exporter_module.TwitterClient = lambda: type("C", (), {"user_id": "123456789012345678"})()
+
+    writer = IndexWriter(file_path=str(tmp_path / "index.md"))
+    exporter_module.export(str(tmp_path), writer)
+
+    assert (tmp_path / "~42-111.md").exists()
