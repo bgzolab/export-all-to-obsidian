@@ -88,3 +88,4 @@ docs/implementation-plans/*.md
 debug/
 tests/import-from-github-url/
 bruno/
+cookies.txt
