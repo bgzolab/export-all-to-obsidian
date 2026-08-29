@@ -9,9 +9,9 @@ from typing import Callable, Literal
 import click
 import requests
 
+from app.cookies import CookiesConfigError
 from bangumi.api_endpoints import USER_CURRENT as BANGUMI_USER_CURRENT
 from bangumi.client import BangumiClient
-from app.cookies import CookiesConfigError
 from bilibili.api_endpoints import BILIBILI_FAV_URL
 from bilibili.cilent import BilibiliClient
 from cnblog.api_endpoints import USER as CNBLOG_USER
@@ -111,8 +111,6 @@ def probe_bangumi_credentials() -> CredentialProbeResult:
     try:
         client = BangumiClient()
         response = client.session.get(BANGUMI_USER_CURRENT)
-    except CookiesConfigError as exc:
-        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -134,8 +132,6 @@ def probe_cnblog_credentials() -> CredentialProbeResult:
     try:
         client = CnblogClient()
         response = client.session.get(CNBLOG_USER)
-    except CookiesConfigError as exc:
-        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:

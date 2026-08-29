@@ -58,6 +58,62 @@ def test_flag_false_host_only_exact_match(tmp_path):
     assert load_cookie_header(path, ("api.zhihu.com",)) == "host=v1"
 
 
+def test_flag_numeric_zero_treated_as_false(tmp_path):
+    """数字 flag 0 应与 FALSE 等价，host-only Cookie 不泄漏到父域。"""
+    content = "api.zhihu.com\t0\t/\tTRUE\t0\thost\tv1\n"
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, ("zhihu.com",)) == ""
+
+
+def test_expired_cookie_skipped_session_cookie_kept(tmp_path):
+    """过期条目（非零过去时间戳）应跳过；会话 Cookie（0）保留。"""
+    content = (
+        ".zhihu.com\tTRUE\t/\tTRUE\t1000\told\tv\n"
+        ".zhihu.com\tTRUE\t/\tTRUE\t0\tsess\ts\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(path, ("zhihu.com",))
+    assert header == "sess=s"
+
+
+def test_same_name_across_domains_both_kept(tmp_path):
+    """多域同名 Cookie 应共存，不做跨域覆盖。"""
+    content = (
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tAAA\n"
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tBBB\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(path, ("x.com", "twitter.com"))
+    assert header == "ct0=AAA; ct0=BBB"
+
+
+def test_utf8_bom_stripped(tmp_path):
+    """UTF-8 BOM 应被剥除，host-only 首条 Cookie 不被静默丢弃。"""
+    content = "zhihu.com\tFALSE\t/\tTRUE\t0\thost\tv1\n"
+    path = _write(tmp_path, content)
+    with open(path, "wb") as f:
+        f.write(b"\xef\xbb\xbf" + content.encode("utf-8"))
+    assert load_cookie_header(path, ("zhihu.com",)) == "host=v1"
+
+
+def test_non_utf8_encoding_raises_config_error(monkeypatch, tmp_path):
+    """非 UTF-8 字节应转抛 CookiesConfigError，而非 UnicodeDecodeError 泄漏。"""
+    path = tmp_path / "cookies.txt"
+    path.write_bytes(b".zhihu.com\tTRUE\t/\tTRUE\t0\tbad\t\xff\xfe\n")
+    monkeypatch.setenv("COOKIES", str(path))
+    from app.cookies import CookiesConfigError
+
+    with pytest.raises(CookiesConfigError, match="encoding error"):
+        get_cookie_header(("zhihu.com",))
+
+
+def test_value_whitespace_stripped(tmp_path):
+    """value 的尾随空白应被清理，不拼入请求头。"""
+    content = ".zhihu.com\tTRUE\t/\tTRUE\t0\tct0\tabc \n"
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, ("zhihu.com",)) == "ct0=abc"
+
+
 def test_duplicate_names_keep_last_value(tmp_path):
     """同名 Cookie 去重，保留文件中最后一条的值，位置保持首次出现顺序。"""
     content = (
