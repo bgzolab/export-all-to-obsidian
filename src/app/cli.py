@@ -10,6 +10,7 @@ from app.credential_guard import probe_bilibili_credentials
 from app.credential_guard import probe_cnblog_credentials
 from app.credential_guard import probe_qireader_credentials
 from app.credential_guard import probe_v2ex_credentials
+from app.credential_guard import probe_twitter_credentials
 from app.credential_guard import probe_weibo_credentials
 from app.credential_guard import probe_zhihu_credentials
 from app.credential_guard import run_with_credential_guard
@@ -19,6 +20,8 @@ from bilibili.exporter import export as export_bilibili
 from cnblog.exporter import export as export_cnblog
 from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
+from twitter.exporter import export as export_twitter
+from twitter.exporter import TWITTER_MAX_PAGES
 from v2ex.exporter import export as export_v2ex
 from weibo.exporter import export as export_weibo
 from zhihu.exporter import export as export_zhihu
@@ -110,6 +113,26 @@ def v2ex(output: str) -> None:
         "v2ex",
         probe_v2ex_credentials,
         lambda: export_v2ex(output, get_index_writer()),
+    )
+
+
+@eto.command()
+@click.option("--output", "-o", required=True, help="输出目录")
+@click.option("--force", required=False, is_flag=True, help="是否强制覆盖")
+@click.option(
+    "--max-pages",
+    required=False,
+    type=click.IntRange(min=1),
+    default=None,
+    help=f"Twitter 点赞最大分页数（默认 {TWITTER_MAX_PAGES}，即约 "
+    f"{TWITTER_MAX_PAGES * 20} 条）",
+)
+def twitter(output: str, force: bool, max_pages: int | None) -> None:
+    """导出 Twitter 点赞。"""
+    run_with_credential_guard(
+        "twitter",
+        probe_twitter_credentials,
+        lambda: export_twitter(output, get_index_writer(), force, max_pages),
     )
 
 

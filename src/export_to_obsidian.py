@@ -9,6 +9,7 @@ from cnblog.exporter import export as cnblog_export
 from export_runtime.index_writer import IndexWriter
 from github.exporter import export as github_export
 from qireader.exporter import export as qireader_export
+from twitter.exporter import export as twitter_export
 from v2ex.exporter import export as v2ex_export
 from weibo.exporter import export as weibo_export
 from weibo.exporter import handle_weibo_pic

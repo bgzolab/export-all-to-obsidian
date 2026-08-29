@@ -13,7 +13,7 @@ Obsidian 友好的 Markdown 文件。
 ## 架构概览
 
 - 薄 CLI 入口：src/export_to_obsidian.py -> src/app/cli.py
-- 模块按平台拆分：bangumi、bilibili、cnblog、github、qireader、v2ex、weibo、zhihu
+- 模块按平台拆分：bangumi、bilibili、cnblog、github、qireader、twitter、v2ex、weibo、zhihu
 - 各平台导出编排位于各自 exporter.py
 - 导出运行时对象位于 export_runtime
 - 通用能力放在 utils、entity
@@ -53,6 +53,7 @@ Obsidian 友好的 Markdown 文件。
 - cnblog: 导出博客园收藏
 - bangumi: 导出 Bangumi 收藏，可按 subject_type 或 collection_type 过滤
 - qireader: 导出稍后读列表
+- twitter: 导出当前用户点赞 Tweet（X 网页 GraphQL Likes 接口，Cookie 鉴权）
 - v2ex: 导出收藏主题
 - zhihu: 导出收藏夹内容
 - weibo: 导出点赞微博

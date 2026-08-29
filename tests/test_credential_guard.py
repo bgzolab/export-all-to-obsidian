@@ -4,6 +4,120 @@ from app.credential_guard import CredentialProbeResult
 from app.credential_guard import run_with_credential_guard
 
 
+def _fake_twitter_probe(
+    monkeypatch,
+    status_code=200,
+    payload=None,
+    get_error=None,
+    json_error=None,
+):
+    import app.credential_guard as guard
+
+    class FakeResponse:
+        def __init__(self, status_code, payload):
+            self._status = status_code
+            self._payload = payload
+
+        @property
+        def status_code(self):
+            return self._status
+
+        def json(self):
+            if json_error is not None:
+                raise json_error
+            return self._payload
+
+    class FakeSession:
+        def get(self, *args, **kwargs):
+            if get_error is not None:
+                raise get_error
+            return FakeResponse(status_code, payload)
+
+    class FakeClient:
+        user_id = "123"
+        session = FakeSession()
+
+    monkeypatch.setattr(guard, "TwitterClient", lambda: FakeClient())
+    return guard
+
+
+def test_probe_twitter_valid(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, payload={"data": {"user": {}}})
+    result = guard.probe_twitter_credentials()
+    assert result.status == "valid"
+
+
+def test_probe_twitter_unauthorized(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, status_code=401)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "invalid"
+    assert "已过期" in result.reason
+
+
+def test_probe_twitter_forbidden(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, status_code=403)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "invalid"
+
+
+def test_probe_twitter_http_error_unknown(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, status_code=500)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "unknown"
+    assert "HTTP 500" in result.reason
+
+
+def test_probe_twitter_non_json_payload_unknown(monkeypatch):
+    """response.json() 返回 None（非 dict）时应判为 unknown 而非崩溃。"""
+    guard = _fake_twitter_probe(monkeypatch, status_code=200, payload=None)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "unknown"
+    assert "解析失败" in result.reason
+
+
+def test_probe_twitter_json_decode_error_unknown(monkeypatch):
+    """response.json() 抛出 JSONDecodeError 时应判为 unknown。"""
+    import json
+
+    guard = _fake_twitter_probe(
+        monkeypatch,
+        status_code=200,
+        json_error=json.JSONDecodeError("Expecting value", "doc", 0),
+    )
+    result = guard.probe_twitter_credentials()
+    assert result.status == "unknown"
+    assert "解析失败" in result.reason
+
+
+def test_probe_twitter_no_data_invalid(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, status_code=200, payload={})
+    result = guard.probe_twitter_credentials()
+    assert result.status == "invalid"
+
+
+def test_probe_twitter_value_error_invalid(monkeypatch):
+    import app.credential_guard as guard
+
+    def boom():
+        raise ValueError("TWITTER_COOKIE 缺失")
+
+    monkeypatch.setattr(guard, "TwitterClient", boom)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "invalid"
+    assert "TWITTER_COOKIE" in result.reason
+
+
+def test_probe_twitter_request_exception_unknown(monkeypatch):
+    import requests
+
+    guard = _fake_twitter_probe(
+        monkeypatch, get_error=requests.RequestException("network down")
+    )
+    result = guard.probe_twitter_credentials()
+    assert result.status == "unknown"
+    assert "network down" in result.reason
+
+
 def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
     events: dict[str, object] = {"export_called": False, "notified": []}
 
@@ -91,3 +205,77 @@ def test_cli_runs_export_when_probe_valid(monkeypatch):
 
     assert result.exit_code == 0
     assert called["export"] is True
+
+
+def test_cli_twitter_passes_force_to_export(monkeypatch):
+    from export_to_obsidian import eto
+
+    called = {}
+
+    monkeypatch.setattr(
+        "app.cli.probe_twitter_credentials",
+        lambda: CredentialProbeResult.valid("twitter"),
+    )
+
+    def fake_export(output, index_writer, force=False, max_pages=None):
+        called["output"] = output
+        called["force"] = force
+        called["max_pages"] = max_pages
+
+    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+    monkeypatch.setattr(
+        "app.credential_guard.notify_invalid_credentials", lambda results: False
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--force"])
+
+    assert result.exit_code == 0
+    assert called["output"] == "output/twitter"
+    assert called["force"] is True
+    assert called["max_pages"] is None
+
+
+def test_cli_twitter_passes_max_pages(monkeypatch):
+    from export_to_obsidian import eto
+
+    called = {}
+
+    monkeypatch.setattr(
+        "app.cli.probe_twitter_credentials",
+        lambda: CredentialProbeResult.valid("twitter"),
+    )
+
+    def fake_export(output, index_writer, force=False, max_pages=None):
+        called["max_pages"] = max_pages
+
+    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+    monkeypatch.setattr(
+        "app.credential_guard.notify_invalid_credentials", lambda results: False
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--max-pages", "5"])
+
+    assert result.exit_code == 0
+    assert called["max_pages"] == 5
+
+
+def test_cli_twitter_rejects_max_pages_zero(monkeypatch):
+    from export_to_obsidian import eto
+
+    monkeypatch.setattr(
+        "app.cli.probe_twitter_credentials",
+        lambda: CredentialProbeResult.valid("twitter"),
+    )
+
+    def fake_export(output, index_writer, force=False, max_pages=None):
+        raise AssertionError("不应调用 export")
+
+    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+
+    runner = CliRunner()
+    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--max-pages", "0"])
+
+    assert result.exit_code != 0
+    assert "Invalid value" in result.output

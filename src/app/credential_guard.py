@@ -17,6 +17,9 @@ from cnblog.api_endpoints import USER as CNBLOG_USER
 from cnblog.client import CnblogClient
 from qireader.api_endpoints import READ_LATER as QIREADER_READ_LATER
 from qireader.cilent import QiReaderClient
+from twitter.api_endpoints import TWITTER_LIKES_PATH
+from twitter.client import TwitterClient
+from twitter.like import build_likes_params
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
 from weibo.api_endpoints import WEIBO_LIKE_URL
@@ -190,6 +193,41 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
     return CredentialProbeResult.valid(module)
+
+
+def probe_twitter_credentials() -> CredentialProbeResult:
+    module = "twitter"
+    # 注意：此处对 Likes 接口发起一次真实请求用于验活，会消耗 X 的限流配额。
+    # 每次导出启动都会少掉一条配额，排障时留意为何一启动即触发 429。
+    try:
+        client = TwitterClient()
+        response = client.session.get(
+            TWITTER_LIKES_PATH,
+            params=build_likes_params(client.user_id, 1),
+            timeout=30,
+        )
+    except ValueError as exc:
+        return CredentialProbeResult.invalid(module, str(exc))
+    except requests.RequestException as exc:
+        return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
+
+    if response.status_code in {401, 403}:
+        return CredentialProbeResult.invalid(module, "TWITTER_COOKIE 已过期或无效")
+    if response.status_code != 200:
+        return CredentialProbeResult.unknown(module, _http_failure_reason(response))
+
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
+    if payload.get("data"):
+        return CredentialProbeResult.valid(module)
+    return CredentialProbeResult.invalid(
+        module,
+        "TWITTER_COOKIE 已过期或接口未返回有效登录态",
+    )
 
 
 def probe_zhihu_credentials(collection: str) -> CredentialProbeResult:
