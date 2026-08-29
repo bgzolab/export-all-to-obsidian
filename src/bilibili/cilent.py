@@ -5,18 +5,14 @@
 @Date : 2025-12-06
 @Links : https://github.com/bGZo
 """
-import os
-
 import requests
 
+from app.cookies import get_cookie_header
 from demo import (api_endpoints)
 
 class BilibiliClient:
     def __init__(self):
-        self.cookie = os.getenv("BILIBILI_COOKIE")
-
-        if not self.cookie:
-            raise ValueError("BILIBILI_COOKIE environment variable is not set.")
+        self.cookie = get_cookie_header(("bilibili.com",))
 
         self.session = requests.Session()
         self.session.headers.update({
