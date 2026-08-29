@@ -52,10 +52,8 @@ jobs:
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode-go/glm-5.2
-          use_github_token: true
           prompt: |
             你正在 GitHub Actions 中执行一次性只读代码审查。你可以运行除 commit 和 push 外的一切操作辅助判断，并需要保持如下审查规范：
 
