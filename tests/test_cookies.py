@@ -205,6 +205,16 @@ def test_leading_whitespace_on_httponly_line_deduped(tmp_path):
     assert header == "ct0=REAL"
 
 
+def test_empty_name_skipped(tmp_path):
+    """空 cookie name 不应拼出 "=value" 这类非法请求头。"""
+    content = (
+        ".zhihu.com\tTRUE\t/\tTRUE\t0\t\tvalue\n"
+        ".zhihu.com\tTRUE\t/\tTRUE\t0\tgood\tv\n"
+    )
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, ("zhihu.com",)) == "good=v"
+
+
 def test_crlf_line_endings_supported(tmp_path):
     content = ".zhihu.com\tTRUE\t/\tTRUE\t0\tcrlf\tv\r\n"
     path = _write(tmp_path, content)
