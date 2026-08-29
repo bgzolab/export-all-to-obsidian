@@ -163,7 +163,7 @@ def probe_qireader_credentials(tag: str) -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "QIREADER_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "qireader Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(
             module,
@@ -187,7 +187,7 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {301, 302, 303, 307, 308}:
-        return CredentialProbeResult.invalid(module, "V2EX_COOKIE 已过期或未登录")
+        return CredentialProbeResult.invalid(module, "v2ex Cookie 已过期或未登录")
     if response.status_code in {401, 403}:
         return CredentialProbeResult.invalid(module, "V2EX 凭证已过期或无效")
     if response.status_code != 200:
@@ -212,7 +212,7 @@ def probe_twitter_credentials() -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "TWITTER_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "twitter Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
@@ -226,7 +226,7 @@ def probe_twitter_credentials() -> CredentialProbeResult:
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(
         module,
-        "TWITTER_COOKIE 已过期或接口未返回有效登录态",
+        "twitter Cookie 已过期或接口未返回有效登录态",
     )
 
 
@@ -244,7 +244,7 @@ def probe_zhihu_credentials(collection: str) -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "ZHIHU_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "zhihu Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(
             module,
@@ -267,14 +267,14 @@ def probe_weibo_credentials(uid: int) -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "WEIBO_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "weibo Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
     payload = response.json()
     if payload.get("ok") == 1:
         return CredentialProbeResult.valid(module)
-    return CredentialProbeResult.invalid(module, "WEIBO_COOKIE 已过期或接口未返回有效登录态")
+    return CredentialProbeResult.invalid(module, "weibo Cookie 已过期或接口未返回有效登录态")
 
 
 def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
@@ -301,7 +301,7 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "BILIBILI_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "bilibili Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(
             module,
@@ -312,7 +312,7 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
     if payload.get("code") == 0:
         return CredentialProbeResult.valid(module)
     if payload.get("code") == -101:
-        return CredentialProbeResult.invalid(module, "BILIBILI_COOKIE 已过期或未登录")
+        return CredentialProbeResult.invalid(module, "bilibili Cookie 已过期或未登录")
     return CredentialProbeResult.unknown(
         module,
         f"探针返回 code={payload.get('code')} message={payload.get('message')}",
