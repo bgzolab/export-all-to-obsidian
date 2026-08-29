@@ -194,6 +194,17 @@ def test_leading_whitespace_tolerated(tmp_path):
     assert header == "lead=v"
 
 
+def test_leading_whitespace_on_httponly_line_deduped(tmp_path):
+    """带前导空白的 #HttpOnly_ 行前缀检测不应失效，仍能与同名普通 Cookie 去重。"""
+    content = (
+        "  #HttpOnly_.zhihu.com\tTRUE\t/\tTRUE\t0\tct0\tLEAK\n"
+        ".zhihu.com\tTRUE\t/\tTRUE\t0\tct0\tREAL\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(path, ("zhihu.com",))
+    assert header == "ct0=REAL"
+
+
 def test_crlf_line_endings_supported(tmp_path):
     content = ".zhihu.com\tTRUE\t/\tTRUE\t0\tcrlf\tv\r\n"
     path = _write(tmp_path, content)
