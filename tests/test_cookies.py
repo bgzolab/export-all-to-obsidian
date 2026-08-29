@@ -220,6 +220,23 @@ def test_no_matching_domain_raises(monkeypatch, tmp_path):
         get_cookie_header(("zhihu.com",))
 
 
+def test_unreadable_file_raises_config_error(monkeypatch, tmp_path):
+    """cookies.txt 存在但不可读（如权限 000）时应转抛 CookiesConfigError，
+    而非泄漏 PermissionError 原始 traceback。"""
+    from app.cookies import CookiesConfigError
+
+    path = _write(tmp_path, ".zhihu.com\tTRUE\t/\tTRUE\t0\ta\t1\n")
+    import os
+    import stat
+
+    os.chmod(path, stat.S_IWRITE | stat.S_IREAD)  # 确保先可读再锁定
+    os.chmod(path, 0)
+    monkeypatch.setenv("COOKIES", path)
+    with pytest.raises(CookiesConfigError, match="not readable"):
+        get_cookie_header(("zhihu.com",))
+    os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+
+
 def test_ctx_cookies_file_overrides_env(monkeypatch, tmp_path):
     env_path = _write(tmp_path, ".weibo.com\tTRUE\t/\tTRUE\t0\twb\tv\n")
     explicit = tmp_path / "explicit.txt"
