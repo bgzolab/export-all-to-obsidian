@@ -89,3 +89,7 @@ debug/
 tests/import-from-github-url/
 bruno/
 cookies.txt
+
+# 本地备份类 env 文件不入库
+.env.bak
+.env.*.bak
