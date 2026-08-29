@@ -123,6 +123,23 @@ def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
         guard.probe_twitter_credentials()
 
 
+def test_probe_twitter_missing_ct0_in_cookie_invalid(monkeypatch, tmp_path):
+    """真实路径：cookies.txt 存在但缺 ct0/twid 且环境变量未设时，
+    TwitterClient 抛 ValueError，探测应判为 invalid（跳过+提醒）而非硬退出。"""
+    import app.credential_guard as guard
+
+    p = tmp_path / "cookies.txt"
+    p.write_text(
+        ".x.com\tTRUE\t/\tTRUE\t0\tguest_id\t1\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("COOKIES", str(p))
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
+    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "invalid"
+    assert "ct0" in result.reason
+
+
 def test_probe_twitter_request_exception_unknown(monkeypatch):
     import requests
 

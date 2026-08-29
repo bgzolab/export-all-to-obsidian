@@ -14,7 +14,6 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from app.cookies import CookiesConfigError
 from app.cookies import get_cookie_header
 from twitter.api_endpoints import TWITTER_BEARER_TOKEN
 from twitter.api_endpoints import TWITTER_CSRF_ENV
@@ -46,14 +45,17 @@ class TwitterClient:
             if match:
                 csrf_token = match.group(1).strip()
         if not csrf_token:
-            raise CookiesConfigError(
+            # 缺 ct0/twid 属于凭证缺失而非配置缺失：抛 ValueError，由
+            # credential_guard 判为 invalid 走「跳过+提醒」，与改造前语义一致，
+            # 不使用 CookiesConfigError 的硬退出语义。
+            raise ValueError(
                 f"{TWITTER_CSRF_ENV} environment variable is not set "
                 "or Cookie missing ct0."
             )
 
         user_id = os.getenv(TWITTER_USER_ID_ENV) or _derive_user_id_from_cookie(cookie)
         if not user_id:
-            raise CookiesConfigError(
+            raise ValueError(
                 f"{TWITTER_USER_ID_ENV} environment variable is not set "
                 "or Cookie missing twid."
             )
