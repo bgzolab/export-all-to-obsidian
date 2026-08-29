@@ -70,12 +70,14 @@ def load_cookie_header(
         raise CookiesConfigError(f"Cookies file encoding error: {exc}") from exc
     now = time.time()
     for line in lines:
-        stripped = line.rstrip("\r\n")
+        # 先统一 strip，容忍行首空白：保证 #HttpOnly_ 前缀检测不被前导空格破坏，
+        # 否则该行会按普通数据解析，去重键的域名也因残留前缀而错乱
+        stripped = line.strip()
         if stripped.startswith("#HttpOnly_"):
             stripped = stripped[len("#HttpOnly_"):]
         elif stripped.startswith("#"):
             continue
-        if not stripped.strip():
+        if not stripped:
             continue
         fields = stripped.split("\t")
         if len(fields) < 7:
