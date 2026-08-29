@@ -1,12 +1,12 @@
 # Export your data into Obsidian
 
-> Your data is your asset, you should own it. 
+> Your data is your asset, you own it forever. 
 
-This tool exports your saved data to Markdown files for Obsidian.
+This tool exports your social media data to Obsidian with markdown files.
 
 - Export data from many sites into local Markdown files.
 - Keep one simple CLI for all modules.
-- Write an optional index file in Markdown.
+- Provide an optional index file in Markdown.
 
 Now this tool had supported following modules:
 
@@ -16,8 +16,9 @@ Now this tool had supported following modules:
 4. github
 5. qireader
 6. v2ex
-7. weibo
-8. zhihu
+7. twitter
+8. weibo
+9. zhihu
 
 ## Quick start
 
@@ -50,6 +51,9 @@ Main env vars used by the current modules:
 - WEIBO_COOKIE
 - ZHIHU_COOKIE
 - BILIBILI_COOKIE
+- TWITTER_COOKIE
+- TWITTER_CSRF_TOKEN
+- TWITTER_USER_ID
 - GITHUB_TOKEN
 
 Optional reminder env vars:
@@ -144,6 +148,28 @@ eto weibo -u your-user-id -o output/weibo
 ```shell
 eto bilibili -f your-fav-id -o output/bilibili
 ```
+
+### twitter
+
+Exports your Twitter likes.
+
+```shell
+eto twitter -o output/twitter
+```
+
+By default it exports up to the built-in max pages (roughly 100 liked tweets). Use `--max-pages` to adjust:
+
+```shell
+eto twitter --max-pages 5 -o output/twitter
+```
+
+Use `--force` to overwrite existing local files:
+
+```shell
+eto twitter --force -o output/twitter
+```
+
+`TWITTER_CSRF_TOKEN` and `TWITTER_USER_ID` are optional; if not set, they are derived from `TWITTER_COOKIE` (`ct0` / `twid`).
 
 ## Credential health check
 
