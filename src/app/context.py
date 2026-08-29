@@ -9,11 +9,13 @@ def initialize_context(
     ctx: click.Context,
     index_file: str | None,
     output_prefix: str,
+    cookies_file: str | None = None,
 ) -> None:
     """初始化根上下文。"""
     ctx.ensure_object(dict)
     ctx.obj["index_writer"] = IndexWriter(file_path=index_file)
     ctx.obj["output_prefix"] = output_prefix
+    ctx.obj["cookies_file"] = cookies_file
 
 
 def get_index_writer() -> IndexWriter:

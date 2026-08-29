@@ -24,6 +24,7 @@ tags:
 ## 关键模块职责
 
 - `src/app/context.py`: 根上下文初始化与 IndexWriter 获取。
+- `src/app/cookies.py`: 统一从 Netscape cookies.txt 按域名提取 Cookie 请求头。
 - `src/export_runtime/index_writer.py`: 导出索引累计与落盘。
 - `src/export_runtime/exporter_support.py`: 输出路径、增量剪枝、Markdown 写入、索引追加等轻量共用 helper。
 - `src/<platform>/exporter.py`: 各平台导出编排。
