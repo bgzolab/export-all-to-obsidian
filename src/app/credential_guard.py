@@ -11,6 +11,7 @@ import requests
 
 from bangumi.api_endpoints import USER_CURRENT as BANGUMI_USER_CURRENT
 from bangumi.client import BangumiClient
+from app.cookies import CookiesConfigError
 from bilibili.api_endpoints import BILIBILI_FAV_URL
 from bilibili.cilent import BilibiliClient
 from cnblog.api_endpoints import USER as CNBLOG_USER
@@ -110,6 +111,8 @@ def probe_bangumi_credentials() -> CredentialProbeResult:
     try:
         client = BangumiClient()
         response = client.session.get(BANGUMI_USER_CURRENT)
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -131,6 +134,8 @@ def probe_cnblog_credentials() -> CredentialProbeResult:
     try:
         client = CnblogClient()
         response = client.session.get(CNBLOG_USER)
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -157,6 +162,8 @@ def probe_qireader_credentials(tag: str) -> CredentialProbeResult:
                 "olderThan": None,
             },
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -181,6 +188,8 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
     try:
         client = V2exClient()
         response = client.session.get(V2EX_FAV, params={"p": 1}, allow_redirects=False)
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -206,6 +215,8 @@ def probe_twitter_credentials() -> CredentialProbeResult:
             params=build_likes_params(client.user_id, 1),
             timeout=30,
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -238,6 +249,8 @@ def probe_zhihu_credentials(collection: str) -> CredentialProbeResult:
             ZHIHU_FAV_URL.format(collection_id=collection),
             params={"offset": 0, "limit": 1},
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -261,6 +274,8 @@ def probe_weibo_credentials(uid: int) -> CredentialProbeResult:
             WEIBO_LIKE_URL,
             params={"page": 1, "uid": uid, "with_total": True},
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
@@ -295,6 +310,8 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
                 "web_location": 333.1387,
             },
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:

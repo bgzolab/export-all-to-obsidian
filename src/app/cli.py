@@ -4,7 +4,6 @@ from typing import Optional
 
 import click
 
-from app.cookies import set_explicit_cookies_file
 from app.context import get_index_writer, get_output_prefix, initialize_context
 from app.credential_guard import probe_bangumi_credentials
 from app.credential_guard import probe_bilibili_credentials
@@ -42,15 +41,14 @@ from zhihu.exporter import export as export_zhihu
 )
 @click.option(
     "--cookies-file",
-    type=click.Path(dir_okay=False, path_type=str),
+    type=click.Path(dir_okay=False, exists=True, path_type=str),
     default=None,
     help="cookies.txt 文件路径；未指定时读取环境变量 COOKIES",
 )
 @click.pass_context
 def eto(ctx: click.Context, index_file: Optional[str], prefix: str, cookies_file: Optional[str]) -> None:
     """导出命令组。"""
-    initialize_context(ctx, index_file, prefix)
-    set_explicit_cookies_file(cookies_file)
+    initialize_context(ctx, index_file, prefix, cookies_file)
 
 
 @eto.command()

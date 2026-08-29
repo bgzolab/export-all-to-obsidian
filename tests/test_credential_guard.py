@@ -99,12 +99,28 @@ def test_probe_twitter_value_error_invalid(monkeypatch):
     import app.credential_guard as guard
 
     def boom():
-        raise ValueError("TWITTER_COOKIE 缺失")
+        raise ValueError("COOKIES 配置无效")
 
     monkeypatch.setattr(guard, "TwitterClient", boom)
     result = guard.probe_twitter_credentials()
     assert result.status == "invalid"
-    assert "TWITTER_COOKIE" in result.reason
+    assert "COOKIES" in result.reason
+
+
+def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
+    """cookies.txt 配置缺失应抛 ClickException（非零退出码），而非判为凭证失效。"""
+    import click
+    import pytest
+
+    import app.credential_guard as guard
+    from app.cookies import CookiesConfigError
+
+    def boom():
+        raise CookiesConfigError("Cookies file not found: /no/such/cookies.txt")
+
+    monkeypatch.setattr(guard, "TwitterClient", boom)
+    with pytest.raises(click.ClickException, match="配置缺失"):
+        guard.probe_twitter_credentials()
 
 
 def test_probe_twitter_request_exception_unknown(monkeypatch):
@@ -122,7 +138,7 @@ def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
     events: dict[str, object] = {"export_called": False, "notified": []}
 
     def probe() -> CredentialProbeResult:
-        return CredentialProbeResult.invalid("zhihu", "ZHIHU_COOKIE 已过期")
+        return CredentialProbeResult.invalid("zhihu", "zhihu Cookie 已过期")
 
     def export_action() -> None:
         events["export_called"] = True
