@@ -87,6 +87,33 @@ def test_same_name_across_domains_both_kept(tmp_path):
     assert header == "ct0=AAA; ct0=BBB"
 
 
+def test_dedupe_by_name_prefers_first_domain(tmp_path):
+    """dedupe_by_name 按域名优先级去重：x.com 优先，twitter.com 回退。"""
+    content = (
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tAAA\n"
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tBBB\n"
+        ".x.com\tTRUE\t/\tTRUE\t0\tother\t1\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(
+        path, ("x.com", "twitter.com"), dedupe_by_name=True
+    )
+    assert header == "ct0=AAA; other=1"
+
+
+def test_dedupe_by_name_falls_back_to_second_domain(tmp_path):
+    """主域无该 Cookie 时回退到次优先域名的值。"""
+    content = (
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tBBB\n"
+        ".x.com\tTRUE\t/\tTRUE\t0\tother\t1\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(
+        path, ("x.com", "twitter.com"), dedupe_by_name=True
+    )
+    assert header == "ct0=BBB; other=1"
+
+
 def test_utf8_bom_stripped(tmp_path):
     """UTF-8 BOM 应被剥除，host-only 首条 Cookie 不被静默丢弃。"""
     content = "zhihu.com\tFALSE\t/\tTRUE\t0\thost\tv1\n"

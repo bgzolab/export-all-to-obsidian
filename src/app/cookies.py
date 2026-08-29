@@ -9,7 +9,8 @@
 - 第 5 列 ``expiry`` 为非零正整数且早于当前时间时跳过该条（已过期）；``0`` 表示
   会话 Cookie，保留。
 - 同一 (cookie 域, name) 去重，保留文件中最后一条的值（首次出现的顺序位置不变）；
-  多域同名 Cookie 会各自保留（如 x.com 与 twitter.com 的同名 Cookie 共存）。
+  多域同名 Cookie 默认各自保留（如 x.com 与 twitter.com 的同名 Cookie 共存），
+  也可通过 ``dedupe_by_name=True`` 按域名优先级（domains 元组顺序）去重。
 - name 与 value 均做空白清理（strip），避免拼入非法的 cookie-octet。
 - 同一域名内按文件行序拼接为 ``name1=value1; name2=value2`` 形式的请求头字符串。
 
@@ -44,9 +45,21 @@ def resolve_cookies_file() -> str:
     return path
 
 
-def load_cookie_header(cookies_file: str, domains: tuple[str, ...]) -> str:
-    """按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。"""
+def load_cookie_header(
+    cookies_file: str,
+    domains: tuple[str, ...],
+    dedupe_by_name: bool = False,
+) -> str:
+    """按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。
+
+    ``dedupe_by_name`` 为 True 时对跨域同名 Cookie 按域名优先级去重：
+    ``domains`` 元组中的顺序即优先级（越靠前优先级越高），保留优先级最高
+    域名的值；适用于 twitter 这类「主域 + 旧域」场景，避免同一请求头里
+    出现重复同名 Cookie。
+    """
+    domain_priority = {d: i for i, d in enumerate(domains)}
     parts: dict[tuple[str, str], str] = {}
+    deduped: dict[str, tuple[int, str]] = {}
     with open(cookies_file, "r", encoding="utf-8-sig") as f:
         try:
             lines = f.readlines()
@@ -80,17 +93,26 @@ def load_cookie_header(cookies_file: str, domains: tuple[str, ...]) -> str:
         )
         if matched:
             parts[(cookie_domain, name)] = value
+            if dedupe_by_name:
+                prio = domain_priority.get(cookie_domain, len(domains))
+                prev = deduped.get(name)
+                if prev is None or prio < prev[0]:
+                    deduped[name] = (prio, value)
+    if dedupe_by_name:
+        return "; ".join(f"{name}={value}" for name, (_, value) in deduped.items())
     return "; ".join(f"{name}={value}" for (_, name), value in parts.items())
 
 
 def get_cookie_header(
-    domains: tuple[str, ...], cookies_file: str | None = None
+    domains: tuple[str, ...],
+    cookies_file: str | None = None,
+    dedupe_by_name: bool = False,
 ) -> str:
     """对外统一入口：返回指定域名的 Cookie 请求头字符串。"""
     path = cookies_file or resolve_cookies_file()
     if not os.path.isfile(path):
         raise CookiesConfigError(f"Cookies file not found: {path}")
-    header = load_cookie_header(path, domains)
+    header = load_cookie_header(path, domains, dedupe_by_name=dedupe_by_name)
     if not header:
         raise CookiesConfigError(f"No cookies found for domain {domains!r} in {path}")
     return header
