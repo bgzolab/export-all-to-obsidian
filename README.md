@@ -34,7 +34,7 @@ Or install from this repo:
 pipx install -e .
 ```
 
-Put your token or cookie values in .env, then load them:
+Put your token or cookie values in .env, then load them. Cookies come from a single Netscape-format `cookies.txt` file; point the `COOKIES` env var at its path (or pass `--cookies-file` to the CLI).
 
 ```shell
 chmod +x ./export-env.sh
@@ -45,16 +45,10 @@ Main env vars used by the current modules:
 
 - CNBLOG_ACCESS_TOKEN
 - BGM_ACCESS_TOKEN
-- QIREADER_COOKIE
 - V2EX_ACCESS_TOKEN
-- V2EX_COOKIE
-- WEIBO_COOKIE
-- ZHIHU_COOKIE
-- BILIBILI_COOKIE
-- TWITTER_COOKIE
 - TWITTER_CSRF_TOKEN
 - TWITTER_USER_ID
-- GITHUB_TOKEN
+- COOKIES (path to a Netscape-format cookies.txt used by qireader, v2ex, zhihu, weibo, bilibili and twitter)
 
 Optional reminder env vars:
 
@@ -169,7 +163,7 @@ Use `--force` to overwrite existing local files:
 eto twitter --force -o output/twitter
 ```
 
-`TWITTER_CSRF_TOKEN` and `TWITTER_USER_ID` are optional; if not set, they are derived from `TWITTER_COOKIE` (`ct0` / `twid`).
+`TWITTER_CSRF_TOKEN` and `TWITTER_USER_ID` are optional; if not set, they are derived from your cookies.txt Cookie (`ct0` / `twid`).
 
 ## Credential health check
 
