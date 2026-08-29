@@ -118,8 +118,12 @@ def get_cookie_header(
 ) -> str:
     """对外统一入口：返回指定域名的 Cookie 请求头字符串。"""
     path = cookies_file or resolve_cookies_file()
-    if not os.path.isfile(path):
+    # 区分「不存在」与「是目录」：isfile 对目录返回 False，
+    # 一律报 not found 会误导用户以为文件不存在
+    if not os.path.exists(path):
         raise CookiesConfigError(f"Cookies file not found: {path}")
+    if not os.path.isfile(path):
+        raise CookiesConfigError(f"Cookies file is not a regular file: {path}")
     header = load_cookie_header(path, domains, dedupe_by_name=dedupe_by_name)
     if not header:
         raise CookiesConfigError(f"No cookies found for domain {domains!r} in {path}")

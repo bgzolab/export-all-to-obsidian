@@ -241,6 +241,13 @@ def test_no_matching_domain_raises(monkeypatch, tmp_path):
         get_cookie_header(("zhihu.com",))
 
 
+def test_directory_path_raises_not_a_regular_file(monkeypatch, tmp_path):
+    """COOKIES 指向目录时报「not a regular file」而非「not found」。"""
+    monkeypatch.setenv("COOKIES", str(tmp_path))
+    with pytest.raises(CookiesConfigError, match="not a regular file"):
+        get_cookie_header(("zhihu.com",))
+
+
 def test_unreadable_file_raises_config_error(monkeypatch, tmp_path):
     """cookies.txt 存在但不可读（如权限 000）时应转抛 CookiesConfigError，
     而非泄漏 PermissionError 原始 traceback。"""
