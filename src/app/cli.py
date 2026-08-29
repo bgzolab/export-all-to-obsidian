@@ -46,7 +46,12 @@ from zhihu.exporter import export as export_zhihu
     help="cookies.txt 文件路径；未指定时读取环境变量 COOKIES",
 )
 @click.pass_context
-def eto(ctx: click.Context, index_file: Optional[str], prefix: str, cookies_file: Optional[str]) -> None:
+def eto(
+    ctx: click.Context,
+    index_file: Optional[str],
+    prefix: str,
+    cookies_file: Optional[str],
+) -> None:
     """导出命令组。"""
     initialize_context(ctx, index_file, prefix, cookies_file)
 
