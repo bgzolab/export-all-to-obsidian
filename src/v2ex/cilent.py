@@ -11,17 +11,16 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from app.cookies import get_cookie_header
 from demo import (api_endpoints)
 
 class V2exClient:
     def __init__(self):
         self.token = os.getenv("V2EX_ACCESS_TOKEN")
-        self.cookie = os.getenv("V2EX_COOKIE")
+        self.cookie = get_cookie_header(("v2ex.com",))
 
         if not self.token:
             raise ValueError("V2EX_ACCESS_TOKEN environment variable is not set.")
-        if not self.cookie:
-            raise ValueError("V2EX_COOKIE environment variable is not set.")
 
         self.session = requests.Session()
         # 配置重试：v2ex 偶发 SSL 握手中断 / 限流，需自动重试并退避
