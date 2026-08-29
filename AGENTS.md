@@ -48,8 +48,10 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 
 ## CLI contract (gotchas)
 
-- `--index-file` is a **top-level option and must come before the subcommand**; when
-  omitted, the index is printed to the terminal.
+- `--index-file` and `--cookies-file` are **top-level options and must come before the
+  subcommand**; when `--index-file` is omitted, the index is printed to the terminal.
+  `--cookies-file` points to a Netscape-format `cookies.txt`; when omitted, the
+  environment variable `COOKIES` (the file path) is used.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
   `bilibili(-f -o [--force])`.
@@ -57,10 +59,11 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 
 ## Environment variables (required by module exports)
 
-`CNBLOG_ACCESS_TOKEN`, `BGM_ACCESS_TOKEN`, `QIREADER_COOKIE`, `V2EX_ACCESS_TOKEN`,
-`V2EX_COOKIE`, `WEIBO_COOKIE`, `ZHIHU_COOKIE`, `BILIBILI_COOKIE`, `TWITTER_COOKIE`,
-`TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID` fall
-back to deriving from the Cookie (`ct0` / `twid`). Optional
+`CNBLOG_ACCESS_TOKEN`, `BGM_ACCESS_TOKEN`, `V2EX_ACCESS_TOKEN`,
+`TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID`
+fall back to deriving from the cookies.txt Cookie (`ct0` / `twid`). `COOKIES` holds the
+path to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo,
+bilibili and twitter. Optional
 notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. (`GITHUB_TOKEN` no longer has
 a corresponding implementation; ignore it.)
 

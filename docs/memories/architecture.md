@@ -15,10 +15,11 @@ tags:
 2. click 解析顶层参数与子命令。
 3. `app.context` 创建 IndexWriter，并把 `--index-file` 配置注入根上下文。
 4. `app.cli` 将 IndexWriter 显式注入对应平台 exporter。
-5. 每条数据转换为 WebPage 或 Video 前言加 Markdown 内容。
-6. `export_runtime.exporter_support` 处理通用输出路径、增量剪枝、Markdown 写入与索引追加。
-7. `utils.file_utils` 将内容写入 output 目录。
-8. IndexWriter 将本轮导出条目打印到终端或写入一个 Markdown 索引文件。
+5. Cookie 统一由 `app.cookies` 从 Netscape 格式 `cookies.txt`（`COOKIES` 环境变量或 `--cookies-file` 指定路径）按域名提取。
+6. 每条数据转换为 WebPage 或 Video 前言加 Markdown 内容。
+7. `export_runtime.exporter_support` 处理通用输出路径、增量剪枝、Markdown 写入与索引追加。
+8. `utils.file_utils` 将内容写入 output 目录。
+9. IndexWriter 将本轮导出条目打印到终端或写入一个 Markdown 索引文件。
 
 ## 关键模块职责
 
