@@ -60,11 +60,14 @@ def load_cookie_header(
     domain_priority = {d: i for i, d in enumerate(domains)}
     parts: dict[tuple[str, str], str] = {}
     deduped: dict[str, tuple[int, str]] = {}
-    with open(cookies_file, "r", encoding="utf-8-sig") as f:
-        try:
+    try:
+        with open(cookies_file, "r", encoding="utf-8-sig") as f:
             lines = f.readlines()
-        except UnicodeDecodeError as exc:
-            raise CookiesConfigError(f"Cookies file encoding error: {exc}") from exc
+    except OSError as exc:
+        # 文件不可读 / 预检后被删除（TOCTOU）等，均转成配置错误而非裸 traceback
+        raise CookiesConfigError(f"Cookies file not readable: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise CookiesConfigError(f"Cookies file encoding error: {exc}") from exc
     now = time.time()
     for line in lines:
         stripped = line.rstrip("\r\n")
