@@ -14,8 +14,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from app.cookies import get_cookie_header
 from twitter.api_endpoints import TWITTER_BEARER_TOKEN
-from twitter.api_endpoints import TWITTER_COOKIE_ENV
 from twitter.api_endpoints import TWITTER_CSRF_ENV
 from twitter.api_endpoints import TWITTER_USER_ID_ENV
 
@@ -37,9 +37,7 @@ class TwitterClient:
     """封装 X 网页端 GraphQL 请求所需的 Cookie 与请求头。"""
 
     def __init__(self) -> None:
-        cookie = os.getenv(TWITTER_COOKIE_ENV)
-        if not cookie:
-            raise ValueError(f"{TWITTER_COOKIE_ENV} environment variable is not set.")
+        cookie = get_cookie_header(("x.com", "twitter.com"))
 
         csrf_token = os.getenv(TWITTER_CSRF_ENV)
         if not csrf_token:
