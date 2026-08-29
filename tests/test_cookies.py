@@ -8,6 +8,7 @@
 import click
 import pytest
 
+from app.cookies import CookiesConfigError
 from app.cookies import get_cookie_header
 from app.cookies import load_cookie_header
 from app.cookies import resolve_cookies_file
@@ -128,7 +129,6 @@ def test_non_utf8_encoding_raises_config_error(monkeypatch, tmp_path):
     path = tmp_path / "cookies.txt"
     path.write_bytes(b".zhihu.com\tTRUE\t/\tTRUE\t0\tbad\t\xff\xfe\n")
     monkeypatch.setenv("COOKIES", str(path))
-    from app.cookies import CookiesConfigError
 
     with pytest.raises(CookiesConfigError, match="encoding error"):
         get_cookie_header(("zhihu.com",))
@@ -224,20 +224,20 @@ def test_crlf_line_endings_supported(tmp_path):
 
 def test_missing_env_and_ctx_raises(monkeypatch):
     monkeypatch.delenv("COOKIES", raising=False)
-    with pytest.raises(ValueError, match="COOKIES environment variable"):
+    with pytest.raises(CookiesConfigError, match="COOKIES environment variable"):
         resolve_cookies_file()
 
 
 def test_missing_file_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("COOKIES", str(tmp_path / "no-such-file.txt"))
-    with pytest.raises(ValueError, match="Cookies file not found"):
+    with pytest.raises(CookiesConfigError, match="Cookies file not found"):
         get_cookie_header(("zhihu.com",))
 
 
 def test_no_matching_domain_raises(monkeypatch, tmp_path):
     path = _write(tmp_path, ".weibo.com\tTRUE\t/\tTRUE\t0\twb\tv\n")
     monkeypatch.setenv("COOKIES", path)
-    with pytest.raises(ValueError, match="No cookies found"):
+    with pytest.raises(CookiesConfigError, match="No cookies found"):
         get_cookie_header(("zhihu.com",))
 
 
