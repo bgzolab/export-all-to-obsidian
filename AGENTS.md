@@ -84,10 +84,9 @@ a corresponding implementation; ignore it.)
 
 ## Test status
 
-- Existing tests: `test_bangumi.py`, `test_cnblog.py`, `test_credential_guard.py`,
-  `test_github.py`, `test_qireader.py`, `test_twitter.py`, `test_utils.py`, `test_v2ex.py`.
-- No dedicated test files yet for `bilibili`, `weibo`, `zhihu` (prioritize adding them
-  when touching those modules).
+- Existing tests: `test_bangumi.py`, `test_bilibili.py`, `test_cnblog.py`, `test_cookies.py`,
+  `test_credential_guard.py`, `test_github.py`, `test_qireader.py`, `test_twitter.py`, `test_utils.py`, `test_v2ex.py`, `test_weibo.py`, `test_zhihu.py`.
+
 
 ## Non-goals
 

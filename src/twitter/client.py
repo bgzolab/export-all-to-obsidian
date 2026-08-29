@@ -14,6 +14,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from app.cookies import CookiesConfigError
 from app.cookies import get_cookie_header
 from twitter.api_endpoints import TWITTER_BEARER_TOKEN
 from twitter.api_endpoints import TWITTER_CSRF_ENV
@@ -45,14 +46,14 @@ class TwitterClient:
             if match:
                 csrf_token = match.group(1).strip()
         if not csrf_token:
-            raise ValueError(
+            raise CookiesConfigError(
                 f"{TWITTER_CSRF_ENV} environment variable is not set "
                 "or Cookie missing ct0."
             )
 
         user_id = os.getenv(TWITTER_USER_ID_ENV) or _derive_user_id_from_cookie(cookie)
         if not user_id:
-            raise ValueError(
+            raise CookiesConfigError(
                 f"{TWITTER_USER_ID_ENV} environment variable is not set "
                 "or Cookie missing twid."
             )

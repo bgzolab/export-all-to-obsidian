@@ -4,9 +4,13 @@
 解析规则：
 - 跳过空行、普通 ``#`` 注释行；以 ``#HttpOnly_`` 开头的行视为有效数据行（剥掉该前缀后解析）。
 - 每行字段数不足 7 时直接跳过，不中断整个文件解析。
-- cookie 域以 ``.`` 开头时剥掉前导点；第 2 列 ``flag`` 为 TRUE（或 ``1``）时做后缀匹配，
-  FALSE 时仅做精确域名匹配（host-only，不发送到子域）。
-- 同名 Cookie 去重，保留文件中最后一条的值（首次出现的顺序位置不变）。
+- cookie 域以 ``.`` 开头时剥掉前导点；第 2 列 ``flag`` 为 FALSE 或 ``0`` 时仅做精确
+  域名匹配（host-only，不发送到子域），其余（TRUE/``1`` 等）做后缀匹配。
+- 第 5 列 ``expiry`` 为非零正整数且早于当前时间时跳过该条（已过期）；``0`` 表示
+  会话 Cookie，保留。
+- 同一 (cookie 域, name) 去重，保留文件中最后一条的值（首次出现的顺序位置不变）；
+  多域同名 Cookie 会各自保留（如 x.com 与 twitter.com 的同名 Cookie 共存）。
+- name 与 value 均做空白清理（strip），避免拼入非法的 cookie-octet。
 - 同一域名内按文件行序拼接为 ``name1=value1; name2=value2`` 形式的请求头字符串。
 
 配置读取优先级：click 根上下文 ``ctx.obj["cookies_file"]``（由顶层 ``--cookies-file``
@@ -14,12 +18,13 @@
 """
 
 import os
+import time
 
 import click
 
 
 class CookiesConfigError(ValueError):
-    """cookies.txt 配置缺失（环境变量未设、文件不存在或域名无匹配）。"""
+    """cookies.txt 配置缺失或数据错误（环境变量未设、文件不存在、编码错误或域名无匹配）。"""
 
 
 def resolve_cookies_file() -> str:
@@ -41,33 +46,41 @@ def resolve_cookies_file() -> str:
 
 def load_cookie_header(cookies_file: str, domains: tuple[str, ...]) -> str:
     """按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。"""
-    parts: dict[str, str] = {}
-    with open(cookies_file, "r", encoding="utf-8") as f:
-        for line in f:
-            stripped = line.rstrip("\r\n")
-            if stripped.startswith("#HttpOnly_"):
-                stripped = stripped[len("#HttpOnly_"):]
-            elif stripped.startswith("#"):
-                continue
-            if not stripped.strip():
-                continue
-            fields = stripped.split("\t")
-            if len(fields) < 7:
-                continue
-            cookie_domain = fields[0].strip()
-            flag = fields[1].strip().upper()
-            name = fields[5].strip()
-            value = fields[6]
-            if cookie_domain.startswith("."):
-                cookie_domain = cookie_domain[1:]
-            matched = any(
-                cookie_domain == d
-                or (flag != "FALSE" and cookie_domain.endswith("." + d))
-                for d in domains
-            )
-            if matched:
-                parts[name] = value
-    return "; ".join(f"{name}={value}" for name, value in parts.items())
+    parts: dict[tuple[str, str], str] = {}
+    with open(cookies_file, "r", encoding="utf-8-sig") as f:
+        try:
+            lines = f.readlines()
+        except UnicodeDecodeError as exc:
+            raise CookiesConfigError(f"Cookies file encoding error: {exc}") from exc
+    now = time.time()
+    for line in lines:
+        stripped = line.rstrip("\r\n")
+        if stripped.startswith("#HttpOnly_"):
+            stripped = stripped[len("#HttpOnly_"):]
+        elif stripped.startswith("#"):
+            continue
+        if not stripped.strip():
+            continue
+        fields = stripped.split("\t")
+        if len(fields) < 7:
+            continue
+        cookie_domain = fields[0].strip()
+        if cookie_domain.startswith("."):
+            cookie_domain = cookie_domain[1:]
+        flag = fields[1].strip().upper()
+        expiry = fields[4].strip()
+        name = fields[5].strip()
+        value = fields[6].strip()
+        if expiry.isdigit() and expiry != "0" and int(expiry) < now:
+            continue
+        matched = any(
+            cookie_domain == d
+            or (flag not in ("FALSE", "0") and cookie_domain.endswith("." + d))
+            for d in domains
+        )
+        if matched:
+            parts[(cookie_domain, name)] = value
+    return "; ".join(f"{name}={value}" for (_, name), value in parts.items())
 
 
 def get_cookie_header(
