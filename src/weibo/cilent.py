@@ -14,7 +14,11 @@ from demo import (api_endpoints)
 
 class WeiboClient:
     def __init__(self):
-        self.cookie = get_cookie_header(("weibo.com", "weibo.cn"))
+        # weibo.com/weibo.cn 是「主站 + 旧域」，浏览器导出的 cookies.txt 常同时
+        # 含两域的同名 Cookie（如 SUB），按域名优先级去重，weibo.com 优先。
+        self.cookie = get_cookie_header(
+            ("weibo.com", "weibo.cn"), dedupe_by_name=True
+        )
 
         self.session = requests.Session()
         self.session.headers.update({
