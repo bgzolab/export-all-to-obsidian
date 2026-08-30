@@ -277,6 +277,15 @@ def test_value_with_tab_not_truncated(tmp_path):
     assert load_cookie_header(path, ("zhihu.com",)) == "tabbed=a\tb"
 
 
+def test_semicolon_in_value_passthrough(tmp_path):
+    """value 含 ; 时按原样拼入请求头，不转义也不跳过：
+    假定来源合法（RFC 6265 排除 ;，正常导出工具不会产生），
+    该行为在 docstring 中明示为契约。"""
+    content = ".zhihu.com\tTRUE\t/\tTRUE\t0\tk\ta;b\n"
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, ("zhihu.com",)) == "k=a;b"
+
+
 def test_crlf_line_endings_supported(tmp_path):
     content = ".zhihu.com\tTRUE\t/\tTRUE\t0\tcrlf\tv\r\n"
     path = _write(tmp_path, content)
