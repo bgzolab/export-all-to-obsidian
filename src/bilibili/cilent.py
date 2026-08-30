@@ -16,7 +16,7 @@ class BilibiliClient:
 
         self.session = requests.Session()
         self.session.headers.update({
-            "Cookie": f"{self.cookie}",
+            "Cookie": self.cookie,
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0",
             "Referer": "https://www.bilibili.com/"
         })
