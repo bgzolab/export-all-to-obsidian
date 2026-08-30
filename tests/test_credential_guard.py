@@ -1,4 +1,5 @@
 from click.testing import CliRunner
+import pytest
 
 from app.credential_guard import CredentialProbeResult
 from app.credential_guard import run_with_credential_guard
@@ -121,6 +122,35 @@ def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
     monkeypatch.setattr(guard, "TwitterClient", boom)
     with pytest.raises(click.ClickException, match="配置缺失"):
         guard.probe_twitter_credentials()
+
+
+@pytest.mark.parametrize(
+    "client_attr,probe_name,probe_args",
+    [
+        ("QiReaderClient", "probe_qireader_credentials", ("tag",)),
+        ("V2exClient", "probe_v2ex_credentials", ()),
+        ("TwitterClient", "probe_twitter_credentials", ()),
+        ("ZhihuClient", "probe_zhihu_credentials", ("collection",)),
+        ("WeiboClient", "probe_weibo_credentials", (1,)),
+        ("BilibiliClient", "probe_bilibili_credentials", (1,)),
+    ],
+)
+def test_probe_cookies_config_error_raises_click_exception(
+    monkeypatch, client_attr, probe_name, probe_args
+):
+    """所有基于 cookies.txt 的 probe 在 CookiesConfigError 时应抛 ClickException
+    （非零退出码）而非判为凭证失效，行为与 twitter 一致。"""
+    import click
+
+    import app.credential_guard as guard
+    from app.cookies import CookiesConfigError
+
+    def boom():
+        raise CookiesConfigError("Cookies file not found: /no/such/cookies.txt")
+
+    monkeypatch.setattr(guard, client_attr, boom)
+    with pytest.raises(click.ClickException, match="配置缺失"):
+        getattr(guard, probe_name)(*probe_args)
 
 
 def test_probe_twitter_missing_ct0_in_cookie_invalid(monkeypatch, tmp_path):
