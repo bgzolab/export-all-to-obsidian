@@ -48,9 +48,9 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 
 ## CLI contract (gotchas)
 
-- `--index-file` and `--cookies-file` are **top-level options and must come before the
-  subcommand**; when `--index-file` is omitted, the index is printed to the terminal.
-  `--cookies-file` points to a Netscape-format `cookies.txt`; when omitted, the
+- `--index-file`、`--prefix` and `--cookies-file` are **top-level options and must come
+  before the subcommand**; when `--index-file` is omitted, the index is printed to the
+  terminal. `--cookies-file` points to a Netscape-format `cookies.txt`; when omitted, the
   environment variable `COOKIES` (the file path) is used.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
