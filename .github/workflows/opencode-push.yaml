@@ -1,0 +1,58 @@
+name: opencode-review-push
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  opencode:
+    if: github.event.pull_request.user.login == 'bgzo'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Configure opencode CI permissions (deny rm)
+        run: |
+          mkdir -p "$HOME/.config/opencode"
+          cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
+          {
+            "permission": {
+              "bash": {
+                "rm *": "deny",
+                "rmdir *": "deny",
+                "shred *": "deny",
+                "truncate *": "deny"
+              }
+            }
+          }
+          EOF
+      - name: Run opencode
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode-go/glm-5.3-flash
+          prompt: |
+            Review this PR. Focus on issues, not on evaluating the PR itself.
+
+            Find correctness, regression, security, robustness, maintainability, and test issues. Also suggest meaningful improvements.
+
+            P0/P1 = blocking.
+            P2 = non-blocking TODO.
+
+            Review the current HEAD independently.
+            Do not treat previous reviews as authoritative.
+            Do not report speculative or purely stylistic concerns.
+
+            Every comment must include: file path + line number, what the issue is, why it is an issue, and a concrete fix suggestion. If a specific line cannot be identified, describe the location.
+
+            BLOCK if P0/P1 exists.
+            LGTM otherwise.
+            Reply in Simplified Chinese.
