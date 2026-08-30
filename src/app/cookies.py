@@ -11,6 +11,10 @@
 - 同一 (cookie 域, name) 去重，保留文件中最后一条的值（首次出现的顺序位置不变）；
   多域同名 Cookie 默认各自保留（如 x.com 与 twitter.com 的同名 Cookie 共存），
   也可通过 ``dedupe_by_name=True`` 按域名优先级（domains 元组顺序）去重。
+- 第 3 列 path 不参与解析与去重：本工具面向的平台 Cookie 均为 path=/ 的域级
+  Cookie，同一 (域, name) 的不同 path 条目会被合并（保留最后一条）。
+- 畸形行兜底：空 flag（或非 FALSE/0 值）视为域 Cookie 参与后缀匹配；
+  非数字 expiry 视为会话 Cookie 保留。
 - name 与 value 均做空白清理（strip），避免拼入非法的 cookie-octet。
 - 同一域名内按文件行序拼接为 ``name1=value1; name2=value2`` 形式的请求头字符串。
 
