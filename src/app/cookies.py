@@ -88,7 +88,8 @@ def load_cookie_header(
         flag = fields[1].strip().upper()
         expiry = fields[4].strip()
         name = fields[5].strip()
-        value = fields[6].strip()
+        # value 是最后一列：若其本身含 TAB，需把剩余列拼回，不能取 fields[6] 截断
+        value = "\t".join(fields[6:]).strip()
         if not name:
             # 空 name 会拼出 "=value" 这类非法 Cookie 头，直接跳过
             continue

@@ -228,6 +228,13 @@ def test_empty_name_skipped(tmp_path):
     assert load_cookie_header(path, ("zhihu.com",)) == "good=v"
 
 
+def test_value_with_tab_not_truncated(tmp_path):
+    """value 本身含 TAB 时应保留完整内容，不得截断为第 7 列。"""
+    content = ".zhihu.com\tTRUE\t/\tTRUE\t0\ttabbed\ta\tb\n"
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, ("zhihu.com",)) == "tabbed=a\tb"
+
+
 def test_crlf_line_endings_supported(tmp_path):
     content = ".zhihu.com\tTRUE\t/\tTRUE\t0\tcrlf\tv\r\n"
     path = _write(tmp_path, content)
