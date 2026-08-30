@@ -109,6 +109,18 @@ def test_expired_cookie_skipped_session_cookie_kept(tmp_path):
     assert header == "sess=s"
 
 
+def test_zero_padded_session_expiry_kept(tmp_path):
+    """会话 Cookie 的 expiry 以定宽/前导零形式表示（如 000、0000000000）时，
+    数值上仍为零，不应被误判为已过期而丢弃。"""
+    content = (
+        ".zhihu.com\tTRUE\t/\tTRUE\t000\tpad3\tv\n"
+        ".zhihu.com\tTRUE\t/\tTRUE\t0000000000\tpad10\tv\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(path, ("zhihu.com",))
+    assert header == "pad3=v; pad10=v"
+
+
 def test_unicode_superscript_expiry_treated_as_session(tmp_path):
     """Unicode 上标/下标（如 ² ₁₂₃）的 isdigit() 为 True 但 int() 拒绝解析，
     曾导致未捕获 ValueError 被 credential_guard 误判为凭证失效；

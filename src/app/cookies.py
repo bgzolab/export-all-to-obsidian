@@ -7,8 +7,8 @@
 - cookie 域以 ``.`` 开头时剥掉前导点；域名匹配不区分大小写（cookies.txt 中的
   大写/混合大小写域名会小写化后与目标域比较）。第 2 列 ``flag`` 为 FALSE 或 ``0``
   时仅做精确域名匹配（host-only，不发送到子域），其余（TRUE/``1`` 等）做后缀匹配。
-- 第 5 列 ``expiry`` 为非零正整数且早于当前时间时跳过该条（已过期）；``0`` 表示
-  会话 Cookie，保留。
+- 第 5 列 ``expiry`` 为非零正整数且早于当前时间时跳过该条（已过期）；``0``
+  表示会话 Cookie，保留；按数值判零，前导零的定宽形式（如 ``000``）同样保留。
 - 同一 (cookie 域, name) 去重，保留文件中最后一条的值（首次出现的顺序位置不变）；
   多域同名 Cookie 默认各自保留（如 x.com 与 twitter.com 的同名 Cookie 共存），
   也可通过 ``dedupe_by_name=True`` 按域名优先级（domains 元组顺序）去重。
@@ -108,7 +108,8 @@ def load_cookie_header(
         if not name:
             # 空 name 会拼出 "=value" 这类非法 Cookie 头，直接跳过
             continue
-        if expiry.isdecimal() and expiry != "0" and int(expiry) < now:
+        expiry_ts = int(expiry) if expiry.isdecimal() else None
+        if expiry_ts and expiry_ts < now:
             continue
         # 按 domains 元组顺序取第一个命中的域名：既决定是否匹配，
         # 也作为 dedupe_by_name 的优先级依据（子域如 api.x.com 命中 x.com，
