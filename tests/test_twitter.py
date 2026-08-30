@@ -199,10 +199,10 @@ def test_twitter_client_dedupes_x_com_and_twitter_com(monkeypatch, tmp_path):
 
     lines = [
         # 旧域 twitter.com 的 ct0 写在前面，验证最终仍取 x.com 的值
-        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tOLD_CSRF\n"
-        ".twitter.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n"
-        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tNEW_CSRF\n"
-        ".x.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n"
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tOLD_CSRF\n",
+        ".twitter.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n",
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tNEW_CSRF\n",
+        ".x.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n",
     ]
     p = tmp_path / "cookies.txt"
     p.write_text("".join(lines), encoding="utf-8")
