@@ -179,6 +179,43 @@ def test_cli_cookies_file_bad_path_exits_1(monkeypatch, tmp_path):
     assert "配置缺失" in result.output
 
 
+def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
+    """端到端：--cookies-file 经 initialize_context -> ctx.obj -> resolve_cookies_file
+    传递到平台客户端；显式参数应优先于 COOKIES 环境变量。"""
+    import app.credential_guard as guard
+    from weibo.cilent import WeiboClient
+
+    env_path = tmp_path / "env-cookies.txt"
+    env_path.write_text(
+        ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-env\n", encoding="utf-8"
+    )
+    explicit = tmp_path / "explicit-cookies.txt"
+    explicit.write_text(
+        ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-cli\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("COOKIES", str(env_path))
+    captured: list[WeiboClient] = []
+    from export_to_obsidian import eto
+
+    def fake_probe() -> guard.CredentialProbeResult:
+        # 真实构造 WeiboClient，验证 Cookie 头取自 --cookies-file 指向的文件
+        captured.append(WeiboClient())
+        return guard.CredentialProbeResult.valid("weibo")
+
+    monkeypatch.setattr(guard, "probe_weibo_credentials", fake_probe)
+    monkeypatch.setattr(
+        "app.cli.export_weibo", lambda uid, output, index_writer, force: None
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        eto,
+        ["--cookies-file", str(explicit), "weibo", "-u", "1", "-o", "output/weibo"],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured[0].session.headers["Cookie"] == "SUB=from-cli"
+
+
 def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
     events: dict[str, object] = {"export_called": False, "notified": []}
 
