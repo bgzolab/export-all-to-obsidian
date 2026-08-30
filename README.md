@@ -61,9 +61,12 @@ Optional reminder env vars:
 eto <command> [options]
 eto --prefix <prefix> <command> [options]
 eto --index-file <path> <command> [options]
+eto --cookies-file <path> <command> [options]
 ```
 
-`--index-file` and `--prefix` are top-level options. Put them before the subcommand.
+`--index-file`, `--prefix` and `--cookies-file` are top-level options. Put them before the subcommand.
+
+`--cookies-file` points to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo, bilibili and twitter. When omitted, the `COOKIES` environment variable is used.
 
 If you do not use `--index-file`, the index is printed to the terminal.
 
