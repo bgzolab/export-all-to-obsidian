@@ -271,18 +271,18 @@ def test_directory_path_raises_not_a_regular_file(monkeypatch, tmp_path):
 def test_unreadable_file_raises_config_error(monkeypatch, tmp_path):
     """cookies.txt 存在但不可读（如权限 000）时应转抛 CookiesConfigError，
     而非泄漏 PermissionError 原始 traceback。"""
-    from app.cookies import CookiesConfigError
+    import os
 
     path = _write(tmp_path, ".zhihu.com\tTRUE\t/\tTRUE\t0\ta\t1\n")
-    import os
-    import stat
 
-    os.chmod(path, stat.S_IWRITE | stat.S_IREAD)  # 确保先可读再锁定
     os.chmod(path, 0)
-    monkeypatch.setenv("COOKIES", path)
-    with pytest.raises(CookiesConfigError, match="not readable"):
-        get_cookie_header(("zhihu.com",))
-    os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+    try:
+        monkeypatch.setenv("COOKIES", path)
+        with pytest.raises(CookiesConfigError, match="not readable"):
+            get_cookie_header(("zhihu.com",))
+    finally:
+        # 断言失败也必须恢复权限，否则 tmp_path 清理会失败
+        os.chmod(path, 0o644)
 
 
 def test_ctx_cookies_file_overrides_env(monkeypatch, tmp_path):
