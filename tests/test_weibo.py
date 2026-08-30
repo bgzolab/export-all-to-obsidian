@@ -7,6 +7,7 @@
 """
 import pytest
 
+from app.cookies import CookiesConfigError
 from weibo.cilent import WeiboClient
 
 
@@ -44,5 +45,5 @@ def test_weibo_client_dedupes_cross_domain_same_name(monkeypatch, tmp_path):
 def test_weibo_client_missing_cookie_raises(monkeypatch, tmp_path):
     path = _write_cookies(tmp_path, ".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n")
     monkeypatch.setenv("COOKIES", path)
-    with pytest.raises(ValueError, match="No cookies found"):
+    with pytest.raises(CookiesConfigError, match="No cookies found"):
         WeiboClient()
