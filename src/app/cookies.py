@@ -61,13 +61,17 @@ def load_cookie_header(
     domains: tuple[str, ...],
     dedupe_by_name: bool = False,
 ) -> str:
-    """按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。
+    """    按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。
+
+    ``domains`` 应为无前导点的裸域名（如 ``"zhihu.com"``）；若误传带前导点
+    （``".zhihu.com"``）也会容错剥除后参与匹配，与解析 cookies.txt 时剥点一致。
 
     ``dedupe_by_name`` 为 True 时对跨域同名 Cookie 按域名优先级去重：
     ``domains`` 元组中的顺序即优先级（越靠前优先级越高），保留优先级最高
     域名的值；适用于 twitter 这类「主域 + 旧域」场景，避免同一请求头里
     出现重复同名 Cookie。
     """
+    domains = tuple(d.lstrip(".") for d in domains)
     domain_priority = {d: i for i, d in enumerate(domains)}
     parts: dict[tuple[str, str], str] = {}
     deduped: dict[str, tuple[int, str]] = {}

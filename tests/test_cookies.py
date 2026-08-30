@@ -65,6 +65,21 @@ def test_domain_matching_case_insensitive(tmp_path):
     ) == "ct0=MIXED"
 
 
+def test_domain_arg_with_leading_dot_tolerated(tmp_path):
+    """调用方误传带前导点的域名（如 .zhihu.com）应容错剥除后匹配，
+    且 dedupe_by_name 的优先级查表不受影响。"""
+    content = (
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tAAA\n"
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tBBB\n"
+    )
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, (".zhihu.com",)) == ""
+    assert load_cookie_header(path, (".x.com", ".twitter.com")) == "ct0=AAA; ct0=BBB"
+    assert load_cookie_header(
+        path, (".x.com", ".twitter.com"), dedupe_by_name=True
+    ) == "ct0=AAA"
+
+
 def test_flag_false_host_only_exact_match(tmp_path):
     """flag=FALSE 的 host-only Cookie 不做后缀匹配，不发送到子域。"""
     content = (
