@@ -46,6 +46,7 @@ Main env vars used by the current modules:
 - CNBLOG_ACCESS_TOKEN
 - BGM_ACCESS_TOKEN
 - V2EX_ACCESS_TOKEN
+- GITHUB_TOKEN
 - TWITTER_CSRF_TOKEN (optional, derived from the `ct0` cookie)
 - TWITTER_USER_ID (optional, derived from the `twid` cookie)
 - COOKIES (path to a Netscape-format cookies.txt used by qireader, v2ex, zhihu, weibo, bilibili and twitter)
