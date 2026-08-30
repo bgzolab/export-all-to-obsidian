@@ -110,7 +110,9 @@ def load_cookie_header(
             if dedupe_by_name:
                 prio = domain_priority[matched_domain]
                 prev = deduped.get(name)
-                if prev is None or prio < prev[0]:
+                # <= 使同优先级（同域/同匹配域）的重复同名 Cookie 保留最后一条，
+                # 与 parts 路径及 docstring 的「保留文件中最后一条的值」一致
+                if prev is None or prio <= prev[0]:
                     deduped[name] = (prio, value)
     if dedupe_by_name:
         return "; ".join(f"{name}={value}" for name, (_, value) in deduped.items())

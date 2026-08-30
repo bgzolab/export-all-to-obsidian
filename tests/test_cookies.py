@@ -115,6 +115,18 @@ def test_dedupe_by_name_falls_back_to_second_domain(tmp_path):
     assert header == "ct0=BBB; other=1"
 
 
+def test_dedupe_by_name_same_domain_keeps_last(tmp_path):
+    """dedupe_by_name 下同域同名重复也应保留最后一条值，与非去重路径一致。"""
+    content = (
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tX1\n"
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tX2\n"
+    )
+    path = _write(tmp_path, content)
+    assert load_cookie_header(
+        path, ("x.com", "twitter.com"), dedupe_by_name=True
+    ) == "ct0=X2"
+
+
 def test_dedupe_by_name_subdomain_inherits_domain_priority(tmp_path):
     """子域（api.x.com）命中主域 x.com 时应继承其优先级，高于旧域 twitter.com。"""
     content = (
