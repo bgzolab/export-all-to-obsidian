@@ -10,7 +10,7 @@
 import requests
 
 from app.cookies import get_cookie_header
-from demo import (api_endpoints)
+from weibo import api_endpoints
 
 class WeiboClient:
     def __init__(self):

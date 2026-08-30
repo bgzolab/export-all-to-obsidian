@@ -12,7 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.cookies import get_cookie_header
-from demo import (api_endpoints)
+from v2ex import api_endpoints
 
 class V2exClient:
     def __init__(self):

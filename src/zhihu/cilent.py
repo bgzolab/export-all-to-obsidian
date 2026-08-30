@@ -8,7 +8,7 @@
 import requests
 
 from app.cookies import get_cookie_header
-from demo import (api_endpoints)
+from zhihu import api_endpoints
 
 class ZhihuClient:
     def __init__(self):
