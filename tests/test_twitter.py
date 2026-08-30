@@ -89,19 +89,29 @@ def _sample_response(tweets: list, cursor: dict | None = None) -> dict:
     }
 
 
-def _make_client(monkeypatch):
+def _write_twitter_cookies(monkeypatch, tmp_path, cookie_header=TWITTER_COOKIE):
+    """将 Cookie 头字符串写入 Netscape cookies.txt 并设置 COOKIES 指向它。"""
+    lines = []
+    for pair in cookie_header.split("; "):
+        name, value = pair.split("=", 1)
+        lines.append(f".x.com\tTRUE\t/\tTRUE\t0\t{name}\t{value}\n")
+    p = tmp_path / "cookies.txt"
+    p.write_text("".join(lines), encoding="utf-8")
+    monkeypatch.setenv("COOKIES", str(p))
+    return str(p)
+
+
+def _make_client(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
     monkeypatch.delenv("TWITTER_USER_ID", raising=False)
     monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
     return TwitterClient()
 
 
-def test_twitter_client_headers_configured(monkeypatch):
-    from twitter.client import TwitterClient
-
-    client = _make_client(monkeypatch)
+def test_twitter_client_headers_configured(monkeypatch, tmp_path):
+    client = _make_client(monkeypatch, tmp_path)
     headers = client.session.headers
     assert headers["Authorization"].startswith("Bearer ")
     assert headers["Cookie"] == TWITTER_COOKIE
@@ -112,75 +122,100 @@ def test_twitter_client_headers_configured(monkeypatch):
     assert "User-Agent" in headers
 
 
-def test_twitter_client_derives_user_id_from_twid(monkeypatch):
-    from twitter.client import TwitterClient
-
-    client = _make_client(monkeypatch)
+def test_twitter_client_derives_user_id_from_twid(monkeypatch, tmp_path):
+    client = _make_client(monkeypatch, tmp_path)
     assert client.user_id == "123456789012345678"
 
 
-def test_twitter_client_derives_user_id_from_decoded_twid(monkeypatch):
+def test_twitter_client_derives_user_id_from_decoded_twid(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; twid=u=987654321098765432; ct0=abc")
+    _write_twitter_cookies(monkeypatch, tmp_path, "guest_id=1; twid=u=987654321098765432; ct0=abc")
     monkeypatch.delenv("TWITTER_USER_ID", raising=False)
     client = TwitterClient()
     assert client.user_id == "987654321098765432"
 
 
-def test_twitter_client_strips_ct0_trailing_whitespace(monkeypatch):
+def test_twitter_client_strips_ct0_trailing_whitespace(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv(
-        "TWITTER_COOKIE", "guest_id=1; twid=u%3D123456789012345678; ct0=csrfabc \n"
-    )
+    _write_twitter_cookies(monkeypatch, tmp_path, "guest_id=1; twid=u%3D123456789012345678; ct0=csrfabc \n")
     monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
     client = TwitterClient()
     assert client.session.headers["x-csrf-token"] == "csrfabc"
 
 
-def test_twitter_client_missing_ct0_raises(monkeypatch):
+def test_twitter_client_missing_ct0_raises(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; twid=u%3D123456789012345678")
+    _write_twitter_cookies(monkeypatch, tmp_path, "guest_id=1; twid=u%3D123456789012345678")
     monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
     with pytest.raises(ValueError, match="ct0"):
         TwitterClient()
 
 
-def test_twitter_client_uses_user_id_env(monkeypatch):
+def test_twitter_client_uses_user_id_env(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
     monkeypatch.setenv("TWITTER_USER_ID", "999")
     client = TwitterClient()
     assert client.user_id == "999"
 
 
-def test_twitter_client_csrf_from_env(monkeypatch):
+def test_twitter_client_csrf_from_env(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
     monkeypatch.setenv("TWITTER_CSRF_TOKEN", "csrf-from-env")
     client = TwitterClient()
     assert client.session.headers["x-csrf-token"] == "csrf-from-env"
 
 
-def test_twitter_client_missing_cookie_raises(monkeypatch):
+def test_twitter_client_missing_cookie_raises(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.delenv("TWITTER_COOKIE", raising=False)
-    with pytest.raises(ValueError, match="TWITTER_COOKIE"):
+    # 无 twitter/x.com 域的 cookies.txt
+    p = tmp_path / "cookies.txt"
+    p.write_text(".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n", encoding="utf-8")
+    monkeypatch.setenv("COOKIES", str(p))
+    with pytest.raises(ValueError, match="No cookies found"):
         TwitterClient()
 
 
-def test_twitter_client_missing_user_id_raises(monkeypatch):
+def test_twitter_client_missing_user_id_raises(monkeypatch, tmp_path):
     from twitter.client import TwitterClient
 
-    monkeypatch.setenv("TWITTER_COOKIE", "guest_id=1; ct0=abc")
+    _write_twitter_cookies(monkeypatch, tmp_path, "guest_id=1; ct0=abc")
     monkeypatch.delenv("TWITTER_USER_ID", raising=False)
     with pytest.raises(ValueError, match="TWITTER_USER_ID"):
         TwitterClient()
+
+
+def test_twitter_client_dedupes_x_com_and_twitter_com(monkeypatch, tmp_path):
+    """端到端：cookies.txt 同时含 .x.com 与 .twitter.com 的同名 Cookie 时，
+    TwitterClient 输出的 Cookie 头应去重且 csrf 取 x.com 的值。"""
+    from twitter.client import TwitterClient
+
+    lines = [
+        # 旧域 twitter.com 的 ct0 写在前面，验证最终仍取 x.com 的值
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tOLD_CSRF\n",
+        ".twitter.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n",
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tNEW_CSRF\n",
+        ".x.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n",
+    ]
+    p = tmp_path / "cookies.txt"
+    p.write_text("".join(lines), encoding="utf-8")
+    monkeypatch.setenv("COOKIES", str(p))
+    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
+    client = TwitterClient()
+    cookie_header = client.session.headers["Cookie"]
+    assert cookie_header == (
+        "ct0=NEW_CSRF; twid=u%3D123456789012345678"
+    )
+    assert client.session.headers["x-csrf-token"] == "NEW_CSRF"
+    assert client.user_id == "123456789012345678"
 
 
 def test_tweet_parsing():
@@ -371,11 +406,11 @@ def test_parse_created_at_returns_raw_on_invalid():
     )
 
 
-def test_get_twitter_like_list_builds_params(monkeypatch):
+def test_get_twitter_like_list_builds_params(monkeypatch, tmp_path):
     from twitter.entity import LikesPage
     from twitter.like import get_twitter_like_list
 
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, tmp_path)
 
     captured = {}
 
@@ -428,10 +463,10 @@ def test_build_likes_params_with_cursor():
     assert json.loads(params["variables"])["cursor"] == "NEXT"
 
 
-def test_get_twitter_like_list_returns_none_on_non_dict_payload(monkeypatch):
+def test_get_twitter_like_list_returns_none_on_non_dict_payload(monkeypatch, tmp_path):
     from twitter.like import get_twitter_like_list
 
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, tmp_path)
 
     class FakeSession:
         def get(self, url, params, **kwargs):
@@ -449,10 +484,10 @@ def test_get_twitter_like_list_returns_none_on_non_dict_payload(monkeypatch):
     assert get_twitter_like_list(client) is None
 
 
-def test_get_twitter_like_list_returns_none_on_json_decode_error(monkeypatch):
+def test_get_twitter_like_list_returns_none_on_json_decode_error(monkeypatch, tmp_path):
     from twitter.like import get_twitter_like_list
 
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, tmp_path)
 
     class FakeSession:
         def get(self, url, params, **kwargs):
@@ -470,10 +505,10 @@ def test_get_twitter_like_list_returns_none_on_json_decode_error(monkeypatch):
     assert get_twitter_like_list(client) is None
 
 
-def test_get_twitter_like_list_returns_none_on_non_dict_data(monkeypatch):
+def test_get_twitter_like_list_returns_none_on_non_dict_data(monkeypatch, tmp_path):
     from twitter.like import get_twitter_like_list
 
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, tmp_path)
 
     class FakeSession:
         def get(self, url, params, **kwargs):
@@ -498,7 +533,7 @@ def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     page = LikesPage(
         tweets=[
@@ -545,7 +580,7 @@ def test_exporter_stops_on_existing_file(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     (tmp_path / "~alice-111.md").write_text("existing", encoding="utf-8")
 
@@ -571,7 +606,7 @@ def test_exporter_stops_on_existing_file(monkeypatch, tmp_path):
 def test_exporter_stops_on_fetch_exception_and_flushes(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     def boom(client, count=20, cursor=None):
         raise RuntimeError("network down")
@@ -594,7 +629,7 @@ def test_exporter_filename_falls_back_to_author_id(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     page = LikesPage(
         tweets=[
@@ -624,7 +659,7 @@ def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     page = LikesPage(
         tweets=[
@@ -662,7 +697,7 @@ def test_exporter_stops_when_cursor_repeats(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     page = LikesPage(
         tweets=[
@@ -700,19 +735,7 @@ def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
-
-    page = LikesPage(
-        tweets=[
-            Tweet(
-                id_str="111",
-                created_at="Thu Aug 15 12:00:00 +0000 2024",
-                full_text="Hello Twitter",
-                author=TwitterUser(screen_name="alice", name="Alice"),
-            )
-        ],
-        cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
-    )
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     calls = []
 
@@ -748,7 +771,7 @@ def test_exporter_falls_back_to_default_when_max_pages_zero(monkeypatch, tmp_pat
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     page = LikesPage(
         tweets=[
@@ -791,7 +814,7 @@ def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
     from twitter.entity import Tweet
     from twitter.entity import TwitterUser
 
-    monkeypatch.setenv("TWITTER_COOKIE", TWITTER_COOKIE)
+    _write_twitter_cookies(monkeypatch, tmp_path)
 
     page = LikesPage(
         tweets=[

@@ -9,6 +9,7 @@ from typing import Callable, Literal
 import click
 import requests
 
+from app.cookies import CookiesConfigError
 from bangumi.api_endpoints import USER_CURRENT as BANGUMI_USER_CURRENT
 from bangumi.client import BangumiClient
 from bilibili.api_endpoints import BILIBILI_FAV_URL
@@ -120,7 +121,12 @@ def probe_bangumi_credentials() -> CredentialProbeResult:
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("username"):
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(module, "BGM_ACCESS_TOKEN 未返回有效用户信息")
@@ -157,20 +163,27 @@ def probe_qireader_credentials(tag: str) -> CredentialProbeResult:
                 "olderThan": None,
             },
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "QIREADER_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "qireader Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(
             module,
             f"探针返回 {_http_failure_reason(response)}，可能是标签无效或服务异常",
         )
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if "result" in payload:
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.unknown(module, "探针响应缺少 result 字段")
@@ -181,13 +194,15 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
     try:
         client = V2exClient()
         response = client.session.get(V2EX_FAV, params={"p": 1}, allow_redirects=False)
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {301, 302, 303, 307, 308}:
-        return CredentialProbeResult.invalid(module, "V2EX_COOKIE 已过期或未登录")
+        return CredentialProbeResult.invalid(module, "v2ex Cookie 已过期或未登录")
     if response.status_code in {401, 403}:
         return CredentialProbeResult.invalid(module, "V2EX 凭证已过期或无效")
     if response.status_code != 200:
@@ -206,13 +221,15 @@ def probe_twitter_credentials() -> CredentialProbeResult:
             params=build_likes_params(client.user_id, 1),
             timeout=30,
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "TWITTER_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "twitter Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
@@ -226,7 +243,7 @@ def probe_twitter_credentials() -> CredentialProbeResult:
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(
         module,
-        "TWITTER_COOKIE 已过期或接口未返回有效登录态",
+        "twitter Cookie 已过期或接口未返回有效登录态",
     )
 
 
@@ -238,13 +255,15 @@ def probe_zhihu_credentials(collection: str) -> CredentialProbeResult:
             ZHIHU_FAV_URL.format(collection_id=collection),
             params={"offset": 0, "limit": 1},
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "ZHIHU_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "zhihu Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(
             module,
@@ -261,20 +280,27 @@ def probe_weibo_credentials(uid: int) -> CredentialProbeResult:
             WEIBO_LIKE_URL,
             params={"page": 1, "uid": uid, "with_total": True},
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "WEIBO_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "weibo Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("ok") == 1:
         return CredentialProbeResult.valid(module)
-    return CredentialProbeResult.invalid(module, "WEIBO_COOKIE 已过期或接口未返回有效登录态")
+    return CredentialProbeResult.invalid(module, "weibo Cookie 已过期或接口未返回有效登录态")
 
 
 def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
@@ -295,24 +321,31 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
                 "web_location": 333.1387,
             },
         )
+    except CookiesConfigError as exc:
+        raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
         return CredentialProbeResult.invalid(module, str(exc))
     except requests.RequestException as exc:
         return CredentialProbeResult.unknown(module, f"验活请求失败: {exc}")
 
     if response.status_code in {401, 403}:
-        return CredentialProbeResult.invalid(module, "BILIBILI_COOKIE 已过期或无效")
+        return CredentialProbeResult.invalid(module, "bilibili Cookie 已过期或无效")
     if response.status_code != 200:
         return CredentialProbeResult.unknown(
             module,
             f"探针返回 {_http_failure_reason(response)}，可能是收藏夹不可访问或服务异常",
         )
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("code") == 0:
         return CredentialProbeResult.valid(module)
     if payload.get("code") == -101:
-        return CredentialProbeResult.invalid(module, "BILIBILI_COOKIE 已过期或未登录")
+        return CredentialProbeResult.invalid(module, "bilibili Cookie 已过期或未登录")
     return CredentialProbeResult.unknown(
         module,
         f"探针返回 code={payload.get('code')} message={payload.get('message')}",

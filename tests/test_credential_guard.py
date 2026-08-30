@@ -1,4 +1,5 @@
 from click.testing import CliRunner
+import pytest
 
 from app.credential_guard import CredentialProbeResult
 from app.credential_guard import run_with_credential_guard
@@ -39,6 +40,76 @@ def _fake_twitter_probe(
 
     monkeypatch.setattr(guard, "TwitterClient", lambda: FakeClient())
     return guard
+
+
+def _fake_probe_client(monkeypatch, client_attr, payload=None, json_error=None):
+    """通用 fake：patch guard.<client_attr> 为固定返回 200 的客户端，
+    用于覆盖各 probe 的 response.json() 解析路径。"""
+    import app.credential_guard as guard
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        @property
+        def status_code(self):
+            return 200
+
+        def json(self):
+            if json_error is not None:
+                raise json_error
+            return self._payload
+
+    class FakeSession:
+        def get(self, *args, **kwargs):
+            return FakeResponse(payload)
+
+    class FakeClient:
+        session = FakeSession()
+
+    monkeypatch.setattr(guard, client_attr, lambda: FakeClient())
+
+
+# 与 probe_twitter_credentials 不同，以下 4 个 probe 均在响应体解析处读取 payload，
+# 需对 200 + 非 JSON/非 dict 响应做防护
+_JSON_PROBE_CASES = [
+    ("BangumiClient", "probe_bangumi_credentials", ()),
+    ("QiReaderClient", "probe_qireader_credentials", ("tag",)),
+    ("WeiboClient", "probe_weibo_credentials", (1,)),
+    ("BilibiliClient", "probe_bilibili_credentials", (1,)),
+]
+
+
+@pytest.mark.parametrize(
+    "client_attr,probe_name,probe_args", _JSON_PROBE_CASES
+)
+def test_probe_non_json_payload_unknown(monkeypatch, client_attr, probe_name, probe_args):
+    """200 + 非 dict JSON（如数组）应判为 unknown，而非 payload.get AttributeError 崩溃。"""
+    import app.credential_guard as guard
+
+    _fake_probe_client(monkeypatch, client_attr, payload=[1, 2, 3])
+    result = getattr(guard, probe_name)(*probe_args)
+    assert result.status == "unknown"
+    assert "非 JSON 对象" in result.reason
+
+
+@pytest.mark.parametrize(
+    "client_attr,probe_name,probe_args", _JSON_PROBE_CASES
+)
+def test_probe_json_decode_error_unknown(monkeypatch, client_attr, probe_name, probe_args):
+    """200 + JSONDecodeError 应判为 unknown，而非 JSONDecodeError 裸崩溃。"""
+    import json
+
+    import app.credential_guard as guard
+
+    _fake_probe_client(
+        monkeypatch,
+        client_attr,
+        json_error=json.JSONDecodeError("Expecting value", "doc", 0),
+    )
+    result = getattr(guard, probe_name)(*probe_args)
+    assert result.status == "unknown"
+    assert "响应解析失败" in result.reason
 
 
 def test_probe_twitter_valid(monkeypatch):
@@ -99,12 +170,74 @@ def test_probe_twitter_value_error_invalid(monkeypatch):
     import app.credential_guard as guard
 
     def boom():
-        raise ValueError("TWITTER_COOKIE 缺失")
+        raise ValueError("COOKIES 配置无效")
 
     monkeypatch.setattr(guard, "TwitterClient", boom)
     result = guard.probe_twitter_credentials()
     assert result.status == "invalid"
-    assert "TWITTER_COOKIE" in result.reason
+    assert "COOKIES" in result.reason
+
+
+def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
+    """cookies.txt 配置缺失应抛 ClickException（非零退出码），而非判为凭证失效。"""
+    import click
+    import pytest
+
+    import app.credential_guard as guard
+    from app.cookies import CookiesConfigError
+
+    def boom():
+        raise CookiesConfigError("Cookies file not found: /no/such/cookies.txt")
+
+    monkeypatch.setattr(guard, "TwitterClient", boom)
+    with pytest.raises(click.ClickException, match="配置缺失"):
+        guard.probe_twitter_credentials()
+
+
+@pytest.mark.parametrize(
+    "client_attr,probe_name,probe_args",
+    [
+        ("QiReaderClient", "probe_qireader_credentials", ("tag",)),
+        ("V2exClient", "probe_v2ex_credentials", ()),
+        ("TwitterClient", "probe_twitter_credentials", ()),
+        ("ZhihuClient", "probe_zhihu_credentials", ("collection",)),
+        ("WeiboClient", "probe_weibo_credentials", (1,)),
+        ("BilibiliClient", "probe_bilibili_credentials", (1,)),
+    ],
+)
+def test_probe_cookies_config_error_raises_click_exception(
+    monkeypatch, client_attr, probe_name, probe_args
+):
+    """所有基于 cookies.txt 的 probe 在 CookiesConfigError 时应抛 ClickException
+    （非零退出码）而非判为凭证失效，行为与 twitter 一致。"""
+    import click
+
+    import app.credential_guard as guard
+    from app.cookies import CookiesConfigError
+
+    def boom():
+        raise CookiesConfigError("Cookies file not found: /no/such/cookies.txt")
+
+    monkeypatch.setattr(guard, client_attr, boom)
+    with pytest.raises(click.ClickException, match="配置缺失"):
+        getattr(guard, probe_name)(*probe_args)
+
+
+def test_probe_twitter_missing_ct0_in_cookie_invalid(monkeypatch, tmp_path):
+    """真实路径：cookies.txt 存在但缺 ct0/twid 且环境变量未设时，
+    TwitterClient 抛 ValueError，探测应判为 invalid（跳过+提醒）而非硬退出。"""
+    import app.credential_guard as guard
+
+    p = tmp_path / "cookies.txt"
+    p.write_text(
+        ".x.com\tTRUE\t/\tTRUE\t0\tguest_id\t1\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("COOKIES", str(p))
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
+    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    result = guard.probe_twitter_credentials()
+    assert result.status == "invalid"
+    assert "ct0" in result.reason
 
 
 def test_probe_twitter_request_exception_unknown(monkeypatch):
@@ -118,11 +251,105 @@ def test_probe_twitter_request_exception_unknown(monkeypatch):
     assert "network down" in result.reason
 
 
+def test_probe_weibo_missing_domain_cookie_invalid(monkeypatch, tmp_path):
+    """cookies.txt 存在但无目标平台域时应判为 invalid（跳过+提醒），而非硬退出。"""
+    import app.credential_guard as guard
+
+    p = tmp_path / "cookies.txt"
+    p.write_text(
+        ".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("COOKIES", str(p))
+    result = guard.probe_weibo_credentials(uid=1)
+    assert result.status == "invalid"
+    assert "No cookies found" in result.reason
+
+
+def test_cli_cookies_file_bad_path_exits_1(monkeypatch, tmp_path):
+    """--cookies-file 指向不存在的文件时应与 COOKIES 一致：exit 1「配置缺失」，
+    而非 click 参数校验的 exit 2（exists=True 已移除，统一由 get_cookie_header 报错）。"""
+    from export_to_obsidian import eto
+
+    bad = tmp_path / "no-such-cookies.txt"
+    runner = CliRunner()
+    result = runner.invoke(
+        eto, ["--cookies-file", str(bad), "weibo", "-u", "1", "-o", "output/weibo"]
+    )
+    assert result.exit_code == 1
+    assert "配置缺失" in result.output
+
+
+def test_cli_cookies_file_directory_exits_1(monkeypatch, tmp_path):
+    """--cookies-file 指向目录时应与 COOKIES 一致：exit 1「配置缺失」，
+    而非 click 参数校验的 exit 2（dir_okay=False 已移除，统一由 get_cookie_header 报错）。"""
+    from export_to_obsidian import eto
+
+    runner = CliRunner()
+    result = runner.invoke(
+        eto, ["--cookies-file", str(tmp_path), "weibo", "-u", "1", "-o", "output/weibo"]
+    )
+    assert result.exit_code == 1
+    assert "配置缺失" in result.output
+    assert "not a regular file" in result.output
+
+
+def test_cli_index_file_directory_exits_1(monkeypatch, tmp_path):
+    """--index-file 指向目录时应与 --cookies-file 一致：exit 1（ClickException），
+    而非 click 参数校验的 exit 2（dir_okay=False 已移除，统一由 initialize_context 报错）。"""
+    from export_to_obsidian import eto
+
+    runner = CliRunner()
+    result = runner.invoke(
+        eto,
+        ["--index-file", str(tmp_path), "cnblog", "-o", "output/cnblog"],
+    )
+    assert result.exit_code == 1
+    assert "Index file is a directory" in result.output
+
+
+def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
+    """端到端：--cookies-file 经 initialize_context -> ctx.obj -> resolve_cookies_file
+    传递到平台客户端；显式参数应优先于 COOKIES 环境变量。"""
+    import app.credential_guard as guard
+    from weibo.cilent import WeiboClient
+
+    env_path = tmp_path / "env-cookies.txt"
+    env_path.write_text(
+        ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-env\n", encoding="utf-8"
+    )
+    explicit = tmp_path / "explicit-cookies.txt"
+    explicit.write_text(
+        ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-cli\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("COOKIES", str(env_path))
+    captured: list[WeiboClient] = []
+    from export_to_obsidian import eto
+
+    def fake_probe(uid: int) -> guard.CredentialProbeResult:
+        # 真实构造 WeiboClient，验证 Cookie 头取自 --cookies-file 指向的文件
+        captured.append(WeiboClient())
+        return guard.CredentialProbeResult.valid("weibo")
+
+    # cli.py 是 from-import 绑定，须 patch app.cli 命名空间才不会触发真实网络探测
+    monkeypatch.setattr("app.cli.probe_weibo_credentials", fake_probe)
+    monkeypatch.setattr(
+        "app.cli.export_weibo", lambda uid, output, index_writer, force: None
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        eto,
+        ["--cookies-file", str(explicit), "weibo", "-u", "1", "-o", "output/weibo"],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured[0].session.headers["Cookie"] == "SUB=from-cli"
+
+
 def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
     events: dict[str, object] = {"export_called": False, "notified": []}
 
     def probe() -> CredentialProbeResult:
-        return CredentialProbeResult.invalid("zhihu", "ZHIHU_COOKIE 已过期")
+        return CredentialProbeResult.invalid("zhihu", "zhihu Cookie 已过期")
 
     def export_action() -> None:
         events["export_called"] = True

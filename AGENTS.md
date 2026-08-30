@@ -11,11 +11,9 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
 
 - Thin entry: `src/export_to_obsidian.py` -> `src/app/cli.py`
 - Platform modules (all registered in the CLI): `bangumi`, `bilibili`, `cnblog`,
-  `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
+  `github`, `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
 - Shared runtime: `src/export_runtime/` (index_writer, exporter_support)
 - Common utilities: `src/utils/`, `src/entity/`
-- `src/demo/` is scaffolding; `src/github/` is an empty dir and not registered as a
-  command — do not treat them as implemented platforms
 
 ## Tech stack
 
@@ -48,21 +46,23 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 
 ## CLI contract (gotchas)
 
-- `--index-file` is a **top-level option and must come before the subcommand**; when
-  omitted, the index is printed to the terminal.
+- `--index-file`、`--prefix` and `--cookies-file` are **top-level options and must come
+  before the subcommand**; when `--index-file` is omitted, the index is printed to the
+  terminal. `--cookies-file` points to a Netscape-format `cookies.txt`; when omitted, the
+  environment variable `COOKIES` (the file path) is used.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
-  `bilibili(-f -o [--force])`.
+  `bilibili(-f -o [--force])`, `github(-t -o [--force])`.
 - `--force` currently only affects bangumi, weibo, bilibili, and twitter.
 
 ## Environment variables (required by module exports)
 
-`CNBLOG_ACCESS_TOKEN`, `BGM_ACCESS_TOKEN`, `QIREADER_COOKIE`, `V2EX_ACCESS_TOKEN`,
-`V2EX_COOKIE`, `WEIBO_COOKIE`, `ZHIHU_COOKIE`, `BILIBILI_COOKIE`, `TWITTER_COOKIE`,
-`TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID` fall
-back to deriving from the Cookie (`ct0` / `twid`). Optional
-notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. (`GITHUB_TOKEN` no longer has
-a corresponding implementation; ignore it.)
+`CNBLOG_ACCESS_TOKEN`, `BGM_ACCESS_TOKEN`, `V2EX_ACCESS_TOKEN`,
+`TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID`
+fall back to deriving from the cookies.txt Cookie (`ct0` / `twid`). `COOKIES` holds the
+path to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo,
+bilibili and twitter. `GITHUB_TOKEN` is used by the github module. Optional
+notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
 ## Incremental / output behavior
 
@@ -81,10 +81,20 @@ a corresponding implementation; ignore it.)
 
 ## Test status
 
-- Existing tests: `test_bangumi.py`, `test_cnblog.py`, `test_credential_guard.py`,
-  `test_github.py`, `test_qireader.py`, `test_twitter.py`, `test_utils.py`, `test_v2ex.py`.
-- No dedicated test files yet for `bilibili`, `weibo`, `zhihu` (prioritize adding them
-  when touching those modules).
+- Existing tests:
+  - `test_bangumi.py`
+  - `test_bilibili.py`
+  - `test_cnblog.py`
+  - `test_cookies.py`
+  - `test_credential_guard.py`
+  - `test_github.py`
+  - `test_qireader.py`
+  - `test_twitter.py`
+  - `test_utils.py`
+  - `test_v2ex.py`
+  - `test_weibo.py`
+  - `test_zhihu.py`
+
 
 ## Non-goals
 

@@ -30,7 +30,7 @@ from zhihu.exporter import export as export_zhihu
 @click.group()
 @click.option(
     "--index-file",
-    type=click.Path(dir_okay=False, path_type=str),
+    type=click.Path(path_type=str),
     help="索引输出文件路径；未指定时直接打印到控制台",
 )
 @click.option(
@@ -39,10 +39,21 @@ from zhihu.exporter import export as export_zhihu
     show_default=True,
     help="所有导出文件的统一名前缀；必须放在子命令前",
 )
+@click.option(
+    "--cookies-file",
+    type=click.Path(path_type=str),
+    default=None,
+    help="cookies.txt 文件路径；未指定时读取环境变量 COOKIES",
+)
 @click.pass_context
-def eto(ctx: click.Context, index_file: Optional[str], prefix: str) -> None:
+def eto(
+    ctx: click.Context,
+    index_file: Optional[str],
+    prefix: str,
+    cookies_file: Optional[str],
+) -> None:
     """导出命令组。"""
-    initialize_context(ctx, index_file, prefix)
+    initialize_context(ctx, index_file, prefix, cookies_file)
 
 
 @eto.command()

@@ -14,8 +14,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from app.cookies import get_cookie_header
 from twitter.api_endpoints import TWITTER_BEARER_TOKEN
-from twitter.api_endpoints import TWITTER_COOKIE_ENV
 from twitter.api_endpoints import TWITTER_CSRF_ENV
 from twitter.api_endpoints import TWITTER_USER_ID_ENV
 
@@ -37,9 +37,12 @@ class TwitterClient:
     """封装 X 网页端 GraphQL 请求所需的 Cookie 与请求头。"""
 
     def __init__(self) -> None:
-        cookie = os.getenv(TWITTER_COOKIE_ENV)
-        if not cookie:
-            raise ValueError(f"{TWITTER_COOKIE_ENV} environment variable is not set.")
+        # x.com / twitter.com 是「主域 + 旧域」，浏览器导出的 cookies.txt 常同时
+        # 含两域的同名 Cookie（如 ct0），按域名优先级去重，x.com 优先，
+        # 避免 Cookie 头出现重复同名条目导致 csrf 取值不确定。
+        cookie = get_cookie_header(
+            ("x.com", "twitter.com"), dedupe_by_name=True
+        )
 
         csrf_token = os.getenv(TWITTER_CSRF_ENV)
         if not csrf_token:
@@ -47,6 +50,9 @@ class TwitterClient:
             if match:
                 csrf_token = match.group(1).strip()
         if not csrf_token:
+            # 缺 ct0/twid 属于凭证缺失而非配置缺失：抛 ValueError，由
+            # credential_guard 判为 invalid 走「跳过+提醒」，与改造前语义一致，
+            # 不使用 CookiesConfigError 的硬退出语义。
             raise ValueError(
                 f"{TWITTER_CSRF_ENV} environment variable is not set "
                 "or Cookie missing ct0."
