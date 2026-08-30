@@ -41,7 +41,7 @@ from zhihu.exporter import export as export_zhihu
 )
 @click.option(
     "--cookies-file",
-    type=click.Path(dir_okay=False, path_type=str),
+    type=click.Path(path_type=str),
     default=None,
     help="cookies.txt 文件路径；未指定时读取环境变量 COOKIES",
 )
