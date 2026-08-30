@@ -94,15 +94,20 @@ def load_cookie_header(
             continue
         if expiry.isdigit() and expiry != "0" and int(expiry) < now:
             continue
-        matched = any(
-            cookie_domain == d
-            or (flag not in ("FALSE", "0") and cookie_domain.endswith("." + d))
-            for d in domains
-        )
-        if matched:
+        # 按 domains 元组顺序取第一个命中的域名：既决定是否匹配，
+        # 也作为 dedupe_by_name 的优先级依据（子域如 api.x.com 命中 x.com，
+        # 应继承 x.com 的优先级，而非用 cookie_domain 本身查表）
+        matched_domain = None
+        for d in domains:
+            if cookie_domain == d or (
+                flag not in ("FALSE", "0") and cookie_domain.endswith("." + d)
+            ):
+                matched_domain = d
+                break
+        if matched_domain is not None:
             parts[(cookie_domain, name)] = value
             if dedupe_by_name:
-                prio = domain_priority.get(cookie_domain, len(domains))
+                prio = domain_priority[matched_domain]
                 prev = deduped.get(name)
                 if prev is None or prio < prev[0]:
                     deduped[name] = (prio, value)

@@ -115,6 +115,19 @@ def test_dedupe_by_name_falls_back_to_second_domain(tmp_path):
     assert header == "ct0=BBB; other=1"
 
 
+def test_dedupe_by_name_subdomain_inherits_domain_priority(tmp_path):
+    """子域（api.x.com）命中主域 x.com 时应继承其优先级，高于旧域 twitter.com。"""
+    content = (
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tTW\n"
+        "api.x.com\tTRUE\t/\tTRUE\t0\tct0\tSUB\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(
+        path, ("x.com", "twitter.com"), dedupe_by_name=True
+    )
+    assert header == "ct0=SUB"
+
+
 def test_utf8_bom_stripped(tmp_path):
     """UTF-8 BOM 应被剥除，host-only 首条 Cookie 不被静默丢弃。"""
     content = "zhihu.com\tFALSE\t/\tTRUE\t0\thost\tv1\n"
