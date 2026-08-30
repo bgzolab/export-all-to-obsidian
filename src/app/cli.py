@@ -30,7 +30,7 @@ from zhihu.exporter import export as export_zhihu
 @click.group()
 @click.option(
     "--index-file",
-    type=click.Path(dir_okay=False, path_type=str),
+    type=click.Path(path_type=str),
     help="索引输出文件路径；未指定时直接打印到控制台",
 )
 @click.option(

@@ -1,5 +1,7 @@
 """click 运行时上下文。"""
 
+import os
+
 import click
 
 from export_runtime.index_writer import IndexWriter
@@ -12,6 +14,10 @@ def initialize_context(
     cookies_file: str | None = None,
 ) -> None:
     """初始化根上下文。"""
+    if index_file and os.path.isdir(index_file):
+        # 与 --cookies-file 指向目录的约定一致：坏路径统一 exit 1（ClickException），
+        # 而非 click 参数校验的 exit 2（dir_okay=False 已移除）
+        raise click.ClickException(f"Index file is a directory: {index_file}")
     ctx.ensure_object(dict)
     ctx.obj["index_writer"] = IndexWriter(file_path=index_file)
     ctx.obj["output_prefix"] = output_prefix
