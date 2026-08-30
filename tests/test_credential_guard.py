@@ -197,7 +197,7 @@ def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
     captured: list[WeiboClient] = []
     from export_to_obsidian import eto
 
-    def fake_probe() -> guard.CredentialProbeResult:
+    def fake_probe(uid: int) -> guard.CredentialProbeResult:
         # 真实构造 WeiboClient，验证 Cookie 头取自 --cookies-file 指向的文件
         captured.append(WeiboClient())
         return guard.CredentialProbeResult.valid("weibo")
