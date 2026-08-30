@@ -42,6 +42,76 @@ def _fake_twitter_probe(
     return guard
 
 
+def _fake_probe_client(monkeypatch, client_attr, payload=None, json_error=None):
+    """通用 fake：patch guard.<client_attr> 为固定返回 200 的客户端，
+    用于覆盖各 probe 的 response.json() 解析路径。"""
+    import app.credential_guard as guard
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        @property
+        def status_code(self):
+            return 200
+
+        def json(self):
+            if json_error is not None:
+                raise json_error
+            return self._payload
+
+    class FakeSession:
+        def get(self, *args, **kwargs):
+            return FakeResponse(payload)
+
+    class FakeClient:
+        session = FakeSession()
+
+    monkeypatch.setattr(guard, client_attr, lambda: FakeClient())
+
+
+# 与 probe_twitter_credentials 不同，以下 4 个 probe 均在响应体解析处读取 payload，
+# 需对 200 + 非 JSON/非 dict 响应做防护
+_JSON_PROBE_CASES = [
+    ("BangumiClient", "probe_bangumi_credentials", ()),
+    ("QiReaderClient", "probe_qireader_credentials", ("tag",)),
+    ("WeiboClient", "probe_weibo_credentials", (1,)),
+    ("BilibiliClient", "probe_bilibili_credentials", (1,)),
+]
+
+
+@pytest.mark.parametrize(
+    "client_attr,probe_name,probe_args", _JSON_PROBE_CASES
+)
+def test_probe_non_json_payload_unknown(monkeypatch, client_attr, probe_name, probe_args):
+    """200 + 非 dict JSON（如数组）应判为 unknown，而非 payload.get AttributeError 崩溃。"""
+    import app.credential_guard as guard
+
+    _fake_probe_client(monkeypatch, client_attr, payload=[1, 2, 3])
+    result = getattr(guard, probe_name)(*probe_args)
+    assert result.status == "unknown"
+    assert "非 JSON 对象" in result.reason
+
+
+@pytest.mark.parametrize(
+    "client_attr,probe_name,probe_args", _JSON_PROBE_CASES
+)
+def test_probe_json_decode_error_unknown(monkeypatch, client_attr, probe_name, probe_args):
+    """200 + JSONDecodeError 应判为 unknown，而非 JSONDecodeError 裸崩溃。"""
+    import json
+
+    import app.credential_guard as guard
+
+    _fake_probe_client(
+        monkeypatch,
+        client_attr,
+        json_error=json.JSONDecodeError("Expecting value", "doc", 0),
+    )
+    result = getattr(guard, probe_name)(*probe_args)
+    assert result.status == "unknown"
+    assert "响应解析失败" in result.reason
+
+
 def test_probe_twitter_valid(monkeypatch):
     guard = _fake_twitter_probe(monkeypatch, payload={"data": {"user": {}}})
     result = guard.probe_twitter_credentials()

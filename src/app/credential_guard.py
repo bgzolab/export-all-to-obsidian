@@ -121,7 +121,12 @@ def probe_bangumi_credentials() -> CredentialProbeResult:
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("username"):
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(module, "BGM_ACCESS_TOKEN 未返回有效用户信息")
@@ -173,7 +178,12 @@ def probe_qireader_credentials(tag: str) -> CredentialProbeResult:
             f"探针返回 {_http_failure_reason(response)}，可能是标签无效或服务异常",
         )
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if "result" in payload:
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.unknown(module, "探针响应缺少 result 字段")
@@ -282,7 +292,12 @@ def probe_weibo_credentials(uid: int) -> CredentialProbeResult:
     if response.status_code != 200:
         return CredentialProbeResult.unknown(module, _http_failure_reason(response))
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("ok") == 1:
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(module, "weibo Cookie 已过期或接口未返回有效登录态")
@@ -321,7 +336,12 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
             f"探针返回 {_http_failure_reason(response)}，可能是收藏夹不可访问或服务异常",
         )
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, TypeError, AttributeError) as exc:
+        return CredentialProbeResult.unknown(module, f"响应解析失败: {exc}")
+    if not isinstance(payload, dict):
+        return CredentialProbeResult.unknown(module, "响应解析失败: 非 JSON 对象")
     if payload.get("code") == 0:
         return CredentialProbeResult.valid(module)
     if payload.get("code") == -101:
