@@ -14,7 +14,6 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
   `github`, `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
 - Shared runtime: `src/export_runtime/` (index_writer, exporter_support)
 - Common utilities: `src/utils/`, `src/entity/`
-- `src/demo/` is scaffolding; do not treat it as an implemented platform
 
 ## Tech stack
 
