@@ -61,7 +61,7 @@ def load_cookie_header(
     domains: tuple[str, ...],
     dedupe_by_name: bool = False,
 ) -> str:
-    """    按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。
+    """按域名匹配从 cookies.txt 提取 Cookie，按文件行序去重拼接请求头。
 
     ``domains`` 应为无前导点的裸域名（如 ``"zhihu.com"``）；若误传带前导点
     （``".zhihu.com"``）也会容错剥除后参与匹配，与解析 cookies.txt 时剥点一致。
