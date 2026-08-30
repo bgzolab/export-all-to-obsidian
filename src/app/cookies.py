@@ -28,8 +28,12 @@ import time
 import click
 
 
-class CookiesConfigError(ValueError):
-    """cookies.txt 配置缺失或数据错误（环境变量未设、文件不存在、编码错误或域名无匹配）。"""
+class CookiesConfigError(Exception):
+    """cookies.txt 配置缺失或数据错误（环境变量未设、文件不存在、编码错误等）。
+
+    刻意不继承 ValueError：与「凭证失效」(ValueError) 保持类型正交，
+    调用方的 ``except CookiesConfigError`` / ``except ValueError`` 无顺序约束。
+    """
 
 
 def resolve_cookies_file() -> str:
