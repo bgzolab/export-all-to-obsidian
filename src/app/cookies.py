@@ -17,6 +17,8 @@
 - 畸形行兜底：空 flag（或非 FALSE/0 值）视为域 Cookie 参与后缀匹配；
   非数字 expiry 视为会话 Cookie 保留。
 - name 与 value 均做空白清理（strip），避免拼入非法的 cookie-octet。
+- value 按 netscape 格式原样取用，不转义 ``;`` 等字符：RFC 6265 的
+  cookie-octet 排除 ``;``，正常导出工具不会产生，假定来源合法。
 - 同一域名内按文件行序拼接为 ``name1=value1; name2=value2`` 形式的请求头字符串。
 
 配置读取优先级：click 根上下文 ``ctx.obj["cookies_file"]``（由顶层 ``--cookies-file``
