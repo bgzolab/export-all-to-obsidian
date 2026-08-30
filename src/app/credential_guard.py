@@ -158,8 +158,6 @@ def probe_qireader_credentials(tag: str) -> CredentialProbeResult:
                 "olderThan": None,
             },
         )
-    # 注意：CookiesConfigError 继承自 ValueError，此分支必须排在 except ValueError
-    # 之前，否则配置缺失会被误判为凭证失效，顺序不可调换。
     except CookiesConfigError as exc:
         raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
@@ -186,8 +184,6 @@ def probe_v2ex_credentials() -> CredentialProbeResult:
     try:
         client = V2exClient()
         response = client.session.get(V2EX_FAV, params={"p": 1}, allow_redirects=False)
-    # 注意：CookiesConfigError 继承自 ValueError，此分支必须排在 except ValueError
-    # 之前，否则配置缺失会被误判为凭证失效，顺序不可调换。
     except CookiesConfigError as exc:
         raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
@@ -215,8 +211,6 @@ def probe_twitter_credentials() -> CredentialProbeResult:
             params=build_likes_params(client.user_id, 1),
             timeout=30,
         )
-    # 注意：CookiesConfigError 继承自 ValueError，此分支必须排在 except ValueError
-    # 之前，否则配置缺失会被误判为凭证失效，顺序不可调换。
     except CookiesConfigError as exc:
         raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
@@ -251,8 +245,6 @@ def probe_zhihu_credentials(collection: str) -> CredentialProbeResult:
             ZHIHU_FAV_URL.format(collection_id=collection),
             params={"offset": 0, "limit": 1},
         )
-    # 注意：CookiesConfigError 继承自 ValueError，此分支必须排在 except ValueError
-    # 之前，否则配置缺失会被误判为凭证失效，顺序不可调换。
     except CookiesConfigError as exc:
         raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
@@ -278,8 +270,6 @@ def probe_weibo_credentials(uid: int) -> CredentialProbeResult:
             WEIBO_LIKE_URL,
             params={"page": 1, "uid": uid, "with_total": True},
         )
-    # 注意：CookiesConfigError 继承自 ValueError，此分支必须排在 except ValueError
-    # 之前，否则配置缺失会被误判为凭证失效，顺序不可调换。
     except CookiesConfigError as exc:
         raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
@@ -316,8 +306,6 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
                 "web_location": 333.1387,
             },
         )
-    # 注意：CookiesConfigError 继承自 ValueError，此分支必须排在 except ValueError
-    # 之前，否则配置缺失会被误判为凭证失效，顺序不可调换。
     except CookiesConfigError as exc:
         raise click.ClickException(f"配置缺失: {exc}")
     except ValueError as exc:
