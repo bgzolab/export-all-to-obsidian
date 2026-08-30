@@ -165,6 +165,20 @@ def test_probe_weibo_missing_domain_cookie_invalid(monkeypatch, tmp_path):
     assert "No cookies found" in result.reason
 
 
+def test_cli_cookies_file_bad_path_exits_1(monkeypatch, tmp_path):
+    """--cookies-file 指向不存在的文件时应与 COOKIES 一致：exit 1「配置缺失」，
+    而非 click 参数校验的 exit 2（exists=True 已移除，统一由 get_cookie_header 报错）。"""
+    from export_to_obsidian import eto
+
+    bad = tmp_path / "no-such-cookies.txt"
+    runner = CliRunner()
+    result = runner.invoke(
+        eto, ["--cookies-file", str(bad), "weibo", "-o", "output/weibo"]
+    )
+    assert result.exit_code == 1
+    assert "配置缺失" in result.output
+
+
 def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
     events: dict[str, object] = {"export_called": False, "notified": []}
 
