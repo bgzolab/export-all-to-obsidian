@@ -11,11 +11,10 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
 
 - Thin entry: `src/export_to_obsidian.py` -> `src/app/cli.py`
 - Platform modules (all registered in the CLI): `bangumi`, `bilibili`, `cnblog`,
-  `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
+  `github`, `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
 - Shared runtime: `src/export_runtime/` (index_writer, exporter_support)
 - Common utilities: `src/utils/`, `src/entity/`
-- `src/demo/` is scaffolding; `src/github/` is an empty dir and not registered as a
-  command — do not treat them as implemented platforms
+- `src/demo/` is scaffolding; do not treat it as an implemented platform
 
 ## Tech stack
 
@@ -54,7 +53,7 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
   environment variable `COOKIES` (the file path) is used.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
-  `bilibili(-f -o [--force])`.
+  `bilibili(-f -o [--force])`, `github(-t -o [--force])`.
 - `--force` currently only affects bangumi, weibo, bilibili, and twitter.
 
 ## Environment variables (required by module exports)
@@ -63,9 +62,8 @@ PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
 `TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID`
 fall back to deriving from the cookies.txt Cookie (`ct0` / `twid`). `COOKIES` holds the
 path to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo,
-bilibili and twitter. Optional
-notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. (`GITHUB_TOKEN` no longer has
-a corresponding implementation; ignore it.)
+bilibili and twitter. `GITHUB_TOKEN` is used by the github module. Optional
+notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
 ## Incremental / output behavior
 
