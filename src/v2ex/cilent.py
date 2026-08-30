@@ -12,7 +12,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.cookies import get_cookie_header
-from v2ex import api_endpoints
 
 class V2exClient:
     def __init__(self):
@@ -47,4 +46,3 @@ class V2exClient:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0",
             "Referer": "https://www.v2ex.com"
         })
-        self.api_endpoints = api_endpoints

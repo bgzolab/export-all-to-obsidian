@@ -10,7 +10,6 @@
 import requests
 
 from app.cookies import get_cookie_header
-from weibo import api_endpoints
 
 class WeiboClient:
     def __init__(self):
@@ -26,5 +25,4 @@ class WeiboClient:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0",
             "Referer": "https://weibo.com/u/page/like/"
         })
-        self.api_endpoints = api_endpoints
 

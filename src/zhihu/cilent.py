@@ -8,7 +8,6 @@
 import requests
 
 from app.cookies import get_cookie_header
-from zhihu import api_endpoints
 
 class ZhihuClient:
     def __init__(self):
@@ -20,4 +19,3 @@ class ZhihuClient:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0",
             "Referer": "https://www.zhihu.com"
         })
-        self.api_endpoints = api_endpoints
