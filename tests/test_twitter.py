@@ -111,8 +111,6 @@ def _make_client(monkeypatch, tmp_path):
 
 
 def test_twitter_client_headers_configured(monkeypatch, tmp_path):
-    from twitter.client import TwitterClient
-
     client = _make_client(monkeypatch, tmp_path)
     headers = client.session.headers
     assert headers["Authorization"].startswith("Bearer ")
@@ -125,8 +123,6 @@ def test_twitter_client_headers_configured(monkeypatch, tmp_path):
 
 
 def test_twitter_client_derives_user_id_from_twid(monkeypatch, tmp_path):
-    from twitter.client import TwitterClient
-
     client = _make_client(monkeypatch, tmp_path)
     assert client.user_id == "123456789012345678"
 
@@ -740,18 +736,6 @@ def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
     from twitter.entity import TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
-
-    page = LikesPage(
-        tweets=[
-            Tweet(
-                id_str="111",
-                created_at="Thu Aug 15 12:00:00 +0000 2024",
-                full_text="Hello Twitter",
-                author=TwitterUser(screen_name="alice", name="Alice"),
-            )
-        ],
-        cursor_bottom=TimelineCursor(value="NEXT", cursor_type="Bottom"),
-    )
 
     calls = []
 
