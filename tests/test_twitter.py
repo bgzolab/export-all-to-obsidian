@@ -197,6 +197,32 @@ def test_twitter_client_missing_user_id_raises(monkeypatch, tmp_path):
         TwitterClient()
 
 
+def test_twitter_client_dedupes_x_com_and_twitter_com(monkeypatch, tmp_path):
+    """端到端：cookies.txt 同时含 .x.com 与 .twitter.com 的同名 Cookie 时，
+    TwitterClient 输出的 Cookie 头应去重且 csrf 取 x.com 的值。"""
+    from twitter.client import TwitterClient
+
+    lines = [
+        # 旧域 twitter.com 的 ct0 写在前面，验证最终仍取 x.com 的值
+        ".twitter.com\tTRUE\t/\tTRUE\t0\tct0\tOLD_CSRF\n"
+        ".twitter.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n"
+        ".x.com\tTRUE\t/\tTRUE\t0\tct0\tNEW_CSRF\n"
+        ".x.com\tTRUE\t/\tTRUE\t0\ttwid\tu%3D123456789012345678\n"
+    ]
+    p = tmp_path / "cookies.txt"
+    p.write_text("".join(lines), encoding="utf-8")
+    monkeypatch.setenv("COOKIES", str(p))
+    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
+    client = TwitterClient()
+    cookie_header = client.session.headers["Cookie"]
+    assert cookie_header == (
+        "ct0=NEW_CSRF; twid=u%3D123456789012345678"
+    )
+    assert client.session.headers["x-csrf-token"] == "NEW_CSRF"
+    assert client.user_id == "123456789012345678"
+
+
 def test_tweet_parsing():
     from twitter.entity import Tweet
 
