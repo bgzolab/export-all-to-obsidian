@@ -202,7 +202,8 @@ def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
         captured.append(WeiboClient())
         return guard.CredentialProbeResult.valid("weibo")
 
-    monkeypatch.setattr(guard, "probe_weibo_credentials", fake_probe)
+    # cli.py 是 from-import 绑定，须 patch app.cli 命名空间才不会触发真实网络探测
+    monkeypatch.setattr("app.cli.probe_weibo_credentials", fake_probe)
     monkeypatch.setattr(
         "app.cli.export_weibo", lambda uid, output, index_writer, force: None
     )
