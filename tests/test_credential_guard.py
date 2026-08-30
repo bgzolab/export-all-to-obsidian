@@ -193,6 +193,20 @@ def test_cli_cookies_file_directory_exits_1(monkeypatch, tmp_path):
     assert "not a regular file" in result.output
 
 
+def test_cli_index_file_directory_exits_1(monkeypatch, tmp_path):
+    """--index-file 指向目录时应与 --cookies-file 一致：exit 1（ClickException），
+    而非 click 参数校验的 exit 2（dir_okay=False 已移除，统一由 initialize_context 报错）。"""
+    from export_to_obsidian import eto
+
+    runner = CliRunner()
+    result = runner.invoke(
+        eto,
+        ["--index-file", str(tmp_path), "cnblog", "-o", "output/cnblog"],
+    )
+    assert result.exit_code == 1
+    assert "Index file is a directory" in result.output
+
+
 def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
     """端到端：--cookies-file 经 initialize_context -> ctx.obj -> resolve_cookies_file
     传递到平台客户端；显式参数应优先于 COOKIES 环境变量。"""
