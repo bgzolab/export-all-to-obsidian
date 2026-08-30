@@ -27,6 +27,20 @@ def test_weibo_client_headers_configured_cn_domain(monkeypatch, tmp_path):
     assert headers["Referer"] == "https://weibo.com/u/page/like/"
 
 
+def test_weibo_client_dedupes_cross_domain_same_name(monkeypatch, tmp_path):
+    """weibo.com 与 weibo.cn 同名 Cookie 应去重，weibo.com 优先。"""
+    path = _write_cookies(
+        tmp_path,
+        (
+            ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tv1\n"
+            ".weibo.cn\tTRUE\t/\tTRUE\t0\tSUB\tv2\n"
+        ),
+    )
+    monkeypatch.setenv("COOKIES", path)
+    client = WeiboClient()
+    assert client.session.headers["Cookie"] == "SUB=v1"
+
+
 def test_weibo_client_missing_cookie_raises(monkeypatch, tmp_path):
     path = _write_cookies(tmp_path, ".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n")
     monkeypatch.setenv("COOKIES", path)
