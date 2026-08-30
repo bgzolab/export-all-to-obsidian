@@ -7,7 +7,6 @@
 """
 import pytest
 
-from app.cookies import CookiesConfigError
 from zhihu.cilent import ZhihuClient
 
 
@@ -30,5 +29,5 @@ def test_zhihu_client_headers_configured(monkeypatch, tmp_path):
 def test_zhihu_client_missing_cookie_raises(monkeypatch, tmp_path):
     path = _write_cookies(tmp_path, ".weibo.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n")
     monkeypatch.setenv("COOKIES", path)
-    with pytest.raises(CookiesConfigError, match="No cookies found"):
+    with pytest.raises(ValueError, match="No cookies found"):
         ZhihuClient()

@@ -9,7 +9,6 @@ from urllib3.util.retry import Retry
 
 import pytest
 
-from app.cookies import CookiesConfigError
 from v2ex.cilent import V2exClient
 
 
@@ -72,11 +71,11 @@ def test_v2ex_client_missing_token_raises(monkeypatch, tmp_path):
 
 
 def test_v2ex_client_missing_cookie_raises(monkeypatch, tmp_path):
-    """缺少 Cookie（无 v2ex.com 域 cookies.txt）应抛出 CookiesConfigError。"""
+    """缺少 Cookie（无 v2ex.com 域 cookies.txt）应抛出 ValueError。"""
     monkeypatch.setenv("V2EX_ACCESS_TOKEN", "fake-token")
     p = _write_cookies_file(
         tmp_path, ".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n"
     )
     monkeypatch.setenv("COOKIES", p)
-    with pytest.raises(CookiesConfigError, match="No cookies found"):
+    with pytest.raises(ValueError, match="No cookies found"):
         V2exClient()

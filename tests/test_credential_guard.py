@@ -151,6 +151,20 @@ def test_probe_twitter_request_exception_unknown(monkeypatch):
     assert "network down" in result.reason
 
 
+def test_probe_weibo_missing_domain_cookie_invalid(monkeypatch, tmp_path):
+    """cookies.txt 存在但无目标平台域时应判为 invalid（跳过+提醒），而非硬退出。"""
+    import app.credential_guard as guard
+
+    p = tmp_path / "cookies.txt"
+    p.write_text(
+        ".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("COOKIES", str(p))
+    result = guard.probe_weibo_credentials(uid=1)
+    assert result.status == "invalid"
+    assert "No cookies found" in result.reason
+
+
 def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
     events: dict[str, object] = {"export_called": False, "notified": []}
 

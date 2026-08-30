@@ -9,7 +9,6 @@ import json
 
 import pytest
 
-from app.cookies import CookiesConfigError
 from export_runtime.index_writer import IndexWriter
 
 TWITTER_COOKIE = (
@@ -184,7 +183,7 @@ def test_twitter_client_missing_cookie_raises(monkeypatch, tmp_path):
     p = tmp_path / "cookies.txt"
     p.write_text(".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n", encoding="utf-8")
     monkeypatch.setenv("COOKIES", str(p))
-    with pytest.raises(CookiesConfigError, match="No cookies found"):
+    with pytest.raises(ValueError, match="No cookies found"):
         TwitterClient()
 
 

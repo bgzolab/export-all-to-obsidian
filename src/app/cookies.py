@@ -135,5 +135,8 @@ def get_cookie_header(
         raise CookiesConfigError(f"Cookies file is not a regular file: {path}")
     header = load_cookie_header(path, domains, dedupe_by_name=dedupe_by_name)
     if not header:
-        raise CookiesConfigError(f"No cookies found for domain {domains!r} in {path}")
+        # 文件存在但无目标域 Cookie 属于「该平台凭证不可用」而非「整体配置缺失」：
+        # 抛 ValueError 由 credential_guard 判为 invalid 走「跳过+提醒」，
+        # 不复用 CookiesConfigError 的硬退出语义（与改造前行为一致）。
+        raise ValueError(f"No cookies found for domain {domains!r} in {path}")
     return header
