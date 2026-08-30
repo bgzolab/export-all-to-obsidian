@@ -8,7 +8,7 @@
 import requests
 
 from app.cookies import get_cookie_header
-from demo import (api_endpoints)
+from bilibili import api_endpoints
 
 class BilibiliClient:
     def __init__(self):
