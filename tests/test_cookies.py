@@ -48,6 +48,23 @@ def test_domain_suffix_matching(tmp_path):
     assert header == "dot=v1; sub=v2"
 
 
+def test_domain_matching_case_insensitive(tmp_path):
+    """cookies.txt 中大写/混合大小写域名（如 .Zhihu.com）应与目标域小写比较，
+    否则会被静默丢弃；dedupe_by_name 的域名优先级也应大小写不敏感。"""
+    content = (
+        ".Zhihu.com\tTRUE\t/\tTRUE\t0\tct0\tMIXED\n"
+        ".TWITTER.COM\tTRUE\t/\tTRUE\t0\tct0\tUPPER\n"
+    )
+    path = _write(tmp_path, content)
+    assert load_cookie_header(path, ("zhihu.com",)) == "ct0=MIXED"
+    assert load_cookie_header(path, ("zhihu.com", "twitter.com")) == (
+        "ct0=MIXED; ct0=UPPER"
+    )
+    assert load_cookie_header(
+        path, ("zhihu.com", "twitter.com"), dedupe_by_name=True
+    ) == "ct0=MIXED"
+
+
 def test_flag_false_host_only_exact_match(tmp_path):
     """flag=FALSE 的 host-only Cookie 不做后缀匹配，不发送到子域。"""
     content = (

@@ -4,8 +4,9 @@
 解析规则：
 - 跳过空行、普通 ``#`` 注释行；以 ``#HttpOnly_`` 开头的行视为有效数据行（剥掉该前缀后解析）。
 - 每行字段数不足 7 时直接跳过，不中断整个文件解析。
-- cookie 域以 ``.`` 开头时剥掉前导点；第 2 列 ``flag`` 为 FALSE 或 ``0`` 时仅做精确
-  域名匹配（host-only，不发送到子域），其余（TRUE/``1`` 等）做后缀匹配。
+- cookie 域以 ``.`` 开头时剥掉前导点；域名匹配不区分大小写（cookies.txt 中的
+  大写/混合大小写域名会小写化后与目标域比较）。第 2 列 ``flag`` 为 FALSE 或 ``0``
+  时仅做精确域名匹配（host-only，不发送到子域），其余（TRUE/``1`` 等）做后缀匹配。
 - 第 5 列 ``expiry`` 为非零正整数且早于当前时间时跳过该条（已过期）；``0`` 表示
   会话 Cookie，保留。
 - 同一 (cookie 域, name) 去重，保留文件中最后一条的值（首次出现的顺序位置不变）；
@@ -90,7 +91,7 @@ def load_cookie_header(
         fields = stripped.split("\t")
         if len(fields) < 7:
             continue
-        cookie_domain = fields[0].strip()
+        cookie_domain = fields[0].strip().lower()
         if cookie_domain.startswith("."):
             cookie_domain = cookie_domain[1:]
         flag = fields[1].strip().upper()
@@ -108,8 +109,8 @@ def load_cookie_header(
         # 应继承 x.com 的优先级，而非用 cookie_domain 本身查表）
         matched_domain = None
         for d in domains:
-            if cookie_domain == d or (
-                flag not in ("FALSE", "0") and cookie_domain.endswith("." + d)
+            if cookie_domain == d.lower() or (
+                flag not in ("FALSE", "0") and cookie_domain.endswith("." + d.lower())
             ):
                 matched_domain = d
                 break
