@@ -173,7 +173,7 @@ def test_cli_cookies_file_bad_path_exits_1(monkeypatch, tmp_path):
     bad = tmp_path / "no-such-cookies.txt"
     runner = CliRunner()
     result = runner.invoke(
-        eto, ["--cookies-file", str(bad), "weibo", "-o", "output/weibo"]
+        eto, ["--cookies-file", str(bad), "weibo", "-u", "1", "-o", "output/weibo"]
     )
     assert result.exit_code == 1
     assert "配置缺失" in result.output
