@@ -77,6 +77,19 @@ def test_expired_cookie_skipped_session_cookie_kept(tmp_path):
     assert header == "sess=s"
 
 
+def test_unicode_superscript_expiry_treated_as_session(tmp_path):
+    """Unicode 上标/下标（如 ² ₁₂₃）的 isdigit() 为 True 但 int() 拒绝解析，
+    曾导致未捕获 ValueError 被 credential_guard 误判为凭证失效；
+    isdecimal() 只认十进制数字，此类 expiry 应按「非数字视为会话 Cookie」保留。"""
+    content = (
+        ".zhihu.com\tTRUE\t/\tTRUE\t²\tsup\ts\n"
+        ".zhihu.com\tTRUE\t/\tTRUE\t₁₂₃\tsub\ts\n"
+    )
+    path = _write(tmp_path, content)
+    header = load_cookie_header(path, ("zhihu.com",))
+    assert header == "sup=s; sub=s"
+
+
 def test_same_name_across_domains_both_kept(tmp_path):
     """多域同名 Cookie 应共存，不做跨域覆盖。"""
     content = (

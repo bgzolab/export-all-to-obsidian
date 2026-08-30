@@ -101,7 +101,7 @@ def load_cookie_header(
         if not name:
             # 空 name 会拼出 "=value" 这类非法 Cookie 头，直接跳过
             continue
-        if expiry.isdigit() and expiry != "0" and int(expiry) < now:
+        if expiry.isdecimal() and expiry != "0" and int(expiry) < now:
             continue
         # 按 domains 元组顺序取第一个命中的域名：既决定是否匹配，
         # 也作为 dedupe_by_name 的优先级依据（子域如 api.x.com 命中 x.com，
