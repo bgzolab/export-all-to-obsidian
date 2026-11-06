@@ -1,13 +1,14 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-27
 @Links : https://github.com/bGZo
 """
-from cnblog.client import CnblogClient
 from dataclasses import dataclass
-from typing import List, Any
+from typing import Any
+
+from cnblog.client import CnblogClient
+
 
 @dataclass
 class Bookmark:
@@ -15,7 +16,7 @@ class Bookmark:
     Title: str
     LinkUrl: str
     Summary: str
-    Tags: List[Any]
+    Tags: list[Any]
     DateAdded: str
     FromCNBlogs: bool
 

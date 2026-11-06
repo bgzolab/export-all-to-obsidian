@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-12-06
@@ -8,6 +7,7 @@
 import requests
 
 from app.cookies import get_cookie_header
+
 
 class ZhihuClient:
     def __init__(self):

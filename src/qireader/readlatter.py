@@ -1,17 +1,15 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-12-06
 @Links : https://github.com/bGZo
 """
-from typing import List, Optional
 
 from qireader.cilent import QiReaderClient
-from qireader.models import QiReaderResponse, Entry
+from qireader.models import Entry, QiReaderResponse
 
 
-def get_list_from_read_latter(tag_id: str, oldThan: Optional[str]) -> List[Entry]:
+def get_list_from_read_latter(tag_id: str, oldThan: str | None) -> list[Entry]:
     """
     target-url: https://www.qireader.com/api/streams/{tagId}?articleOrder=0&count=25&id={tagId}&unreadOnly=false&olderThan=1764313764608411573
 
@@ -31,7 +29,7 @@ def get_list_from_read_latter(tag_id: str, oldThan: Optional[str]) -> List[Entry
     return []
 
 
-def get_all_list_from_read_latter_debug(tag_id: str) -> List[Entry]:
+def get_all_list_from_read_latter_debug(tag_id: str) -> list[Entry]:
     all_entries = []
     older_than = None
 

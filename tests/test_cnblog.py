@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-27
@@ -25,7 +24,7 @@ def test_get_cnblog_post_body_by_url():
         post_body = get_cnblog_post_body_by_url(post_url)
         assert isinstance(post_body, str), "Post body should be a string"
         assert len(post_body) > 0, "Post body should not be empty"
-        print("Test result: {}".format(post_body[:100]))
+        print(f"Test result: {post_body[:100]}")
         print("Test passed: Post body retrieved successfully.")
     except Exception as e:
         print(f"Test failed: {e}")
@@ -38,7 +37,7 @@ def test_get_cnblog_post_markdown_by_url():
         post_body = utils.md_utils.html_to_markdown_with_html2text(get_cnblog_post_body_by_url(post_url))
         assert isinstance(post_body, str), "Post body should be a string"
         assert len(post_body) > 0, "Post body should not be empty"
-        print("Test result: {}".format(post_body[:100]))
+        print(f"Test result: {post_body[:100]}")
         print("Test passed: Post body retrieved successfully.")
     except Exception as e:
         print(f"Test failed: {e}")

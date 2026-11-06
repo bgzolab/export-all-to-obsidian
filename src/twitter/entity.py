@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Twitter Likes 接口返回的数据模型。
 
@@ -22,7 +21,7 @@ class TwitterUser:
     id: str = ""
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> "TwitterUser":
+    def from_dict(data: dict[str, Any]) -> TwitterUser:
         legacy = data.get("legacy") or {}
         core = data.get("core") or {}
         return TwitterUser(
@@ -91,7 +90,7 @@ class TimelineCursor:
     cursor_type: str
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> "TimelineCursor":
+    def from_dict(data: dict[str, Any]) -> TimelineCursor:
         return TimelineCursor(
             value=data.get("value", ""),
             cursor_type=data.get("cursorType", ""),
@@ -106,7 +105,7 @@ class LikesPage:
     cursor_bottom: TimelineCursor | None = None
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> "LikesPage":
+    def from_dict(data: dict[str, Any]) -> LikesPage:
         tweets: list[Tweet] = []
         cursor_bottom: TimelineCursor | None = None
 

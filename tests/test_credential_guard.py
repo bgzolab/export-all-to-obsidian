@@ -1,8 +1,7 @@
-from click.testing import CliRunner
 import pytest
+from click.testing import CliRunner
 
-from app.credential_guard import CredentialProbeResult
-from app.credential_guard import run_with_credential_guard
+from app.credential_guard import CredentialProbeResult, run_with_credential_guard
 
 
 def _fake_twitter_probe(

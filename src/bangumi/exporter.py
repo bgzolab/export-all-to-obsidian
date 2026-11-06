@@ -7,9 +7,11 @@ from bangumi.client import BangumiClient
 from bangumi.collection import get_all_collections_by_pages
 from bangumi.enum import CollectionType, SubjectType
 from bangumi.subject import get_subject_character, get_subject_info
-from export_runtime.exporter_support import build_link_target
-from export_runtime.exporter_support import build_output_path
-from export_runtime.exporter_support import resolve_output_prefix
+from export_runtime.exporter_support import (
+    build_link_target,
+    build_output_path,
+    resolve_output_prefix,
+)
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 
@@ -138,7 +140,7 @@ def write_subject_markdown(
         print(f"已存在，提前结束: {filename}")
         return False, "", ""
 
-    with open(template_path, "r", encoding="utf-8") as file:
+    with open(template_path, encoding="utf-8") as file:
         template = file.read()
 
     content = template

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-12-28
@@ -8,6 +7,7 @@
 from bilibili import api_endpoints
 from bilibili.cilent import BilibiliClient
 from bilibili.entity import BilibiliFavListResponse
+
 
 def get_bilibili_favlistd(fid: int, page: int, size: int) -> BilibiliFavListResponse:
     bc = BilibiliClient()

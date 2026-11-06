@@ -146,8 +146,7 @@ def test_get_repository_readme_handles_404_and_base64(monkeypatch):
 
 def test_render_github_template_replaces_default_template_variables():
     from github.entity import GitHubStarredResponseItem
-    from github.exporter import build_template_context
-    from github.exporter import render_github_template
+    from github.exporter import build_template_context, render_github_template
 
     template = Path("config/template/github.md").read_text(encoding="utf-8")
     item = GitHubStarredResponseItem(

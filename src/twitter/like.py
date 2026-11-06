@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Twitter Likes 接口拉取逻辑。
 
@@ -11,9 +10,11 @@ from __future__ import annotations
 
 import json
 
-from twitter.api_endpoints import TWITTER_LIKES_FEATURES
-from twitter.api_endpoints import TWITTER_LIKES_FIELD_TOGGLES
-from twitter.api_endpoints import TWITTER_LIKES_PATH
+from twitter.api_endpoints import (
+    TWITTER_LIKES_FEATURES,
+    TWITTER_LIKES_FIELD_TOGGLES,
+    TWITTER_LIKES_PATH,
+)
 from twitter.client import TwitterClient
 from twitter.entity import LikesPage
 

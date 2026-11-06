@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 获取 Cookie https://weibo.com/u/page/like/8221250887
 
@@ -10,6 +9,7 @@
 import requests
 
 from app.cookies import get_cookie_header
+
 
 class WeiboClient:
     def __init__(self):

@@ -1,27 +1,28 @@
 """CLI 入口装配。"""
 
-from typing import Optional
 
 import click
 
 from app.context import get_index_writer, get_output_prefix, initialize_context
-from app.credential_guard import probe_bangumi_credentials
-from app.credential_guard import probe_bilibili_credentials
-from app.credential_guard import probe_cnblog_credentials
-from app.credential_guard import probe_qireader_credentials
-from app.credential_guard import probe_v2ex_credentials
-from app.credential_guard import probe_twitter_credentials
-from app.credential_guard import probe_weibo_credentials
-from app.credential_guard import probe_zhihu_credentials
-from app.credential_guard import run_with_credential_guard
+from app.credential_guard import (
+    probe_bangumi_credentials,
+    probe_bilibili_credentials,
+    probe_cnblog_credentials,
+    probe_qireader_credentials,
+    probe_twitter_credentials,
+    probe_v2ex_credentials,
+    probe_weibo_credentials,
+    probe_zhihu_credentials,
+    run_with_credential_guard,
+)
 from bangumi.exporter import export as export_bangumi
 from bangumi.exporter import sync_all_collections
 from bilibili.exporter import export as export_bilibili
 from cnblog.exporter import export as export_cnblog
 from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
-from twitter.exporter import export as export_twitter
 from twitter.exporter import TWITTER_MAX_PAGES
+from twitter.exporter import export as export_twitter
 from v2ex.exporter import export as export_v2ex
 from weibo.exporter import export as export_weibo
 from zhihu.exporter import export as export_zhihu
@@ -48,9 +49,9 @@ from zhihu.exporter import export as export_zhihu
 @click.pass_context
 def eto(
     ctx: click.Context,
-    index_file: Optional[str],
+    index_file: str | None,
     prefix: str,
-    cookies_file: Optional[str],
+    cookies_file: str | None,
 ) -> None:
     """导出命令组。"""
     initialize_context(ctx, index_file, prefix, cookies_file)

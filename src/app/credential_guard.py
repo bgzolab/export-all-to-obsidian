@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 import click
 import requests
@@ -28,7 +29,6 @@ from weibo.cilent import WeiboClient
 from zhihu.api_endpoints import FAV_URL as ZHIHU_FAV_URL
 from zhihu.cilent import ZhihuClient
 
-
 ProbeStatus = Literal["valid", "invalid", "unknown"]
 
 
@@ -39,15 +39,15 @@ class CredentialProbeResult:
     reason: str
 
     @classmethod
-    def valid(cls, module: str, reason: str = "") -> "CredentialProbeResult":
+    def valid(cls, module: str, reason: str = "") -> CredentialProbeResult:
         return cls(module=module, status="valid", reason=reason)
 
     @classmethod
-    def invalid(cls, module: str, reason: str) -> "CredentialProbeResult":
+    def invalid(cls, module: str, reason: str) -> CredentialProbeResult:
         return cls(module=module, status="invalid", reason=reason)
 
     @classmethod
-    def unknown(cls, module: str, reason: str) -> "CredentialProbeResult":
+    def unknown(cls, module: str, reason: str) -> CredentialProbeResult:
         return cls(module=module, status="unknown", reason=reason)
 
 

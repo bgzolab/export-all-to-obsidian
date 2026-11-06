@@ -76,7 +76,7 @@ def load_cookie_header(
     parts: dict[tuple[str, str], str] = {}
     deduped: dict[str, tuple[int, str]] = {}
     try:
-        with open(cookies_file, "r", encoding="utf-8-sig") as f:
+        with open(cookies_file, encoding="utf-8-sig") as f:
             lines = f.readlines()
     except OSError as exc:
         # 文件不可读 / 预检后被删除（TOCTOU）等，均转成配置错误而非裸 traceback

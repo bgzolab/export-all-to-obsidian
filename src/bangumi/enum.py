@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-28
@@ -7,6 +6,7 @@
 """
 
 from enum import Enum
+
 
 class CollectionType(Enum):
     """

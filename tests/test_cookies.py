@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2026-08-29
@@ -8,10 +7,12 @@
 import click
 import pytest
 
-from app.cookies import CookiesConfigError
-from app.cookies import get_cookie_header
-from app.cookies import load_cookie_header
-from app.cookies import resolve_cookies_file
+from app.cookies import (
+    CookiesConfigError,
+    get_cookie_header,
+    load_cookie_header,
+    resolve_cookies_file,
+)
 
 
 def _write(tmp_path, content):

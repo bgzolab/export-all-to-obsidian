@@ -1,22 +1,22 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-12-13
 @Links : https://github.com/bGZo
 """
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from typing import Any
+
 
 @dataclass
 class BilibiliUpper:
     mid: int
     name: str
     face: str
-    followed: Optional[bool] = None
-    vip_type: Optional[int] = None
-    vip_statue: Optional[int] = None
-    jump_link: Optional[str] = None
+    followed: bool | None = None
+    vip_type: int | None = None
+    vip_statue: int | None = None
+    jump_link: str | None = None
 
     @staticmethod
     def from_dict(obj: Any) -> 'BilibiliUpper':
@@ -148,7 +148,7 @@ class BilibiliMedia:
     fav_time: int
     bv_id: str
     bvid: str
-    ugc: Optional[BilibiliUgc]
+    ugc: BilibiliUgc | None
     media_list_link: str
     season: Any = None
     ogv: Any = None
@@ -183,7 +183,7 @@ class BilibiliMedia:
 @dataclass
 class BilibiliFavListData:
     info: BilibiliFavInfo
-    medias: List[BilibiliMedia]
+    medias: list[BilibiliMedia]
     has_more: bool
     ttl: int
 
@@ -203,7 +203,7 @@ class BilibiliFavListResponse:
     code: int
     message: str
     ttl: int
-    data: Optional[BilibiliFavListData]
+    data: BilibiliFavListData | None
 
     @staticmethod
     def from_dict(obj: Any) -> 'BilibiliFavListResponse':

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-08-19
 @Links : https://github.com/bGZo
 """
-from bangumi.bangumi import get_subject_info, get_subject_character
-from bangumi.collection import _dict_to_subject_tag_list, _dict_to_slim_subject_v0
+from bangumi.bangumi import get_subject_character, get_subject_info
+from bangumi.collection import _dict_to_slim_subject_v0, _dict_to_subject_tag_list
 from bangumi.entity import SubjectTag
+
 
 def test_subject_get():
     res = get_subject_info(1)

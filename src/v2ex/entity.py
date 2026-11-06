@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Optional, Any, Dict
+from typing import Any
+
 
 @dataclass
 class Member:
@@ -11,10 +12,10 @@ class Member:
     url: str
     avatar: str
     created: int
-    pro: Optional[int] = None
+    pro: int | None = None
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Member':
+    def from_dict(data: dict[str, Any]) -> 'Member':
         return Member(
             id=data.get("id", 0),
             username=data.get("username", ""),
@@ -41,7 +42,7 @@ class Node:
     last_modified: int
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Node':
+    def from_dict(data: dict[str, Any]) -> 'Node':
         return Node(
             id=data.get("id", 0),
             url=data.get("url", ""),
@@ -67,12 +68,12 @@ class TopicResult:
     created: int
     last_modified: int
     last_touched: int
-    member: Optional[Member]
-    node: Optional[Node]
-    supplements: List[Any]
+    member: Member | None
+    node: Node | None
+    supplements: list[Any]
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'TopicResult':
+    def from_dict(data: dict[str, Any]) -> 'TopicResult':
         return TopicResult(
             id=data.get("id", 0),
             title=data.get("title", ""),
@@ -93,10 +94,10 @@ class TopicResult:
 class TopicResponse:
     success: bool
     message: str
-    result: Optional[TopicResult]
+    result: TopicResult | None
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'TopicResponse':
+    def from_dict(data: dict[str, Any]) -> 'TopicResponse':
         return TopicResponse(
             success=data.get("success", False),
             message=data.get("message", ""),

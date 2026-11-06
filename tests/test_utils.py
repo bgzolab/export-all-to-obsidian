@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-27
 @Links : https://github.com/bGZo
 """
 from click.testing import CliRunner
+
 
 def test_html_to_markdown_html2text():
     from utils.md_utils import html_to_markdown_with_html2text
@@ -76,12 +76,14 @@ def test_index_writer_flush_file(tmp_path):
 
 
 def test_exporter_support_helpers(tmp_path, capsys):
-    from export_runtime.exporter_support import add_index_entry
-    from export_runtime.exporter_support import build_link_target
-    from export_runtime.exporter_support import build_output_path
-    from export_runtime.exporter_support import stop_if_output_exists
-    from export_runtime.exporter_support import write_raw_markdown_output
-    from export_runtime.exporter_support import write_markdown_output
+    from export_runtime.exporter_support import (
+        add_index_entry,
+        build_link_target,
+        build_output_path,
+        stop_if_output_exists,
+        write_markdown_output,
+        write_raw_markdown_output,
+    )
     from export_to_obsidian import IndexWriter
 
     writer = IndexWriter(file_path=str(tmp_path / "index.md"))

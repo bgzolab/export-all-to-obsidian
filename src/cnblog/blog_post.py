@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-27
@@ -13,8 +12,8 @@ def get_cnblog_post_body_by_url(url: str):
     :param id: 博客文章的 ID
     :return: 博客文章正文内容
     """
-    from cnblog.client import CnblogClient
     from cnblog.api_endpoints import BLOG_POST
+    from cnblog.client import CnblogClient
 
     client = CnblogClient()
 

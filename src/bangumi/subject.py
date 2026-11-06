@@ -1,13 +1,21 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-08-18
 @Links : https://github.com/bGZo
 """
-from bangumi.api_endpoints import SUBJECT_QUERY, SUBJECT_CHARACTER_QUERY
+from bangumi.api_endpoints import SUBJECT_CHARACTER_QUERY, SUBJECT_QUERY
 from bangumi.client import BangumiClient
-from bangumi.entity import SubjectV0, SubjectImages, SubjectTag, Rating, SubjectCollectionStat, SubjectRelatedCharacter, PersonImages, Actor
+from bangumi.entity import (
+    Actor,
+    PersonImages,
+    Rating,
+    SubjectCollectionStat,
+    SubjectImages,
+    SubjectRelatedCharacter,
+    SubjectTag,
+    SubjectV0,
+)
 
 
 def get_subject_info(subject_id: int) -> SubjectV0:

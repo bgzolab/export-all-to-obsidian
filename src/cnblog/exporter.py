@@ -2,10 +2,12 @@
 
 from cnblog.blog_post import get_cnblog_post_body_by_url
 from cnblog.bookmark import get_bookmark_list
-from export_runtime.exporter_support import add_index_entry
-from export_runtime.exporter_support import build_link_target
-from export_runtime.exporter_support import stop_if_output_exists
-from export_runtime.exporter_support import write_markdown_output
+from export_runtime.exporter_support import (
+    add_index_entry,
+    build_link_target,
+    stop_if_output_exists,
+    write_markdown_output,
+)
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 from utils.md_utils import html_to_markdown_with_bs

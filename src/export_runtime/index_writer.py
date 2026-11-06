@@ -2,14 +2,13 @@
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class IndexWriter:
     """管理导出索引的累计与输出位置。"""
 
-    file_path: Optional[str] = None
+    file_path: str | None = None
     title: str = "输出index"
     _entries: list[str] | None = None
 
@@ -27,7 +26,7 @@ class IndexWriter:
         """渲染最终索引文本。"""
         return "\n".join(self._entries)
 
-    def flush(self, section_name: str, title: Optional[str] = None) -> None:
+    def flush(self, section_name: str, title: str | None = None) -> None:
         """将索引输出到控制台或指定 Markdown 文件。"""
         output_title = title or self.title
         content = self.render()
@@ -53,7 +52,7 @@ class IndexWriter:
         existing_content = ""
 
         if os.path.exists(self.file_path):
-            with open(self.file_path, "r", encoding="utf-8") as file:
+            with open(self.file_path, encoding="utf-8") as file:
                 existing_content = file.read().strip()
 
         updated_content = self._merge_section(existing_content, heading, run_block)

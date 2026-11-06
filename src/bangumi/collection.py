@@ -1,16 +1,20 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-28
 @Links : https://github.com/bGZo
 """
-from http.client import responses
 from datetime import datetime
+from http.client import responses
 
-from bangumi.api_endpoints import COLLECTIONS_UPSERT, COLLECTIONS_QUERY_USERS
+from bangumi.api_endpoints import COLLECTIONS_QUERY_USERS, COLLECTIONS_UPSERT
 from bangumi.client import BangumiClient
-from bangumi.entity import UserSubjectCollection, SlimSubjectV0, SubjectImages, SubjectTag
+from bangumi.entity import (
+    SlimSubjectV0,
+    SubjectImages,
+    SubjectTag,
+    UserSubjectCollection,
+)
 
 
 def mark_subject(subject_id: int, status: int, comment: str = "", tags: list[str] = None) -> bool:

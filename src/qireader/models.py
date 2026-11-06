@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from typing import Any
+
 
 @dataclass
 class Origin:
-    feedId: Optional[str] = None
+    feedId: str | None = None
 
     @staticmethod
     def from_dict(data: dict) -> 'Origin':
@@ -14,15 +15,15 @@ class Entry:
     id: str
     isSaved: bool
     sourceEntryId: str
-    origin: Optional[Origin]
+    origin: Origin | None
     title: str
     summary: str
     url: str
     publishedAt: int
     crawledAt: int
     timestamp: str
-    attachments: List[Any]
-    tagIds: List[str]
+    attachments: list[Any]
+    tagIds: list[str]
 
     @staticmethod
     def from_dict(data: dict) -> 'Entry':
@@ -44,7 +45,7 @@ class Entry:
 @dataclass
 class StreamResult:
     id: str
-    entries: List[Entry]
+    entries: list[Entry]
     hasMore: bool
 
     @staticmethod

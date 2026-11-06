@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-12-28
@@ -7,6 +6,7 @@
 """
 from weibo.api_endpoints import WEIBO_LONGTEXT_URL
 from weibo.cilent import WeiboClient
+
 
 def get_weibo_longtext_by_id(id: str) -> str:
     wb = WeiboClient()

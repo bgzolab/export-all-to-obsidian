@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Optional, Any, Dict
+from typing import Any
+
 
 @dataclass
 class Paging:
@@ -10,7 +11,7 @@ class Paging:
     totals: int
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Paging':
+    def from_dict(data: dict[str, Any]) -> 'Paging':
         return Paging(
             is_end=data.get("is_end", False),
             is_start=data.get("is_start", False),
@@ -29,7 +30,7 @@ class Question:
     updated_time: int
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Question':
+    def from_dict(data: dict[str, Any]) -> 'Question':
         return Question(
             id=str(data.get("id", "")),
             title=data.get("title", ""),
@@ -48,7 +49,7 @@ class Author:
     url: str
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Author':
+    def from_dict(data: dict[str, Any]) -> 'Author':
         return Author(
             id=data.get("id", ""),
             name=data.get("name", ""),
@@ -67,12 +68,12 @@ class Content:
     comment_count: int
     created_time: int
     updated_time: int
-    author: Optional[Author] = None
-    question: Optional[Question] = None
-    title: Optional[str] = None
+    author: Author | None = None
+    question: Question | None = None
+    title: str | None = None
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Content':
+    def from_dict(data: dict[str, Any]) -> 'Content':
         return Content(
             id=str(data.get("id", "")),
             type=data.get("type", ""),
@@ -93,7 +94,7 @@ class CollectionItem:
     created: str
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'CollectionItem':
+    def from_dict(data: dict[str, Any]) -> 'CollectionItem':
         return CollectionItem(
             content=Content.from_dict(data.get("content", {})),
             created=data.get("created", "")
@@ -102,10 +103,10 @@ class CollectionItem:
 @dataclass
 class CollectionResponse:
     paging: Paging
-    data: List[CollectionItem]
+    data: list[CollectionItem]
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'CollectionResponse':
+    def from_dict(data: dict[str, Any]) -> 'CollectionResponse':
         return CollectionResponse(
             paging=Paging.from_dict(data.get("paging", {})),
             data=[CollectionItem.from_dict(item) for item in data.get("data", [])]

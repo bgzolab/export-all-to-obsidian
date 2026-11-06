@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Twitter 点赞导出流程。
 
@@ -7,20 +6,20 @@ Twitter 点赞导出流程。
 @Date : 2026-08-19
 @Links : https://github.com/bGZo
 """
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
 import re
+from datetime import datetime, timedelta, timezone
 
-from export_runtime.exporter_support import add_index_entry
-from export_runtime.exporter_support import build_link_target
-from export_runtime.exporter_support import stop_if_output_exists
-from export_runtime.exporter_support import write_markdown_output
+from export_runtime.exporter_support import (
+    add_index_entry,
+    build_link_target,
+    stop_if_output_exists,
+    write_markdown_output,
+)
 from export_runtime.index_writer import IndexWriter
-from utils.file_utils import get_clean_filename
-from utils.template import WebPage
 from twitter.client import TwitterClient
 from twitter.like import get_twitter_like_list
+from utils.file_utils import get_clean_filename
+from utils.template import WebPage
 
 TWITTER_MAX_PAGES = 50
 

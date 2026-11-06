@@ -5,8 +5,7 @@ import os
 
 import requests
 
-from github.api_endpoints import build_readme_url
-from github.api_endpoints import build_starred_repos_url
+from github.api_endpoints import build_readme_url, build_starred_repos_url
 from github.entity import GitHubStarredResponseItem
 
 

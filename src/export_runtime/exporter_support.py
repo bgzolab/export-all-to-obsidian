@@ -1,7 +1,8 @@
 """导出流程的轻量共用辅助函数。"""
 
 import os
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from app.context import get_output_prefix
 from export_runtime.index_writer import IndexWriter

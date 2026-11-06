@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-08-07
 @Links : https://github.com/bGZo
 """
-from urllib3.util.retry import Retry
-
 import pytest
+from urllib3.util.retry import Retry
 
 from v2ex.cilent import V2exClient
 

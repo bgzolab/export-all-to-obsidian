@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 上游定义： https://github.com/bangumi/server
 
@@ -9,8 +8,9 @@
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Any
 from datetime import datetime
+from typing import Any
+
 
 # https://github.com/bangumi/server/blob/fb44e70f9fac931fc29964cab9c5b5aec41433b0/web/res/image.go#L47
 @dataclass
@@ -41,12 +41,12 @@ class SubjectTag:
 # https://github.com/bangumi/server/blob/fb44e70f9fac931fc29964cab9c5b5aec41433b0/web/res/subject.go#L66C1-L81C2
 @dataclass
 class SlimSubjectV0:
-    date: Optional[str]
+    date: str | None
     images: SubjectImages  # 修正为 images
     name: str
     name_cn: str
     short_summary: str
-    tags: List[SubjectTag]
+    tags: list[SubjectTag]
     score: float
     type: int
     id: int
@@ -60,8 +60,8 @@ class SlimSubjectV0:
 class UserSubjectCollection:
     id: int
     updated_at: datetime
-    comment: Optional[str]
-    tags: List[str]
+    comment: str | None
+    tags: list[str]
     vol_status: int
     ep_status: int
     subject_id: int
@@ -73,10 +73,10 @@ class UserSubjectCollection:
 
 @dataclass
 class Rating:
-    rank: Optional[int] = None
-    total: Optional[int] = None
-    count: Optional[int] = None
-    score: Optional[float] = None
+    rank: int | None = None
+    total: int | None = None
+    count: int | None = None
+    score: float | None = None
 
 @dataclass
 class SubjectCollectionStat:
@@ -89,34 +89,34 @@ class SubjectCollectionStat:
 
 @dataclass
 class SubjectV0:
-    date: Optional[str]
-    platform: Optional[str]
+    date: str | None
+    platform: str | None
     images: SubjectImages
     summary: str
     name: str
     name_cn: str
-    tags: List[SubjectTag]
-    infobox: Optional[List[Any]]
-    rating: Optional[Rating]
+    tags: list[SubjectTag]
+    infobox: list[Any] | None
+    rating: Rating | None
     total_episodes: int
-    collection: Optional[SubjectCollectionStat]
+    collection: SubjectCollectionStat | None
     id: int
     eps: int
-    meta_tags: List[str]
+    meta_tags: list[str]
     volumes: int
     series: bool
     locked: bool
     nsfw: bool
     type_id: int
-    redirect: Optional[int]
+    redirect: int | None
 
 @dataclass
 class Actor:
     id: int
     name: str
-    images: Optional[PersonImages] = None
+    images: PersonImages | None = None
     short_summary: str = ""
-    career: List[str] = None
+    career: list[str] = None
     type: int = 0
     locked: bool = False
 
@@ -125,9 +125,9 @@ class SubjectRelatedCharacter:
     images: PersonImages
     name: str
     relation: str
-    actors: List[Actor]
+    actors: list[Actor]
     type: int
     id: int
 
 # V0wiki 仅为 infobox 的类型别名，等价于 List[Any]
-V0wiki = List[Any]
+V0wiki = list[Any]

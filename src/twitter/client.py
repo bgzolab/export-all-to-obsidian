@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Twitter 网页接口客户端。
 
@@ -15,9 +14,11 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.cookies import get_cookie_header
-from twitter.api_endpoints import TWITTER_BEARER_TOKEN
-from twitter.api_endpoints import TWITTER_CSRF_ENV
-from twitter.api_endpoints import TWITTER_USER_ID_ENV
+from twitter.api_endpoints import (
+    TWITTER_BEARER_TOKEN,
+    TWITTER_CSRF_ENV,
+    TWITTER_USER_ID_ENV,
+)
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) "

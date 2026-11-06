@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2026-08-19
@@ -231,8 +230,7 @@ def test_tweet_parsing():
 
 
 def test_tweet_url_falls_back_to_i_status_when_no_screen_name():
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import Tweet, TwitterUser
 
     tweet = Tweet(
         id_str="111",
@@ -528,10 +526,7 @@ def test_get_twitter_like_list_returns_none_on_non_dict_data(monkeypatch, tmp_pa
 
 def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import TimelineCursor
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -576,9 +571,7 @@ def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
 
 def test_exporter_stops_on_existing_file(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -624,10 +617,7 @@ def test_exporter_stops_on_fetch_exception_and_flushes(monkeypatch, tmp_path):
 
 def test_exporter_filename_falls_back_to_author_id(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import TimelineCursor
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -654,10 +644,7 @@ def test_exporter_filename_falls_back_to_author_id(monkeypatch, tmp_path):
 
 def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import TimelineCursor
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -692,10 +679,7 @@ def test_exporter_breaks_on_empty_cursor_value(monkeypatch, tmp_path):
 
 def test_exporter_stops_when_cursor_repeats(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import TimelineCursor
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -730,10 +714,7 @@ def test_exporter_stops_when_cursor_repeats(monkeypatch, tmp_path):
 
 def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import TimelineCursor
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -766,10 +747,7 @@ def test_exporter_stops_at_max_pages(monkeypatch, tmp_path):
 
 def test_exporter_falls_back_to_default_when_max_pages_zero(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import TimelineCursor
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 
@@ -810,9 +788,7 @@ def test_exporter_falls_back_to_default_when_max_pages_zero(monkeypatch, tmp_pat
 
 def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
-    from twitter.entity import LikesPage
-    from twitter.entity import Tweet
-    from twitter.entity import TwitterUser
+    from twitter.entity import LikesPage, Tweet, TwitterUser
 
     _write_twitter_cookies(monkeypatch, tmp_path)
 

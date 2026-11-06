@@ -1,17 +1,18 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-27
 @Links : https://github.com/bGZo
 """
 import os
+
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from bangumi import api_endpoints
 from bangumi.api_endpoints import USER_CURRENT
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
 
 class BangumiClient:
     def __init__(self):

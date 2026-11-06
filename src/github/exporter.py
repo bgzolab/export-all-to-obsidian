@@ -1,16 +1,17 @@
 """GitHub star 导出流程。"""
 
-from datetime import datetime
 import re
+from datetime import datetime
 
-from export_runtime.exporter_support import add_index_entry
-from export_runtime.exporter_support import build_link_target
-from export_runtime.exporter_support import resolve_output_prefix
-from export_runtime.exporter_support import stop_if_output_exists
-from export_runtime.exporter_support import write_raw_markdown_output
+from export_runtime.exporter_support import (
+    add_index_entry,
+    build_link_target,
+    resolve_output_prefix,
+    stop_if_output_exists,
+    write_raw_markdown_output,
+)
 from export_runtime.index_writer import IndexWriter
-from github.client import get_repository_readme
-from github.client import get_starred_repositories
+from github.client import get_repository_readme, get_starred_repositories
 from github.entity import GitHubStarredResponseItem
 from utils.file_utils import get_clean_filename
 
@@ -75,7 +76,7 @@ def export(
 ) -> None:
     """导出当前认证用户的 GitHub star 仓库。"""
     resolved_prefix = resolve_output_prefix(prefix)
-    with open(template_path, "r", encoding="utf-8") as file:
+    with open(template_path, encoding="utf-8") as file:
         template_content = file.read()
 
     page = 1
