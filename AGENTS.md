@@ -1,8 +1,7 @@
 # AGENTS.md
 
-Instructions for OpenCode. This repo was previously maintained with Claude Code; long-term
-context lives in `docs/memories/` (Simplified Chinese). This file only captures things that
-are easy to get wrong without reading the source.
+Instructions for OpenCode. This file is the source of truth for internals; `README.md` is the
+user-facing usage doc. Both are kept in sync manually — do not add other long-term docs.
 
 ## Project overview
 
@@ -14,6 +13,21 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
   `github`, `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
 - Shared runtime: `src/export_runtime/` (index_writer, exporter_support)
 - Common utilities: `src/utils/`, `src/entity/`
+
+## Runtime flow
+
+1. `eto` -> `src/app/cli.py` parses top-level options and the subcommand.
+2. `app.context` builds the root context and injects IndexWriter into the chosen exporter.
+3. `app.cookies` extracts per-domain Cookie headers from the Netscape `cookies.txt`.
+4. Each exporter converts entries to front matter + Markdown via `utils.template` /
+   `utils.md_utils`.
+5. `export_runtime.exporter_support` handles output paths, incremental pruning, file writes
+   and index appends; `index_writer` prints the index or appends it to the index file.
+
+## Constraints
+
+- Only lightweight exporter helpers exist; there is no `BaseExporter`-style abstraction.
+- `bangumi.bangumi` is a historical compatibility import layer.
 
 ## Tech stack
 
@@ -68,33 +82,24 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
 - Most modules treat "target file already exists" as the local pruning signal and end the
   current sync run immediately — not a remote cursor.
-- Each entry is one Markdown file with YAML front matter; filenames often carry a `~` prefix.
+- Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls
+  the filename prefix (default `~`).
 - Index file is grouped by module: module is `##`, each export run is `###`.
+- Special cases: bangumi and github render from template files, bilibili emits iframe embeds,
+  github injects the repo README.
 
 ## Workflow: planning & execution
 
-- Before planning a new feature, read `docs/memories/` (architecture/design/tech-stack).
+- Before planning a new feature, read this file (and `README.md` for the user-facing contract).
 - Write plans into `docs/implementation-plans/`; tasks must be atomic (with file paths and
   verification steps), status one of `Completed / In progress / Planned / Deprecated / On Hold`.
 - Execute plans TASK by TASK, only advancing after verification passes; update the plan's
-  execution records when done; sync `docs/memories/` if architecture/tech-stack changes.
+  execution records when done; update this file if architecture/tech-stack changes.
 
 ## Test status
 
-- Existing tests:
-  - `test_bangumi.py`
-  - `test_bilibili.py`
-  - `test_cnblog.py`
-  - `test_cookies.py`
-  - `test_credential_guard.py`
-  - `test_github.py`
-  - `test_qireader.py`
-  - `test_twitter.py`
-  - `test_utils.py`
-  - `test_v2ex.py`
-  - `test_weibo.py`
-  - `test_zhihu.py`
-
+Each platform has `tests/test_<platform>.py`; shared pieces are covered by
+`test_cookies.py`, `test_credential_guard.py` and `test_utils.py`.
 
 ## Non-goals
 

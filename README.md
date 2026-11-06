@@ -206,7 +206,8 @@ Example output:
 
 ## Output
 
-Files are written as Markdown files in your output folder.
+Files are written as Markdown files in your output folder, with a `~` filename prefix by default.
+Use the top-level `--prefix` option to change it (`--prefix ""` disables it).
 The project also writes front matter, so the files work well in Obsidian.
 
 
@@ -228,6 +229,7 @@ In VS Code, you can also use the debug and test settings in .vscode/launch.json.
 
 ## Contributing
 
+Internals and repo conventions live in `AGENTS.md`.
 
 Any contributions made are **greatly appreciated**.
 
