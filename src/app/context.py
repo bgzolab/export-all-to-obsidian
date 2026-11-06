@@ -78,6 +78,14 @@ def get_database() -> sqlite3.Connection:
     return database
 
 
+def get_run_id() -> int | None:
+    """Return the active sync run id, if any."""
+    context = click.get_current_context(silent=True)
+    if context is None:
+        return None
+    return context.find_root().obj.get('run_id')
+
+
 @contextmanager
 def sync_run(
     platform: str,
@@ -95,6 +103,7 @@ def sync_run(
         scope=scope,
         command=root.obj.get('command'),
     )
+    root.obj['run_id'] = run_id
     try:
         yield run_id
     except BaseException as exc:
@@ -104,6 +113,7 @@ def sync_run(
         status = 'partial' if root.obj.get('run_partial') else 'success'
         raw.finish_run(database, run_id, status)
     finally:
+        root.obj['run_id'] = None
         root.obj['run_partial'] = False
 
 
