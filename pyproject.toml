@@ -35,3 +35,18 @@ packages = [
 
 [tool.poetry.scripts]
 eto="export_to_obsidian:eto"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "0.17.4"
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# 批量导出按条目容错：单条失败打印后继续，不中断整批同步
+ignore = ["BLE001"]
+
+[tool.ruff.format]
+# 沿用仓库既有的单引号风格
+quote-style = "single"
+

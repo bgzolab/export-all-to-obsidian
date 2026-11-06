@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Optional, Any, Dict
+from typing import Any
+
 
 @dataclass
 class Paging:
@@ -10,14 +11,15 @@ class Paging:
     totals: int
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Paging':
+    def from_dict(data: dict[str, Any]) -> 'Paging':
         return Paging(
-            is_end=data.get("is_end", False),
-            is_start=data.get("is_start", False),
-            next=data.get("next", ""),
-            previous=data.get("previous", ""),
-            totals=data.get("totals", 0)
+            is_end=data.get('is_end', False),
+            is_start=data.get('is_start', False),
+            next=data.get('next', ''),
+            previous=data.get('previous', ''),
+            totals=data.get('totals', 0),
         )
+
 
 @dataclass
 class Question:
@@ -29,15 +31,16 @@ class Question:
     updated_time: int
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Question':
+    def from_dict(data: dict[str, Any]) -> 'Question':
         return Question(
-            id=str(data.get("id", "")),
-            title=data.get("title", ""),
-            url=data.get("url", ""),
-            type=data.get("type", ""),
-            created=data.get("created", 0),
-            updated_time=data.get("updated_time", 0)
+            id=str(data.get('id', '')),
+            title=data.get('title', ''),
+            url=data.get('url', ''),
+            type=data.get('type', ''),
+            created=data.get('created', 0),
+            updated_time=data.get('updated_time', 0),
         )
+
 
 @dataclass
 class Author:
@@ -48,14 +51,15 @@ class Author:
     url: str
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Author':
+    def from_dict(data: dict[str, Any]) -> 'Author':
         return Author(
-            id=data.get("id", ""),
-            name=data.get("name", ""),
-            url_token=data.get("url_token", ""),
-            headline=data.get("headline", ""),
-            url=data.get("url", "")
+            id=data.get('id', ''),
+            name=data.get('name', ''),
+            url_token=data.get('url_token', ''),
+            headline=data.get('headline', ''),
+            url=data.get('url', ''),
         )
+
 
 @dataclass
 class Content:
@@ -67,25 +71,28 @@ class Content:
     comment_count: int
     created_time: int
     updated_time: int
-    author: Optional[Author] = None
-    question: Optional[Question] = None
-    title: Optional[str] = None
+    author: Author | None = None
+    question: Question | None = None
+    title: str | None = None
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Content':
+    def from_dict(data: dict[str, Any]) -> 'Content':
         return Content(
-            id=str(data.get("id", "")),
-            type=data.get("type", ""),
-            url=data.get("url", ""),
-            content=data.get("content", ""),
-            voteup_count=data.get("voteup_count", 0),
-            comment_count=data.get("comment_count", 0),
-            created_time=data.get("created_time", 0),
-            updated_time=data.get("updated_time", 0),
-            author=Author.from_dict(data.get("author")) if data.get("author") else None,
-            question=Question.from_dict(data.get("question")) if data.get("question") else None,
-            title=data.get("title")
+            id=str(data.get('id', '')),
+            type=data.get('type', ''),
+            url=data.get('url', ''),
+            content=data.get('content', ''),
+            voteup_count=data.get('voteup_count', 0),
+            comment_count=data.get('comment_count', 0),
+            created_time=data.get('created_time', 0),
+            updated_time=data.get('updated_time', 0),
+            author=Author.from_dict(data.get('author')) if data.get('author') else None,
+            question=Question.from_dict(data.get('question'))
+            if data.get('question')
+            else None,
+            title=data.get('title'),
         )
+
 
 @dataclass
 class CollectionItem:
@@ -93,21 +100,21 @@ class CollectionItem:
     created: str
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'CollectionItem':
+    def from_dict(data: dict[str, Any]) -> 'CollectionItem':
         return CollectionItem(
-            content=Content.from_dict(data.get("content", {})),
-            created=data.get("created", "")
+            content=Content.from_dict(data.get('content', {})),
+            created=data.get('created', ''),
         )
+
 
 @dataclass
 class CollectionResponse:
     paging: Paging
-    data: List[CollectionItem]
+    data: list[CollectionItem]
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'CollectionResponse':
+    def from_dict(data: dict[str, Any]) -> 'CollectionResponse':
         return CollectionResponse(
-            paging=Paging.from_dict(data.get("paging", {})),
-            data=[CollectionItem.from_dict(item) for item in data.get("data", [])]
+            paging=Paging.from_dict(data.get('paging', {})),
+            data=[CollectionItem.from_dict(item) for item in data.get('data', [])],
         )
-

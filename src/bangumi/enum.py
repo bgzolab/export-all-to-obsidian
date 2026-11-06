@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-07-28
@@ -7,6 +5,7 @@
 """
 
 from enum import Enum
+
 
 class CollectionType(Enum):
     """
@@ -17,6 +16,7 @@ class CollectionType(Enum):
     4: 搁置
     5: 抛弃
     """
+
     WANT = 1
     DONE = 2
     DOING = 3
@@ -28,7 +28,7 @@ class CollectionType(Enum):
         for item in cls:
             if item.value == value:
                 return item
-        raise ValueError(f"Invalid value for CollectionTypeEnum: {value}")
+        raise ValueError(f'Invalid value for CollectionTypeEnum: {value}')
 
     @classmethod
     def all(cls) -> list[int]:
@@ -40,13 +40,13 @@ class CollectionType(Enum):
         根据 value 返回对应的收藏类型中文名
         """
         mapping = {
-            cls.WANT.value: "想看",
-            cls.DONE.value: "看过",
-            cls.DOING.value: "正在看",
-            cls.WAITING.value: "搁置",
-            cls.CANCEL.value: "抛弃"
+            cls.WANT.value: '想看',
+            cls.DONE.value: '看过',
+            cls.DOING.value: '正在看',
+            cls.WAITING.value: '搁置',
+            cls.CANCEL.value: '抛弃',
         }
-        return mapping.get(value, "未知")
+        return mapping.get(value, '未知')
 
     @classmethod
     def get_name_en(cls, value) -> str:
@@ -54,14 +54,13 @@ class CollectionType(Enum):
         根据 value 返回对应的收藏类型英文名
         """
         mapping = {
-            cls.WANT.value: "want",
-            cls.DONE.value: "done",
-            cls.DOING.value: "doing",
-            cls.WAITING.value: "waiting",
-            cls.CANCEL.value: "canncel"
+            cls.WANT.value: 'want',
+            cls.DONE.value: 'done',
+            cls.DOING.value: 'doing',
+            cls.WAITING.value: 'waiting',
+            cls.CANCEL.value: 'canncel',
         }
-        return mapping.get(value, "unknown")
-
+        return mapping.get(value, 'unknown')
 
 
 class SubjectType(Enum):
@@ -74,6 +73,7 @@ class SubjectType(Enum):
     6 为 三次元
     没有 5
     """
+
     BOOK = 1
     ANIME = 2
     MUSIC = 3
@@ -85,7 +85,7 @@ class SubjectType(Enum):
         for item in cls:
             if item.value == value:
                 return item
-        raise ValueError(f"Invalid value for SubjectTypeEnum: {value}")
+        raise ValueError(f'Invalid value for SubjectTypeEnum: {value}')
 
     @classmethod
     def get_name(cls, value) -> str:
@@ -93,13 +93,13 @@ class SubjectType(Enum):
         根据 value 返回对应的类型中文名
         """
         mapping = {
-            cls.BOOK.value: "书籍",
-            cls.ANIME.value: "动画",
-            cls.MUSIC.value: "音乐",
-            cls.GAME.value: "游戏",
-            cls.REAL_LIFE.value: "三次元"
+            cls.BOOK.value: '书籍',
+            cls.ANIME.value: '动画',
+            cls.MUSIC.value: '音乐',
+            cls.GAME.value: '游戏',
+            cls.REAL_LIFE.value: '三次元',
         }
-        return mapping.get(value, "未知")
+        return mapping.get(value, '未知')
 
     @classmethod
     def get_name_en(cls, value) -> str:
@@ -107,10 +107,10 @@ class SubjectType(Enum):
         根据 value 返回对应的类型中英文名
         """
         mapping = {
-            cls.BOOK.value: "book",
-            cls.ANIME.value: "anime",
-            cls.MUSIC.value: "music",
-            cls.GAME.value: "game",
-            cls.REAL_LIFE.value: "real"
+            cls.BOOK.value: 'book',
+            cls.ANIME.value: 'anime',
+            cls.MUSIC.value: 'music',
+            cls.GAME.value: 'game',
+            cls.REAL_LIFE.value: 'real',
         }
-        return mapping.get(value, "unknown")
+        return mapping.get(value, 'unknown')

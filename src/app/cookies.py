@@ -45,13 +45,13 @@ def resolve_cookies_file() -> str:
     if context is not None:
         root_obj = context.find_root().obj
         if root_obj:
-            path = root_obj.get("cookies_file")
+            path = root_obj.get('cookies_file')
             if path:
                 return path
-    path = os.getenv("COOKIES")
+    path = os.getenv('COOKIES')
     if not path:
         raise CookiesConfigError(
-            "COOKIES environment variable is not set and no --cookies-file provided."
+            'COOKIES environment variable is not set and no --cookies-file provided.'
         )
     return path
 
@@ -71,40 +71,39 @@ def load_cookie_header(
     域名的值；适用于 twitter 这类「主域 + 旧域」场景，避免同一请求头里
     出现重复同名 Cookie。
     """
-    domains = tuple(d.lstrip(".") for d in domains)
+    domains = tuple(d.lstrip('.') for d in domains)
     domain_priority = {d: i for i, d in enumerate(domains)}
     parts: dict[tuple[str, str], str] = {}
     deduped: dict[str, tuple[int, str]] = {}
     try:
-        with open(cookies_file, "r", encoding="utf-8-sig") as f:
+        with open(cookies_file, encoding='utf-8-sig') as f:
             lines = f.readlines()
     except OSError as exc:
         # 文件不可读 / 预检后被删除（TOCTOU）等，均转成配置错误而非裸 traceback
-        raise CookiesConfigError(f"Cookies file not readable: {exc}") from exc
+        raise CookiesConfigError(f'Cookies file not readable: {exc}') from exc
     except UnicodeDecodeError as exc:
-        raise CookiesConfigError(f"Cookies file encoding error: {exc}") from exc
+        raise CookiesConfigError(f'Cookies file encoding error: {exc}') from exc
     now = time.time()
     for line in lines:
         # 先统一 strip，容忍行首空白：保证 #HttpOnly_ 前缀检测不被前导空格破坏，
         # 否则该行会按普通数据解析，去重键的域名也因残留前缀而错乱
         stripped = line.strip()
-        if stripped.startswith("#HttpOnly_"):
-            stripped = stripped[len("#HttpOnly_"):]
-        elif stripped.startswith("#"):
+        if stripped.startswith('#HttpOnly_'):
+            stripped = stripped[len('#HttpOnly_') :]
+        elif stripped.startswith('#'):
             continue
         if not stripped:
             continue
-        fields = stripped.split("\t")
+        fields = stripped.split('\t')
         if len(fields) < 7:
             continue
         cookie_domain = fields[0].strip().lower()
-        if cookie_domain.startswith("."):
-            cookie_domain = cookie_domain[1:]
+        cookie_domain = cookie_domain.removeprefix('.')
         flag = fields[1].strip().upper()
         expiry = fields[4].strip()
         name = fields[5].strip()
         # value 是最后一列：若其本身含 TAB，需把剩余列拼回，不能取 fields[6] 截断
-        value = "\t".join(fields[6:]).strip()
+        value = '\t'.join(fields[6:]).strip()
         if not name:
             # 空 name 会拼出 "=value" 这类非法 Cookie 头，直接跳过
             continue
@@ -117,7 +116,7 @@ def load_cookie_header(
         matched_domain = None
         for d in domains:
             if cookie_domain == d.lower() or (
-                flag not in ("FALSE", "0") and cookie_domain.endswith("." + d.lower())
+                flag not in ('FALSE', '0') and cookie_domain.endswith('.' + d.lower())
             ):
                 matched_domain = d
                 break
@@ -132,8 +131,8 @@ def load_cookie_header(
             else:
                 parts[(cookie_domain, name)] = value
     if dedupe_by_name:
-        return "; ".join(f"{name}={value}" for name, (_, value) in deduped.items())
-    return "; ".join(f"{name}={value}" for (_, name), value in parts.items())
+        return '; '.join(f'{name}={value}' for name, (_, value) in deduped.items())
+    return '; '.join(f'{name}={value}' for (_, name), value in parts.items())
 
 
 def get_cookie_header(
@@ -146,13 +145,13 @@ def get_cookie_header(
     # 区分「不存在」与「是目录」：isfile 对目录返回 False，
     # 一律报 not found 会误导用户以为文件不存在
     if not os.path.exists(path):
-        raise CookiesConfigError(f"Cookies file not found: {path}")
+        raise CookiesConfigError(f'Cookies file not found: {path}')
     if not os.path.isfile(path):
-        raise CookiesConfigError(f"Cookies file is not a regular file: {path}")
+        raise CookiesConfigError(f'Cookies file is not a regular file: {path}')
     header = load_cookie_header(path, domains, dedupe_by_name=dedupe_by_name)
     if not header:
         # 文件存在但无目标域 Cookie 属于「该平台凭证不可用」而非「整体配置缺失」：
         # 抛 ValueError 由 credential_guard 判为 invalid 走「跳过+提醒」，
         # 不复用 CookiesConfigError 的硬退出语义（与改造前行为一致）。
-        raise ValueError(f"No cookies found for domain {domains!r} in {path}")
+        raise ValueError(f'No cookies found for domain {domains!r} in {path}')
     return header

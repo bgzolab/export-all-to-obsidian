@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 因为API没有提供这个接口，所以只能通过解析HTML来实现获取我的主题列表功能，进度参考：
 
@@ -11,10 +9,11 @@ https://www.v2ex.com/t/1035675
 @Date : 2025-12-13
 @Links : https://github.com/bGZo
 """
+
 from bs4 import BeautifulSoup
 
-from v2ex.cilent import V2exClient
 from v2ex.api_endpoints import V2EX_FAV
+from v2ex.cilent import V2exClient
 
 
 def get_fav_html_with_page(page: int) -> str:
@@ -25,7 +24,7 @@ def get_fav_html_with_page(page: int) -> str:
     :return: HTML内容字符串
     """
     client = V2exClient()
-    response = client.session.get(V2EX_FAV, params={"p": page})
+    response = client.session.get(V2EX_FAV, params={'p': page})
     return response.text
 
 

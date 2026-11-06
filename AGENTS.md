@@ -34,6 +34,7 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
 - Python >= 3.12, click (CLI), requests (HTTP)
 - beautifulsoup4 / html2text / markdownify (HTML to Markdown), python-frontmatter
 - Poetry packaging (pyproject.toml, poetry-core backend), `[tool.poetry.scripts] eto`
+- Ruff for lint + format (`ruff 0.17.4`), enforced by the PR workflow
 
 ## Development commands
 
@@ -42,6 +43,9 @@ pip install -e .                 # dev install
 source ./export-env.sh           # load env vars from .env (export + source .env)
 PYTHONPATH=src pytest tests -q                 # run all tests
 PYTHONPATH=src pytest tests/test_utils.py -q   # run a single test file
+ruff check src tests                           # lint
+ruff format --check src tests                  # verify formatting
+ruff format src tests                          # apply formatting
 ```
 
 - You must explicitly set `PYTHONPATH=src` to run pytest.

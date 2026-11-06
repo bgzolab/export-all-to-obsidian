@@ -1,7 +1,8 @@
 """导出流程的轻量共用辅助函数。"""
 
 import os
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from app.context import get_output_prefix
 from export_runtime.index_writer import IndexWriter
@@ -23,7 +24,7 @@ def build_output_path(
 ) -> str:
     """返回标准 Markdown 输出路径。"""
     resolved_prefix = resolve_output_prefix(prefix)
-    return os.path.join(output_dir, f"{resolved_prefix}{filename}.md")
+    return os.path.join(output_dir, f'{resolved_prefix}{filename}.md')
 
 
 def build_link_target(
@@ -34,8 +35,8 @@ def build_link_target(
 ) -> str:
     """返回索引使用的链接目标。"""
     resolved_prefix = resolve_output_prefix(prefix)
-    suffix = ".md" if include_extension else ""
-    return f"{resolved_prefix}{filename}{suffix}"
+    suffix = '.md' if include_extension else ''
+    return f'{resolved_prefix}{filename}{suffix}'
 
 
 def stop_if_output_exists(
@@ -44,9 +45,9 @@ def stop_if_output_exists(
     *,
     index_writer: IndexWriter,
     section_name: str,
-    flush_title: str | None = "导出index",
+    flush_title: str | None = '导出index',
     force: bool = False,
-    message: str = "已存在: {filename}.md，同步结束",
+    message: str = '已存在: {filename}.md，同步结束',
     prefix: str | None = None,
 ) -> bool:
     """检测增量剪枝条件并在命中时刷新索引。"""
@@ -75,7 +76,7 @@ def write_markdown_output(
         output_dir,
         filename,
         markdown,
-        "md",
+        'md',
         resolve_output_prefix(prefix),
     )
 
@@ -91,7 +92,7 @@ def write_raw_markdown_output(
         output_dir,
         filename,
         content,
-        "md",
+        'md',
         resolve_output_prefix(prefix),
     )
 
@@ -103,4 +104,4 @@ def add_index_entry(
     title: str,
 ) -> None:
     """追加一条标准索引项。"""
-    index_writer.add(f"- [[{link_target}|{title}]]")
+    index_writer.add(f'- [[{link_target}|{title}]]')

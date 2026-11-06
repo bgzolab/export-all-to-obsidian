@@ -2,4 +2,4 @@
 
 from export_runtime.index_writer import IndexWriter
 
-__all__ = ["IndexWriter"]
+__all__ = ['IndexWriter']

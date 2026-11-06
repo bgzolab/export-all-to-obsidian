@@ -1,12 +1,10 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Author : bGZo
 @Date : 2025-12-06
 @Links : https://github.com/bGZo
 """
 
-READ_LATER = "https://www.qireader.com/api/streams/"
+READ_LATER = 'https://www.qireader.com/api/streams/'
 """
 target-url: https://www.qireader.com/api/streams/{tagId}?articleOrder=0&count=25&id={tagId}&unreadOnly=false&olderThan=1764313764608411573
 
@@ -41,4 +39,4 @@ target-url: https://www.qireader.com/api/streams/{tagId}?articleOrder=0&count=25
 }
 """
 
-FULL_TEXT = "https://nettools3.oxyry.com/text"
+FULL_TEXT = 'https://nettools3.oxyry.com/text'

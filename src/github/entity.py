@@ -27,39 +27,35 @@ class GitHubStarredResponseItem:
     updated_at: str
     pushed_at: str
     starred_at: str
-    readme: str = ""
+    readme: str = ''
 
     @staticmethod
-    def from_api(data: dict[str, Any]) -> "GitHubStarredResponseItem":
+    def from_api(data: dict[str, Any]) -> 'GitHubStarredResponseItem':
         """将 GitHub starred API 响应映射为内部对象。"""
-        repo = data.get("repo") or data
-        owner = repo.get("owner") or {}
-        license_data = repo.get("license") or {}
-        topics = repo.get("topics") or []
+        repo = data.get('repo') or data
+        owner = repo.get('owner') or {}
+        license_data = repo.get('license') or {}
+        topics = repo.get('topics') or []
 
         return GitHubStarredResponseItem(
-            full_name=repo.get("full_name", ""),
-            html_url=repo.get("html_url", ""),
-            description=repo.get("description") or "",
-            owner_login=owner.get("login", ""),
-            repo_name=repo.get("name", ""),
-            language=repo.get("language") or "",
+            full_name=repo.get('full_name', ''),
+            html_url=repo.get('html_url', ''),
+            description=repo.get('description') or '',
+            owner_login=owner.get('login', ''),
+            repo_name=repo.get('name', ''),
+            language=repo.get('language') or '',
             topics=[str(topic) for topic in topics if topic],
-            stargazers_count=repo.get("stargazers_count", 0),
-            forks_count=repo.get("forks_count", 0),
-            open_issues_count=repo.get("open_issues_count", 0),
-            fork=bool(repo.get("fork", False)),
-            archived=bool(repo.get("archived", False)),
-            private=bool(repo.get("private", False)),
-            homepage=repo.get("homepage") or "",
-            license=(
-                license_data.get("spdx_id")
-                or license_data.get("name")
-                or ""
-            ),
-            created_at=repo.get("created_at", ""),
-            updated_at=repo.get("updated_at", ""),
-            pushed_at=repo.get("pushed_at", ""),
-            starred_at=data.get("starred_at", ""),
-            readme=data.get("readme") or "",
+            stargazers_count=repo.get('stargazers_count', 0),
+            forks_count=repo.get('forks_count', 0),
+            open_issues_count=repo.get('open_issues_count', 0),
+            fork=bool(repo.get('fork', False)),
+            archived=bool(repo.get('archived', False)),
+            private=bool(repo.get('private', False)),
+            homepage=repo.get('homepage') or '',
+            license=(license_data.get('spdx_id') or license_data.get('name') or ''),
+            created_at=repo.get('created_at', ''),
+            updated_at=repo.get('updated_at', ''),
+            pushed_at=repo.get('pushed_at', ''),
+            starred_at=data.get('starred_at', ''),
+            readme=data.get('readme') or '',
         )

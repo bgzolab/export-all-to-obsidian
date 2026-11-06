@@ -2,10 +2,12 @@
 
 from cnblog.blog_post import get_cnblog_post_body_by_url
 from cnblog.bookmark import get_bookmark_list
-from export_runtime.exporter_support import add_index_entry
-from export_runtime.exporter_support import build_link_target
-from export_runtime.exporter_support import stop_if_output_exists
-from export_runtime.exporter_support import write_markdown_output
+from export_runtime.exporter_support import (
+    add_index_entry,
+    build_link_target,
+    stop_if_output_exists,
+    write_markdown_output,
+)
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 from utils.md_utils import html_to_markdown_with_bs
@@ -26,9 +28,9 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 output_dir,
                 filename,
                 index_writer=index_writer,
-                section_name="cnblog",
+                section_name='cnblog',
                 flush_title=None,
-                message="已存在，提前结束: {filename}.md",
+                message='已存在，提前结束: {filename}.md',
             ):
                 return
             if bookmark.FromCNBlogs:
@@ -39,7 +41,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     source=bookmark.LinkUrl,
                     created=bookmark.DateAdded,
                     modified=bookmark.DateAdded,
-                    type="archive-web",
+                    type='archive-web',
                 )
 
                 write_markdown_output(
@@ -51,13 +53,13 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     ),
                 )
 
-                print(f"Done: {bookmark.Title}")
+                print(f'Done: {bookmark.Title}')
             else:
-                print(f"Skip: {bookmark.Title}")
+                print(f'Skip: {bookmark.Title}')
             add_index_entry(
                 index_writer,
                 link_target=build_link_target(filename),
                 title=bookmark.Title,
             )
         page_index += 1
-    index_writer.flush("cnblog")
+    index_writer.flush('cnblog')
