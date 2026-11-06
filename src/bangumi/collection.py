@@ -14,6 +14,7 @@ from bangumi.entity import (
     SubjectTag,
     UserSubjectCollection,
 )
+from export_runtime import http
 
 
 def mark_subject(
@@ -42,7 +43,12 @@ def mark_subject(
         'tags': tags,
     }
 
-    response = client.session.post(COLLECTIONS_UPSERT % subject_id, json=payload)
+    response = http.post(
+        client.session,
+        COLLECTIONS_UPSERT % subject_id,
+        endpoint='bangumi.collection.upsert',
+        json=payload,
+    )
     # Accept special for bgm
     if response.status_code == 202:
         return True
@@ -114,8 +120,10 @@ def get_all_collections_by_pages(
     :return: A list of collections.
     """
     client = BangumiClient()
-    response = client.session.get(
+    response = http.get(
+        client.session,
         COLLECTIONS_QUERY_USERS % username,
+        endpoint='bangumi.collections.page',
         params={
             'subject_type': subject_type,
             'type': collection_type,

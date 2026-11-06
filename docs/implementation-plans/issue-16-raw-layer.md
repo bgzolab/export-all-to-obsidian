@@ -127,7 +127,7 @@
 
 #### T3.1 HTTP 采集器与测试
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/export_runtime/http.py`
   - `tests/test_http_recorder.py`
@@ -142,7 +142,7 @@
 
 #### T3.2 接入 GitHub
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/github/client.py`
   - `src/github/exporter.py`
@@ -155,6 +155,31 @@
 - Verify:
   - `PYTHONPATH=src pytest tests/test_github.py -q`
   - 用临时 DB 跑一次 mock 导出后，`sync_response` 中存在 `github.stars.list` 和 `github.repo.readme` 行。
+
+#### T3.3 接入其余平台
+
+- Status: Completed
+- Files:
+  - `src/zhihu/collection.py`
+  - `src/bilibili/favlist.py`
+  - `src/weibo/like.py`
+  - `src/weibo/post.py`
+  - `src/v2ex/mytopic.py`
+  - `src/v2ex/topic.py`
+  - `src/bangumi/client.py`
+  - `src/bangumi/collection.py`
+  - `src/bangumi/subject.py`
+  - `src/qireader/getext.py`
+  - `src/qireader/readlatter.py`
+  - `src/cnblog/client.py`
+  - `src/cnblog/bookmark.py`
+  - `src/cnblog/blog_post.py`
+  - `src/cnblog/user.py`
+  - `src/twitter/like.py`
+  - `tests/test_raw_platforms.py`
+- Work: 所有内容请求改走 `export_runtime.http`，使用稳定 endpoint；凭证探针不经过采集器。
+- Verify:
+  - `PYTHONPATH=src pytest tests/test_raw_platforms.py tests/test_raw_integration.py -q`
 
 ### M4 已有 Markdown 导入
 
@@ -239,7 +264,10 @@
 | 2026-11-07 | T1.1 | Completed | 新增 `src/db`，连接、迁移、两张表和权限设置 |
 | 2026-11-07 | T1.2 | Completed | 新增 raw 仓储 API 和 9 个测试 |
 | 2026-11-07 | T2.1 | Completed | 顶层 `--db`、默认路径、run 生命周期和 6 个 CLI 测试 |
-| 2026-11-07 | M3-M5 | Planned | 下一步接 HTTP 采集 |
+| 2026-11-07 | T3.1 | Completed | HTTP 采集器、header 脱敏和 4 个测试 |
+| 2026-11-07 | T3.2 | Completed | GitHub 端到端 raw 采集测试 |
+| 2026-11-07 | T3.3 | Completed | 其余 8 个平台内容请求全部接入采集器 |
+| 2026-11-07 | M4-M5 | Planned | 下一步导入旧 Markdown |
 
 ## 5. 验收标准
 

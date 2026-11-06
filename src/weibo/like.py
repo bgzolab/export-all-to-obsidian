@@ -4,6 +4,7 @@
 @Links : https://github.com/bGZo
 """
 
+from export_runtime import http
 from weibo.api_endpoints import WEIBO_LIKE_URL
 from weibo.cilent import WeiboClient
 from weibo.entity import WeiboResponse
@@ -11,8 +12,10 @@ from weibo.entity import WeiboResponse
 
 def get_weibo_like_list(uid: int, page: int) -> WeiboResponse | None:
     wb = WeiboClient()
-    response = wb.session.get(
+    response = http.get(
+        wb.session,
         WEIBO_LIKE_URL,
+        endpoint='weibo.likes.page',
         params={
             'page': page,
             'uid': uid,

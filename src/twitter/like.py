@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 
+from export_runtime import http
 from twitter.api_endpoints import (
     TWITTER_LIKES_FEATURES,
     TWITTER_LIKES_FIELD_TOGGLES,
@@ -48,8 +49,10 @@ def get_twitter_like_list(
     cursor: str | None = None,
 ) -> LikesPage | None:
     """拉取指定用户的一页点赞 Tweet。"""
-    response = client.session.get(
+    response = http.get(
+        client.session,
         TWITTER_LIKES_PATH,
+        endpoint='twitter.likes.page',
         params=build_likes_params(client.user_id, count, cursor),
         timeout=30,
     )

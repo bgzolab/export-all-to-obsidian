@@ -12,6 +12,7 @@ https://www.v2ex.com/t/1035675
 
 from bs4 import BeautifulSoup
 
+from export_runtime import http
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
 
@@ -24,7 +25,12 @@ def get_fav_html_with_page(page: int) -> str:
     :return: HTML内容字符串
     """
     client = V2exClient()
-    response = client.session.get(V2EX_FAV, params={'p': page})
+    response = http.get(
+        client.session,
+        V2EX_FAV,
+        endpoint='v2ex.fav.page',
+        params={'p': page},
+    )
     return response.text
 
 

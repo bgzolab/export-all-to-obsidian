@@ -10,6 +10,7 @@ import requests
 
 from cnblog import api_endpoints
 from cnblog.api_endpoints import USER
+from export_runtime import http
 
 
 class CnblogClient:
@@ -22,5 +23,9 @@ class CnblogClient:
         self.api_endpoints = api_endpoints
 
     def get_user(self):
-        resp = self.session.get(USER)
+        resp = http.get(
+            self.session,
+            USER,
+            endpoint='cnblog.user.current',
+        )
         return resp.json()

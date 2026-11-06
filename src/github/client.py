@@ -5,6 +5,7 @@ import os
 
 import requests
 
+from export_runtime import http
 from github.api_endpoints import build_readme_url, build_starred_repos_url
 from github.entity import GitHubStarredResponseItem
 
@@ -22,8 +23,10 @@ def get_starred_repositories(
     per_page: int = 100,
 ) -> list[GitHubStarredResponseItem]:
     """拉取当前认证用户的 starred repositories。"""
-    response = requests.get(
+    response = http.get(
+        requests.Session(),
         build_starred_repos_url(page, per_page),
+        endpoint='github.stars.list',
         headers={
             'Authorization': f'Bearer {get_github_token()}',
             'Accept': 'application/vnd.github.star+json',
@@ -42,8 +45,10 @@ def get_starred_repositories(
 
 def get_repository_readme(owner: str, repo: str) -> str:
     """获取仓库 README 内容，缺失时返回空字符串。"""
-    response = requests.get(
+    response = http.get(
+        requests.Session(),
         build_readme_url(owner, repo),
+        endpoint='github.repo.readme',
         headers={
             'Authorization': f'Bearer {get_github_token()}',
             'Accept': 'application/vnd.github.raw+json',

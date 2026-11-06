@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from cnblog.client import CnblogClient
+from export_runtime import http
 
 
 @dataclass
@@ -41,8 +42,10 @@ def get_bookmark_list(page_index: int, page_size: int) -> list:
         list: A list of bookmarks.
     """
     client = CnblogClient()
-    response = client.session.get(
+    response = http.get(
+        client.session,
         client.api_endpoints.BOOKMARK,
+        endpoint='cnblog.bookmarks.page',
         params={'pageIndex': page_index, 'pageSize': page_size},
     )
     if response.status_code == 200:
@@ -65,7 +68,12 @@ def delete_by_id(id: int):
         id (int): The ID of the bookmark to delete.
     """
     client = CnblogClient()
-    response = client.session.delete(f'{client.api_endpoints.BOOKMARK_DELETE}/{id}')
+    response = http.request(
+        client.session,
+        'DELETE',
+        f'{client.api_endpoints.BOOKMARK_DELETE}/{id}',
+        endpoint='cnblog.bookmark.delete',
+    )
     if response.status_code == 204:
         print(f'Bookmark with ID {id} deleted successfully.')
     else:

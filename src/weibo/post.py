@@ -4,14 +4,17 @@
 @Links : https://github.com/bGZo
 """
 
+from export_runtime import http
 from weibo.api_endpoints import WEIBO_LONGTEXT_URL
 from weibo.cilent import WeiboClient
 
 
 def get_weibo_longtext_by_id(id: str) -> str:
     wb = WeiboClient()
-    response = wb.session.get(
+    response = http.get(
+        wb.session,
         WEIBO_LONGTEXT_URL,
+        endpoint='weibo.longtext',
         params={
             'id': id,
         },

@@ -4,6 +4,7 @@
 @Links : https://github.com/bGZo
 """
 
+from export_runtime import http
 from v2ex.api_endpoints import V2EX_API_TOPICS
 from v2ex.cilent import V2exClient
 from v2ex.entity import TopicResponse
@@ -11,7 +12,11 @@ from v2ex.entity import TopicResponse
 
 def get_v2ex_topic_info(topic_id: int) -> TopicResponse | None:
     client = V2exClient()
-    response = client.session.get(V2EX_API_TOPICS.format(topic_id=topic_id))
+    response = http.get(
+        client.session,
+        V2EX_API_TOPICS.format(topic_id=topic_id),
+        endpoint='v2ex.topic.detail',
+    )
 
     if response.status_code == 200:
         return TopicResponse.from_dict(response.json())
