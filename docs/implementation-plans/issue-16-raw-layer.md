@@ -1,7 +1,7 @@
 # Issue #16 Raw Layer Implementation Plan
 
 - Issue: [#16](https://github.com/bgzolab/export-all-to-obsidian/issues/16)
-- Status: In progress
+- Status: Completed (raw layer)
 - Date: 2026-11-07
 - Design: [`../design/raw-response-layer.md`](../design/raw-response-layer.md)
 

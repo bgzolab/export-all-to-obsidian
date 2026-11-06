@@ -1,7 +1,7 @@
 # Raw Response Layer Design
 
 - Issue: [#16](https://github.com/bgzolab/export-all-to-obsidian/issues/16)
-- Status: Draft (raw layer only)
+- Status: Implemented (raw layer)
 - Date: 2026-11-07
 - Plan: [`../implementation-plans/issue-16-raw-layer.md`](../implementation-plans/issue-16-raw-layer.md)
 
