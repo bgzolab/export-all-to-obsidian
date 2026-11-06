@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Twitter Likes 接口拉取逻辑。
 

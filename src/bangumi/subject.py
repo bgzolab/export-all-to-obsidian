@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 @Author : bGZo
 @Date : 2025-08-18

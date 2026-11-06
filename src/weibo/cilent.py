@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 获取 Cookie https://weibo.com/u/page/like/8221250887
 

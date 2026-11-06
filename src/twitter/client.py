@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Twitter 网页接口客户端。
 

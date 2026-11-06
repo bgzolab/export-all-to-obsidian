@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Best-effort GitHub repository importer for a URL list."""
 
 from __future__ import annotations

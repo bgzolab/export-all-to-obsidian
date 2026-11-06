@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Twitter 点赞导出流程。
 

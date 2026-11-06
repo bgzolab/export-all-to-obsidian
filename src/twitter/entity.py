@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Twitter Likes 接口返回的数据模型。
 

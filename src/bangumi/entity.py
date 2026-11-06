@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 上游定义： https://github.com/bangumi/server
 

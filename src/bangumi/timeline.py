@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 因为第三方API没有这个，所以只能用 传统 Cookie 的方式来获取时间线数据
 
