@@ -40,7 +40,7 @@ def get_clean_filename(filename: str) -> str:
         return "unknown"
 
     try:
-        filename = re.sub(r'[@…：.？，！\|｜【】\[\]:!“”《》_、「」#——<>:"/\\|\-。（）&•​\n]', ' ', filename)
+        filename = re.sub(r'[@…：.？，！\|｜【】\[\]:!“”《》_、「」#——<>:"/\\|\-。（）&•\u200b\n]', ' ', filename)
         filename = re.sub(r'[ ]+', ' ', filename)
         filename = filename.strip()
         filename = re.sub(r' ', '-', filename)

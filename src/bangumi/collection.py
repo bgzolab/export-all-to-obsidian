@@ -16,7 +16,7 @@ from bangumi.entity import (
 )
 
 
-def mark_subject(subject_id: int, status: int, comment: str = "", tags: list[str] = None) -> bool:
+def mark_subject(subject_id: int, status: int, comment: str = "", tags: list[str] | None = None) -> bool:
     """
     Mark a subject with a specific status and optional comment and tags.
 

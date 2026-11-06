@@ -15,7 +15,7 @@ def get_weibo_longtext_by_id(id: str) -> str:
     try:
         json = response.json()
         return json['data']['longTextContent']
-    except Exception as e:
+    except Exception:
         return None
 
 if __name__ == '__main__':

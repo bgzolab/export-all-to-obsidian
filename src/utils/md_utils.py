@@ -53,11 +53,7 @@ def html_to_markdown_with_html2text(html:str):
 def read(path: str):
     # 读取并解析 Markdown 文件
     with open(path, encoding='utf-8') as f:
-        post = frontmatter.load(f)
-    # 获取 FrontMatter 和正文
-    meta = post.metadata
-    content = post.content
-    return post
+        return frontmatter.load(f)
 
 
 def dump_markdown_with_frontmatter(meta: dict, content: str) -> str:
