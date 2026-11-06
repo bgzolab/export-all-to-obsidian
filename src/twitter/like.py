@@ -5,6 +5,7 @@ Twitter Likes 接口拉取逻辑。
 @Date : 2026-08-19
 @Links : https://github.com/bGZo
 """
+
 from __future__ import annotations
 
 import json
@@ -25,19 +26,19 @@ def build_likes_params(
 ) -> dict[str, str]:
     """构造 Likes GraphQL 查询参数。"""
     variables = {
-        "userId": user_id,
-        "count": count,
-        "includePromotedContent": False,
-        "withClientEventToken": False,
-        "withBirdwatchNotes": False,
-        "withVoice": True,
+        'userId': user_id,
+        'count': count,
+        'includePromotedContent': False,
+        'withClientEventToken': False,
+        'withBirdwatchNotes': False,
+        'withVoice': True,
     }
     if cursor:
-        variables["cursor"] = cursor
+        variables['cursor'] = cursor
     return {
-        "features": json.dumps(TWITTER_LIKES_FEATURES),
-        "fieldToggles": json.dumps(TWITTER_LIKES_FIELD_TOGGLES),
-        "variables": json.dumps(variables),
+        'features': json.dumps(TWITTER_LIKES_FEATURES),
+        'fieldToggles': json.dumps(TWITTER_LIKES_FIELD_TOGGLES),
+        'variables': json.dumps(variables),
     }
 
 
@@ -53,18 +54,18 @@ def get_twitter_like_list(
         timeout=30,
     )
     if response.status_code != 200:
-        print(f"Twitter Likes 请求失败: HTTP {response.status_code}")
+        print(f'Twitter Likes 请求失败: HTTP {response.status_code}')
         return None
 
     try:
         payload = response.json()
     except (ValueError, TypeError) as exc:
-        print(f"Twitter Likes 响应解析失败: {exc}")
+        print(f'Twitter Likes 响应解析失败: {exc}')
         return None
     if not isinstance(payload, dict):
-        print("Twitter Likes 响应解析失败: 非 JSON 对象")
+        print('Twitter Likes 响应解析失败: 非 JSON 对象')
         return None
-    data = payload.get("data")
+    data = payload.get('data')
     if not isinstance(data, dict) or not data:
         return None
     return LikesPage.from_dict(data)

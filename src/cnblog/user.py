@@ -18,9 +18,10 @@ def get_current_user_info() -> dict:
     else:
         response.raise_for_status()  # Raise an error for bad responses
 
+
 if __name__ == '__main__':
     try:
         user_info = get_current_user_info()
         print(user_info)
     except requests.RequestException as e:
-        print(f"An error occurred: {e}")
+        print(f'An error occurred: {e}')

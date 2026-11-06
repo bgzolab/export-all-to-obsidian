@@ -3,6 +3,7 @@
 @Date : 2025-08-18
 @Links : https://github.com/bGZo
 """
+
 from bangumi.api_endpoints import SUBJECT_CHARACTER_QUERY, SUBJECT_QUERY
 from bangumi.client import BangumiClient
 from bangumi.entity import (
@@ -19,15 +20,16 @@ from bangumi.entity import (
 
 def get_subject_info(subject_id: int) -> SubjectV0:
     client = BangumiClient()
-    res = client.session.get(
-        SUBJECT_QUERY % subject_id
-    )
+    res = client.session.get(SUBJECT_QUERY % subject_id)
     if res.status_code == 200:
         result = res.json()
         return _dict_to_subject(result)
     else:
-        print(f"Error fetching {subject_id} info with response: {res.status_code} {res[res.status_code]}")
+        print(
+            f'Error fetching {subject_id} info with response: {res.status_code} {res[res.status_code]}'
+        )
         return None
+
 
 def _dict_to_subject(data: dict) -> SubjectV0:
     images = SubjectImages(**data.get('images', {})) if data.get('images') else None
@@ -45,7 +47,7 @@ def _dict_to_subject(data: dict) -> SubjectV0:
                 rank=rating_data.get('rank'),
                 total=rating_data.get('total'),
                 count=count,
-                score=rating_data.get('score')
+                score=rating_data.get('score'),
             )
         else:
             rating = Rating(**rating_data)
@@ -58,7 +60,7 @@ def _dict_to_subject(data: dict) -> SubjectV0:
             doing=collection_data.get('doing', 0),
             on_hold=collection_data.get('on_hold', 0),
             dropped=collection_data.get('dropped', 0),
-            total=collection_data.get('total', 0)
+            total=collection_data.get('total', 0),
         )
     return SubjectV0(
         date=data.get('date'),
@@ -80,29 +82,38 @@ def _dict_to_subject(data: dict) -> SubjectV0:
         locked=data.get('locked', False),
         nsfw=data.get('nsfw', False),
         type_id=data.get('type', 0),
-        redirect=data.get('redirect')
+        redirect=data.get('redirect'),
     )
+
 
 def _dict_to_subject_character(data: dict) -> SubjectRelatedCharacter:
     # 兼容 images 字段缺失 key 的情况
     images_data = data.get('images', {})
-    images = PersonImages(
-        small=images_data.get('small', ''),
-        grid=images_data.get('grid', ''),
-        large=images_data.get('large', ''),
-        medium=images_data.get('medium', ''),
-        common=images_data.get('common', '')
-    ) if images_data else None
+    images = (
+        PersonImages(
+            small=images_data.get('small', ''),
+            grid=images_data.get('grid', ''),
+            large=images_data.get('large', ''),
+            medium=images_data.get('medium', ''),
+            common=images_data.get('common', ''),
+        )
+        if images_data
+        else None
+    )
     actors = []
     for actor in data.get('actors', []):
         actor_images_data = actor.get('images', {})
-        actor_images = PersonImages(
-            small=actor_images_data.get('small', ''),
-            grid=actor_images_data.get('grid', ''),
-            large=actor_images_data.get('large', ''),
-            medium=actor_images_data.get('medium', ''),
-            common=actor_images_data.get('common', '')
-        ) if actor_images_data else None
+        actor_images = (
+            PersonImages(
+                small=actor_images_data.get('small', ''),
+                grid=actor_images_data.get('grid', ''),
+                large=actor_images_data.get('large', ''),
+                medium=actor_images_data.get('medium', ''),
+                common=actor_images_data.get('common', ''),
+            )
+            if actor_images_data
+            else None
+        )
         actors.append(
             Actor(
                 id=actor.get('id'),
@@ -111,7 +122,7 @@ def _dict_to_subject_character(data: dict) -> SubjectRelatedCharacter:
                 short_summary=actor.get('short_summary', ''),
                 career=actor.get('career', []) or [],
                 type=actor.get('type', 0),
-                locked=actor.get('locked', False)
+                locked=actor.get('locked', False),
             )
         )
     return SubjectRelatedCharacter(
@@ -120,21 +131,20 @@ def _dict_to_subject_character(data: dict) -> SubjectRelatedCharacter:
         relation=data.get('relation', ''),
         actors=actors,
         type=data.get('type', 0),
-        id=data.get('id', 0)
+        id=data.get('id', 0),
     )
+
 
 def get_subject_character(subject_id: int) -> list[SubjectRelatedCharacter]:
     """获取条目角色列表。"""
     client = BangumiClient()
-    res = client.session.get(
-        SUBJECT_CHARACTER_QUERY % subject_id
-    )
+    res = client.session.get(SUBJECT_CHARACTER_QUERY % subject_id)
     if res.status_code == 200:
         result = res.json()
         return [_dict_to_subject_character(item) for item in result]
     else:
         print(
-            "Error fetching character of "
-            f"{subject_id} with response: {res.status_code} {res.text}"
+            'Error fetching character of '
+            f'{subject_id} with response: {res.status_code} {res.text}'
         )
         return []

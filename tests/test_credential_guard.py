@@ -34,10 +34,10 @@ def _fake_twitter_probe(
             return FakeResponse(status_code, payload)
 
     class FakeClient:
-        user_id = "123"
+        user_id = '123'
         session = FakeSession()
 
-    monkeypatch.setattr(guard, "TwitterClient", lambda: FakeClient())
+    monkeypatch.setattr(guard, 'TwitterClient', lambda: FakeClient())
     return guard
 
 
@@ -72,30 +72,30 @@ def _fake_probe_client(monkeypatch, client_attr, payload=None, json_error=None):
 # 与 probe_twitter_credentials 不同，以下 4 个 probe 均在响应体解析处读取 payload，
 # 需对 200 + 非 JSON/非 dict 响应做防护
 _JSON_PROBE_CASES = [
-    ("BangumiClient", "probe_bangumi_credentials", ()),
-    ("QiReaderClient", "probe_qireader_credentials", ("tag",)),
-    ("WeiboClient", "probe_weibo_credentials", (1,)),
-    ("BilibiliClient", "probe_bilibili_credentials", (1,)),
+    ('BangumiClient', 'probe_bangumi_credentials', ()),
+    ('QiReaderClient', 'probe_qireader_credentials', ('tag',)),
+    ('WeiboClient', 'probe_weibo_credentials', (1,)),
+    ('BilibiliClient', 'probe_bilibili_credentials', (1,)),
 ]
 
 
-@pytest.mark.parametrize(
-    "client_attr,probe_name,probe_args", _JSON_PROBE_CASES
-)
-def test_probe_non_json_payload_unknown(monkeypatch, client_attr, probe_name, probe_args):
+@pytest.mark.parametrize('client_attr,probe_name,probe_args', _JSON_PROBE_CASES)
+def test_probe_non_json_payload_unknown(
+    monkeypatch, client_attr, probe_name, probe_args
+):
     """200 + 非 dict JSON（如数组）应判为 unknown，而非 payload.get AttributeError 崩溃。"""
     import app.credential_guard as guard
 
     _fake_probe_client(monkeypatch, client_attr, payload=[1, 2, 3])
     result = getattr(guard, probe_name)(*probe_args)
-    assert result.status == "unknown"
-    assert "非 JSON 对象" in result.reason
+    assert result.status == 'unknown'
+    assert '非 JSON 对象' in result.reason
 
 
-@pytest.mark.parametrize(
-    "client_attr,probe_name,probe_args", _JSON_PROBE_CASES
-)
-def test_probe_json_decode_error_unknown(monkeypatch, client_attr, probe_name, probe_args):
+@pytest.mark.parametrize('client_attr,probe_name,probe_args', _JSON_PROBE_CASES)
+def test_probe_json_decode_error_unknown(
+    monkeypatch, client_attr, probe_name, probe_args
+):
     """200 + JSONDecodeError 应判为 unknown，而非 JSONDecodeError 裸崩溃。"""
     import json
 
@@ -104,45 +104,45 @@ def test_probe_json_decode_error_unknown(monkeypatch, client_attr, probe_name, p
     _fake_probe_client(
         monkeypatch,
         client_attr,
-        json_error=json.JSONDecodeError("Expecting value", "doc", 0),
+        json_error=json.JSONDecodeError('Expecting value', 'doc', 0),
     )
     result = getattr(guard, probe_name)(*probe_args)
-    assert result.status == "unknown"
-    assert "响应解析失败" in result.reason
+    assert result.status == 'unknown'
+    assert '响应解析失败' in result.reason
 
 
 def test_probe_twitter_valid(monkeypatch):
-    guard = _fake_twitter_probe(monkeypatch, payload={"data": {"user": {}}})
+    guard = _fake_twitter_probe(monkeypatch, payload={'data': {'user': {}}})
     result = guard.probe_twitter_credentials()
-    assert result.status == "valid"
+    assert result.status == 'valid'
 
 
 def test_probe_twitter_unauthorized(monkeypatch):
     guard = _fake_twitter_probe(monkeypatch, status_code=401)
     result = guard.probe_twitter_credentials()
-    assert result.status == "invalid"
-    assert "已过期" in result.reason
+    assert result.status == 'invalid'
+    assert '已过期' in result.reason
 
 
 def test_probe_twitter_forbidden(monkeypatch):
     guard = _fake_twitter_probe(monkeypatch, status_code=403)
     result = guard.probe_twitter_credentials()
-    assert result.status == "invalid"
+    assert result.status == 'invalid'
 
 
 def test_probe_twitter_http_error_unknown(monkeypatch):
     guard = _fake_twitter_probe(monkeypatch, status_code=500)
     result = guard.probe_twitter_credentials()
-    assert result.status == "unknown"
-    assert "HTTP 500" in result.reason
+    assert result.status == 'unknown'
+    assert 'HTTP 500' in result.reason
 
 
 def test_probe_twitter_non_json_payload_unknown(monkeypatch):
     """response.json() 返回 None（非 dict）时应判为 unknown 而非崩溃。"""
     guard = _fake_twitter_probe(monkeypatch, status_code=200, payload=None)
     result = guard.probe_twitter_credentials()
-    assert result.status == "unknown"
-    assert "解析失败" in result.reason
+    assert result.status == 'unknown'
+    assert '解析失败' in result.reason
 
 
 def test_probe_twitter_json_decode_error_unknown(monkeypatch):
@@ -152,29 +152,29 @@ def test_probe_twitter_json_decode_error_unknown(monkeypatch):
     guard = _fake_twitter_probe(
         monkeypatch,
         status_code=200,
-        json_error=json.JSONDecodeError("Expecting value", "doc", 0),
+        json_error=json.JSONDecodeError('Expecting value', 'doc', 0),
     )
     result = guard.probe_twitter_credentials()
-    assert result.status == "unknown"
-    assert "解析失败" in result.reason
+    assert result.status == 'unknown'
+    assert '解析失败' in result.reason
 
 
 def test_probe_twitter_no_data_invalid(monkeypatch):
     guard = _fake_twitter_probe(monkeypatch, status_code=200, payload={})
     result = guard.probe_twitter_credentials()
-    assert result.status == "invalid"
+    assert result.status == 'invalid'
 
 
 def test_probe_twitter_value_error_invalid(monkeypatch):
     import app.credential_guard as guard
 
     def boom():
-        raise ValueError("COOKIES 配置无效")
+        raise ValueError('COOKIES 配置无效')
 
-    monkeypatch.setattr(guard, "TwitterClient", boom)
+    monkeypatch.setattr(guard, 'TwitterClient', boom)
     result = guard.probe_twitter_credentials()
-    assert result.status == "invalid"
-    assert "COOKIES" in result.reason
+    assert result.status == 'invalid'
+    assert 'COOKIES' in result.reason
 
 
 def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
@@ -186,22 +186,22 @@ def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
     from app.cookies import CookiesConfigError
 
     def boom():
-        raise CookiesConfigError("Cookies file not found: /no/such/cookies.txt")
+        raise CookiesConfigError('Cookies file not found: /no/such/cookies.txt')
 
-    monkeypatch.setattr(guard, "TwitterClient", boom)
-    with pytest.raises(click.ClickException, match="配置缺失"):
+    monkeypatch.setattr(guard, 'TwitterClient', boom)
+    with pytest.raises(click.ClickException, match='配置缺失'):
         guard.probe_twitter_credentials()
 
 
 @pytest.mark.parametrize(
-    "client_attr,probe_name,probe_args",
+    'client_attr,probe_name,probe_args',
     [
-        ("QiReaderClient", "probe_qireader_credentials", ("tag",)),
-        ("V2exClient", "probe_v2ex_credentials", ()),
-        ("TwitterClient", "probe_twitter_credentials", ()),
-        ("ZhihuClient", "probe_zhihu_credentials", ("collection",)),
-        ("WeiboClient", "probe_weibo_credentials", (1,)),
-        ("BilibiliClient", "probe_bilibili_credentials", (1,)),
+        ('QiReaderClient', 'probe_qireader_credentials', ('tag',)),
+        ('V2exClient', 'probe_v2ex_credentials', ()),
+        ('TwitterClient', 'probe_twitter_credentials', ()),
+        ('ZhihuClient', 'probe_zhihu_credentials', ('collection',)),
+        ('WeiboClient', 'probe_weibo_credentials', (1,)),
+        ('BilibiliClient', 'probe_bilibili_credentials', (1,)),
     ],
 )
 def test_probe_cookies_config_error_raises_click_exception(
@@ -215,10 +215,10 @@ def test_probe_cookies_config_error_raises_click_exception(
     from app.cookies import CookiesConfigError
 
     def boom():
-        raise CookiesConfigError("Cookies file not found: /no/such/cookies.txt")
+        raise CookiesConfigError('Cookies file not found: /no/such/cookies.txt')
 
     monkeypatch.setattr(guard, client_attr, boom)
-    with pytest.raises(click.ClickException, match="配置缺失"):
+    with pytest.raises(click.ClickException, match='配置缺失'):
         getattr(guard, probe_name)(*probe_args)
 
 
@@ -227,41 +227,37 @@ def test_probe_twitter_missing_ct0_in_cookie_invalid(monkeypatch, tmp_path):
     TwitterClient 抛 ValueError，探测应判为 invalid（跳过+提醒）而非硬退出。"""
     import app.credential_guard as guard
 
-    p = tmp_path / "cookies.txt"
-    p.write_text(
-        ".x.com\tTRUE\t/\tTRUE\t0\tguest_id\t1\n", encoding="utf-8"
-    )
-    monkeypatch.setenv("COOKIES", str(p))
-    monkeypatch.delenv("TWITTER_CSRF_TOKEN", raising=False)
-    monkeypatch.delenv("TWITTER_USER_ID", raising=False)
+    p = tmp_path / 'cookies.txt'
+    p.write_text('.x.com\tTRUE\t/\tTRUE\t0\tguest_id\t1\n', encoding='utf-8')
+    monkeypatch.setenv('COOKIES', str(p))
+    monkeypatch.delenv('TWITTER_CSRF_TOKEN', raising=False)
+    monkeypatch.delenv('TWITTER_USER_ID', raising=False)
     result = guard.probe_twitter_credentials()
-    assert result.status == "invalid"
-    assert "ct0" in result.reason
+    assert result.status == 'invalid'
+    assert 'ct0' in result.reason
 
 
 def test_probe_twitter_request_exception_unknown(monkeypatch):
     import requests
 
     guard = _fake_twitter_probe(
-        monkeypatch, get_error=requests.RequestException("network down")
+        monkeypatch, get_error=requests.RequestException('network down')
     )
     result = guard.probe_twitter_credentials()
-    assert result.status == "unknown"
-    assert "network down" in result.reason
+    assert result.status == 'unknown'
+    assert 'network down' in result.reason
 
 
 def test_probe_weibo_missing_domain_cookie_invalid(monkeypatch, tmp_path):
     """cookies.txt 存在但无目标平台域时应判为 invalid（跳过+提醒），而非硬退出。"""
     import app.credential_guard as guard
 
-    p = tmp_path / "cookies.txt"
-    p.write_text(
-        ".zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n", encoding="utf-8"
-    )
-    monkeypatch.setenv("COOKIES", str(p))
+    p = tmp_path / 'cookies.txt'
+    p.write_text('.zhihu.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n', encoding='utf-8')
+    monkeypatch.setenv('COOKIES', str(p))
     result = guard.probe_weibo_credentials(uid=1)
-    assert result.status == "invalid"
-    assert "No cookies found" in result.reason
+    assert result.status == 'invalid'
+    assert 'No cookies found' in result.reason
 
 
 def test_cli_cookies_file_bad_path_exits_1(monkeypatch, tmp_path):
@@ -269,13 +265,13 @@ def test_cli_cookies_file_bad_path_exits_1(monkeypatch, tmp_path):
     而非 click 参数校验的 exit 2（exists=True 已移除，统一由 get_cookie_header 报错）。"""
     from export_to_obsidian import eto
 
-    bad = tmp_path / "no-such-cookies.txt"
+    bad = tmp_path / 'no-such-cookies.txt'
     runner = CliRunner()
     result = runner.invoke(
-        eto, ["--cookies-file", str(bad), "weibo", "-u", "1", "-o", "output/weibo"]
+        eto, ['--cookies-file', str(bad), 'weibo', '-u', '1', '-o', 'output/weibo']
     )
     assert result.exit_code == 1
-    assert "配置缺失" in result.output
+    assert '配置缺失' in result.output
 
 
 def test_cli_cookies_file_directory_exits_1(monkeypatch, tmp_path):
@@ -285,11 +281,11 @@ def test_cli_cookies_file_directory_exits_1(monkeypatch, tmp_path):
 
     runner = CliRunner()
     result = runner.invoke(
-        eto, ["--cookies-file", str(tmp_path), "weibo", "-u", "1", "-o", "output/weibo"]
+        eto, ['--cookies-file', str(tmp_path), 'weibo', '-u', '1', '-o', 'output/weibo']
     )
     assert result.exit_code == 1
-    assert "配置缺失" in result.output
-    assert "not a regular file" in result.output
+    assert '配置缺失' in result.output
+    assert 'not a regular file' in result.output
 
 
 def test_cli_index_file_directory_exits_1(monkeypatch, tmp_path):
@@ -300,10 +296,10 @@ def test_cli_index_file_directory_exits_1(monkeypatch, tmp_path):
     runner = CliRunner()
     result = runner.invoke(
         eto,
-        ["--index-file", str(tmp_path), "cnblog", "-o", "output/cnblog"],
+        ['--index-file', str(tmp_path), 'cnblog', '-o', 'output/cnblog'],
     )
     assert result.exit_code == 1
-    assert "Index file is a directory" in result.output
+    assert 'Index file is a directory' in result.output
 
 
 def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
@@ -312,125 +308,127 @@ def test_cli_cookies_file_option_reaches_client(monkeypatch, tmp_path):
     import app.credential_guard as guard
     from weibo.cilent import WeiboClient
 
-    env_path = tmp_path / "env-cookies.txt"
+    env_path = tmp_path / 'env-cookies.txt'
     env_path.write_text(
-        ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-env\n", encoding="utf-8"
+        '.weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-env\n', encoding='utf-8'
     )
-    explicit = tmp_path / "explicit-cookies.txt"
+    explicit = tmp_path / 'explicit-cookies.txt'
     explicit.write_text(
-        ".weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-cli\n", encoding="utf-8"
+        '.weibo.com\tTRUE\t/\tTRUE\t0\tSUB\tfrom-cli\n', encoding='utf-8'
     )
-    monkeypatch.setenv("COOKIES", str(env_path))
+    monkeypatch.setenv('COOKIES', str(env_path))
     captured: list[WeiboClient] = []
     from export_to_obsidian import eto
 
     def fake_probe(uid: int) -> guard.CredentialProbeResult:
         # 真实构造 WeiboClient，验证 Cookie 头取自 --cookies-file 指向的文件
         captured.append(WeiboClient())
-        return guard.CredentialProbeResult.valid("weibo")
+        return guard.CredentialProbeResult.valid('weibo')
 
     # cli.py 是 from-import 绑定，须 patch app.cli 命名空间才不会触发真实网络探测
-    monkeypatch.setattr("app.cli.probe_weibo_credentials", fake_probe)
+    monkeypatch.setattr('app.cli.probe_weibo_credentials', fake_probe)
     monkeypatch.setattr(
-        "app.cli.export_weibo", lambda uid, output, index_writer, force: None
+        'app.cli.export_weibo', lambda uid, output, index_writer, force: None
     )
 
     runner = CliRunner()
     result = runner.invoke(
         eto,
-        ["--cookies-file", str(explicit), "weibo", "-u", "1", "-o", "output/weibo"],
+        ['--cookies-file', str(explicit), 'weibo', '-u', '1', '-o', 'output/weibo'],
     )
     assert result.exit_code == 0, result.output
-    assert captured[0].session.headers["Cookie"] == "SUB=from-cli"
+    assert captured[0].session.headers['Cookie'] == 'SUB=from-cli'
 
 
 def test_run_with_credential_guard_skips_export_and_notifies(monkeypatch):
-    events: dict[str, object] = {"export_called": False, "notified": []}
+    events: dict[str, object] = {'export_called': False, 'notified': []}
 
     def probe() -> CredentialProbeResult:
-        return CredentialProbeResult.invalid("zhihu", "zhihu Cookie 已过期")
+        return CredentialProbeResult.invalid('zhihu', 'zhihu Cookie 已过期')
 
     def export_action() -> None:
-        events["export_called"] = True
+        events['export_called'] = True
 
     def fake_notify(results):
-        events["notified"] = results
+        events['notified'] = results
         return True
 
-    monkeypatch.setattr("app.credential_guard.notify_invalid_credentials", fake_notify)
+    monkeypatch.setattr('app.credential_guard.notify_invalid_credentials', fake_notify)
 
-    allowed = run_with_credential_guard("zhihu", probe, export_action)
+    allowed = run_with_credential_guard('zhihu', probe, export_action)
 
     assert allowed is False
-    assert events["export_called"] is False
-    assert len(events["notified"]) == 1
-    assert events["notified"][0].module == "zhihu"
+    assert events['export_called'] is False
+    assert len(events['notified']) == 1
+    assert events['notified'][0].module == 'zhihu'
 
 
 def test_run_with_credential_guard_continues_on_unknown(monkeypatch):
-    events = {"export_called": False}
+    events = {'export_called': False}
 
     def probe() -> CredentialProbeResult:
-        return CredentialProbeResult.unknown("weibo", "网络超时")
+        return CredentialProbeResult.unknown('weibo', '网络超时')
 
     def export_action() -> None:
-        events["export_called"] = True
+        events['export_called'] = True
 
     monkeypatch.setattr(
-        "app.credential_guard.notify_invalid_credentials",
+        'app.credential_guard.notify_invalid_credentials',
         lambda results: True,
     )
 
-    allowed = run_with_credential_guard("weibo", probe, export_action)
+    allowed = run_with_credential_guard('weibo', probe, export_action)
 
     assert allowed is True
-    assert events["export_called"] is True
+    assert events['export_called'] is True
 
 
 def test_cli_skips_export_when_probe_invalid(monkeypatch):
     from export_to_obsidian import eto
 
-    called = {"export": False}
+    called = {'export': False}
 
     monkeypatch.setattr(
-        "app.cli.probe_cnblog_credentials",
-        lambda: CredentialProbeResult.invalid("cnblog", "CNBLOG_ACCESS_TOKEN 已过期"),
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.invalid('cnblog', 'CNBLOG_ACCESS_TOKEN 已过期'),
     )
 
     def fake_export(output, index_writer):
-        called["export"] = True
+        called['export'] = True
 
-    monkeypatch.setattr("app.cli.export_cnblog", fake_export)
-    monkeypatch.setattr("app.credential_guard.notify_invalid_credentials", lambda results: False)
+    monkeypatch.setattr('app.cli.export_cnblog', fake_export)
+    monkeypatch.setattr(
+        'app.credential_guard.notify_invalid_credentials', lambda results: False
+    )
 
     runner = CliRunner()
-    result = runner.invoke(eto, ["cnblog", "-o", "output/cnblog"])
+    result = runner.invoke(eto, ['cnblog', '-o', 'output/cnblog'])
 
     assert result.exit_code == 0
-    assert "cnblog 凭证已失效" in result.output
-    assert called["export"] is False
+    assert 'cnblog 凭证已失效' in result.output
+    assert called['export'] is False
 
 
 def test_cli_runs_export_when_probe_valid(monkeypatch):
     from export_to_obsidian import eto
 
-    called = {"export": False}
+    called = {'export': False}
 
     monkeypatch.setattr(
-        "app.cli.probe_cnblog_credentials",
-        lambda: CredentialProbeResult.valid("cnblog"),
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
     )
 
     def fake_export(output, index_writer):
-        called["export"] = True
+        called['export'] = True
 
-    monkeypatch.setattr("app.cli.export_cnblog", fake_export)
+    monkeypatch.setattr('app.cli.export_cnblog', fake_export)
 
     runner = CliRunner()
-    result = runner.invoke(eto, ["cnblog", "-o", "output/cnblog"])
+    result = runner.invoke(eto, ['cnblog', '-o', 'output/cnblog'])
 
     assert result.exit_code == 0
-    assert called["export"] is True
+    assert called['export'] is True
 
 
 def test_cli_twitter_passes_force_to_export(monkeypatch):
@@ -439,27 +437,27 @@ def test_cli_twitter_passes_force_to_export(monkeypatch):
     called = {}
 
     monkeypatch.setattr(
-        "app.cli.probe_twitter_credentials",
-        lambda: CredentialProbeResult.valid("twitter"),
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
     )
 
     def fake_export(output, index_writer, force=False, max_pages=None):
-        called["output"] = output
-        called["force"] = force
-        called["max_pages"] = max_pages
+        called['output'] = output
+        called['force'] = force
+        called['max_pages'] = max_pages
 
-    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+    monkeypatch.setattr('app.cli.export_twitter', fake_export)
     monkeypatch.setattr(
-        "app.credential_guard.notify_invalid_credentials", lambda results: False
+        'app.credential_guard.notify_invalid_credentials', lambda results: False
     )
 
     runner = CliRunner()
-    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--force"])
+    result = runner.invoke(eto, ['twitter', '-o', 'output/twitter', '--force'])
 
     assert result.exit_code == 0
-    assert called["output"] == "output/twitter"
-    assert called["force"] is True
-    assert called["max_pages"] is None
+    assert called['output'] == 'output/twitter'
+    assert called['force'] is True
+    assert called['max_pages'] is None
 
 
 def test_cli_twitter_passes_max_pages(monkeypatch):
@@ -468,40 +466,40 @@ def test_cli_twitter_passes_max_pages(monkeypatch):
     called = {}
 
     monkeypatch.setattr(
-        "app.cli.probe_twitter_credentials",
-        lambda: CredentialProbeResult.valid("twitter"),
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
     )
 
     def fake_export(output, index_writer, force=False, max_pages=None):
-        called["max_pages"] = max_pages
+        called['max_pages'] = max_pages
 
-    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+    monkeypatch.setattr('app.cli.export_twitter', fake_export)
     monkeypatch.setattr(
-        "app.credential_guard.notify_invalid_credentials", lambda results: False
+        'app.credential_guard.notify_invalid_credentials', lambda results: False
     )
 
     runner = CliRunner()
-    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--max-pages", "5"])
+    result = runner.invoke(eto, ['twitter', '-o', 'output/twitter', '--max-pages', '5'])
 
     assert result.exit_code == 0
-    assert called["max_pages"] == 5
+    assert called['max_pages'] == 5
 
 
 def test_cli_twitter_rejects_max_pages_zero(monkeypatch):
     from export_to_obsidian import eto
 
     monkeypatch.setattr(
-        "app.cli.probe_twitter_credentials",
-        lambda: CredentialProbeResult.valid("twitter"),
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
     )
 
     def fake_export(output, index_writer, force=False, max_pages=None):
-        raise AssertionError("不应调用 export")
+        raise AssertionError('不应调用 export')
 
-    monkeypatch.setattr("app.cli.export_twitter", fake_export)
+    monkeypatch.setattr('app.cli.export_twitter', fake_export)
 
     runner = CliRunner()
-    result = runner.invoke(eto, ["twitter", "-o", "output/twitter", "--max-pages", "0"])
+    result = runner.invoke(eto, ['twitter', '-o', 'output/twitter', '--max-pages', '0'])
 
     assert result.exit_code != 0
-    assert "Invalid value" in result.output
+    assert 'Invalid value' in result.output

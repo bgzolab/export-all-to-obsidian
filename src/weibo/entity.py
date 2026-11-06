@@ -16,15 +16,16 @@ class User:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'User':
         return User(
-            id=data.get("id", 0),
-            idstr=data.get("idstr", ""),
-            screen_name=data.get("screen_name", ""),
-            profile_image_url=data.get("profile_image_url", ""),
-            profile_url=data.get("profile_url", ""),
-            verified=data.get("verified", False),
-            avatar_large=data.get("avatar_large", ""),
-            avatar_hd=data.get("avatar_hd", "")
+            id=data.get('id', 0),
+            idstr=data.get('idstr', ''),
+            screen_name=data.get('screen_name', ''),
+            profile_image_url=data.get('profile_image_url', ''),
+            profile_url=data.get('profile_url', ''),
+            verified=data.get('verified', False),
+            avatar_large=data.get('avatar_large', ''),
+            avatar_hd=data.get('avatar_hd', ''),
         )
+
 
 @dataclass
 class PicInfo:
@@ -38,13 +39,14 @@ class PicInfo:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'PicInfo':
         return PicInfo(
-            thumbnail=data.get("thumbnail", {}),
-            large=data.get("large", {}),
-            original=data.get("original", {}),
-            largest=data.get("largest", {}),
-            object_id=data.get("object_id", ""),
-            pic_id=data.get("pic_id", "")
+            thumbnail=data.get('thumbnail', {}),
+            large=data.get('large', {}),
+            original=data.get('original', {}),
+            largest=data.get('largest', {}),
+            object_id=data.get('object_id', ''),
+            pic_id=data.get('pic_id', ''),
         )
+
 
 @dataclass
 class WeiboItem:
@@ -69,29 +71,34 @@ class WeiboItem:
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'WeiboItem':
-        pic_infos_data = data.get("pic_infos", {})
-        pic_infos = {k: PicInfo.from_dict(v) for k, v in pic_infos_data.items()} if pic_infos_data else {}
-        
-        return WeiboItem(
-            created_at=data.get("created_at", ""),
-            id=data.get("id", 0),
-            idstr=data.get("idstr", ""),
-            mid=data.get("mid", ""),
-            mblogid=data.get("mblogid", ""),
-            user=User.from_dict(data.get("user")) if data.get("user") else None,
-            text=data.get("text", ""),
-            text_raw=data.get("text_raw", ""),
-            source=data.get("source", ""),
-            favorited=data.get("favorited", False),
-            pic_num=data.get("pic_num", None),
-            pic_ids=data.get("pic_ids", []),
-            pic_infos=pic_infos,
-            reposts_count=data.get("reposts_count", 0),
-            comments_count=data.get("comments_count", 0),
-            attitudes_count=data.get("attitudes_count", 0),
-            isLongText=data.get("isLongText", False),
-            region_name=data.get("region_name", "")
+        pic_infos_data = data.get('pic_infos', {})
+        pic_infos = (
+            {k: PicInfo.from_dict(v) for k, v in pic_infos_data.items()}
+            if pic_infos_data
+            else {}
         )
+
+        return WeiboItem(
+            created_at=data.get('created_at', ''),
+            id=data.get('id', 0),
+            idstr=data.get('idstr', ''),
+            mid=data.get('mid', ''),
+            mblogid=data.get('mblogid', ''),
+            user=User.from_dict(data.get('user')) if data.get('user') else None,
+            text=data.get('text', ''),
+            text_raw=data.get('text_raw', ''),
+            source=data.get('source', ''),
+            favorited=data.get('favorited', False),
+            pic_num=data.get('pic_num', None),
+            pic_ids=data.get('pic_ids', []),
+            pic_infos=pic_infos,
+            reposts_count=data.get('reposts_count', 0),
+            comments_count=data.get('comments_count', 0),
+            attitudes_count=data.get('attitudes_count', 0),
+            isLongText=data.get('isLongText', False),
+            region_name=data.get('region_name', ''),
+        )
+
 
 @dataclass
 class WeiboData:
@@ -100,8 +107,9 @@ class WeiboData:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'WeiboData':
         return WeiboData(
-            list=[WeiboItem.from_dict(item) for item in data.get("list", [])]
+            list=[WeiboItem.from_dict(item) for item in data.get('list', [])]
         )
+
 
 @dataclass
 class WeiboResponse:
@@ -111,6 +119,6 @@ class WeiboResponse:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'WeiboResponse':
         return WeiboResponse(
-            ok=data.get("ok", 0),
-            data=WeiboData.from_dict(data.get("data")) if data.get("data") else None
+            ok=data.get('ok', 0),
+            data=WeiboData.from_dict(data.get('data')) if data.get('data') else None,
         )

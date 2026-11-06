@@ -14,6 +14,7 @@ from markdownify import markdownify as md
 From html to markdown
 """
 
+
 # using BeautifulSoup to convert HTML to Markdown
 def html_to_markdown_with_bs(html):
     soup = BeautifulSoup(html, 'html.parser')
@@ -27,23 +28,26 @@ def html_to_markdown_with_bs(html):
             elif elem.name == 'p':
                 lines.append(elem.get_text(strip=True) + '\n')
             elif elem.name == 'a':
-                lines.append(f"[{elem.get_text(strip=True)}]({elem.get('href')})")
+                lines.append(f'[{elem.get_text(strip=True)}]({elem.get("href")})')
             elif elem.name == 'ul':
                 for li in elem.find_all('li'):
-                    lines.append(f"- {li.get_text(strip=True)}")
+                    lines.append(f'- {li.get_text(strip=True)}')
             elif elem.name == 'ol':
                 for idx, li in enumerate(elem.find_all('li'), 1):
-                    lines.append(f"{idx}. {li.get_text(strip=True)}")
+                    lines.append(f'{idx}. {li.get_text(strip=True)}')
     return '\n'.join(lines)
+
 
 # using markdownify to convert HTML to Markdown
 def html_to_markdown_with_md(html: str) -> str:
     return md(html, strip=['a'])
 
+
 # using html2text to convert HTML to Markdown
-def html_to_markdown_with_html2text(html:str):
+def html_to_markdown_with_html2text(html: str):
     # 使用 html2text 库将 HTML 转换为 Markdown
     return html2text.html2text(html)
+
 
 """
 =========================================================================
@@ -65,4 +69,3 @@ def dump_markdown_with_frontmatter(meta: dict, content: str) -> str:
     """
     post = frontmatter.Post(content, **meta)
     return frontmatter.dumps(post)
-

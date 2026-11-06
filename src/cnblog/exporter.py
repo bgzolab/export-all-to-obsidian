@@ -28,9 +28,9 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 output_dir,
                 filename,
                 index_writer=index_writer,
-                section_name="cnblog",
+                section_name='cnblog',
                 flush_title=None,
-                message="已存在，提前结束: {filename}.md",
+                message='已存在，提前结束: {filename}.md',
             ):
                 return
             if bookmark.FromCNBlogs:
@@ -41,7 +41,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     source=bookmark.LinkUrl,
                     created=bookmark.DateAdded,
                     modified=bookmark.DateAdded,
-                    type="archive-web",
+                    type='archive-web',
                 )
 
                 write_markdown_output(
@@ -53,13 +53,13 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     ),
                 )
 
-                print(f"Done: {bookmark.Title}")
+                print(f'Done: {bookmark.Title}')
             else:
-                print(f"Skip: {bookmark.Title}")
+                print(f'Skip: {bookmark.Title}')
             add_index_entry(
                 index_writer,
                 link_target=build_link_target(filename),
                 title=bookmark.Title,
             )
         page_index += 1
-    index_writer.flush("cnblog")
+    index_writer.flush('cnblog')

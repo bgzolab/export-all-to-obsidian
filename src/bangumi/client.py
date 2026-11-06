@@ -3,6 +3,7 @@
 @Date : 2025-07-27
 @Links : https://github.com/bGZo
 """
+
 import os
 
 import requests
@@ -15,14 +16,16 @@ from bangumi.api_endpoints import USER_CURRENT
 
 class BangumiClient:
     def __init__(self):
-        self.token = os.getenv("BGM_ACCESS_TOKEN")
+        self.token = os.getenv('BGM_ACCESS_TOKEN')
         if not self.token:
-            raise ValueError("BGM_ACCESS_TOKEN environment variable is not set.")
+            raise ValueError('BGM_ACCESS_TOKEN environment variable is not set.')
         self.session = self._get_retry_session()
-        self.session.headers.update({
-            "Authorization": f"Bearer {self.token}",
-            "User-Agent": "bGZo/self-debug-private-project"
-        })
+        self.session.headers.update(
+            {
+                'Authorization': f'Bearer {self.token}',
+                'User-Agent': 'bGZo/self-debug-private-project',
+            }
+        )
         self.api_endpoints = api_endpoints
 
     def _get_retry_session(self, retries=10, backoff_factor=0.3, timeout=30):
@@ -34,7 +37,7 @@ class BangumiClient:
             backoff_factor=backoff_factor,
             status_forcelist=(500, 502, 504),
             allowed_methods=frozenset(['GET', 'POST']),
-            raise_on_status=False
+            raise_on_status=False,
         )
         adapter = HTTPAdapter(max_retries=retry)
         session.mount('http://', adapter)
@@ -48,6 +51,7 @@ class BangumiClient:
             if 'timeout' not in kwargs:
                 kwargs['timeout'] = timeout
             return func(*args, **kwargs)
+
         return wrapper
 
     def get_user(self):

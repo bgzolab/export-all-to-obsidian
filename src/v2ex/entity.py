@@ -17,16 +17,17 @@ class Member:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'Member':
         return Member(
-            id=data.get("id", 0),
-            username=data.get("username", ""),
-            bio=data.get("bio", ""),
-            website=data.get("website", ""),
-            github=data.get("github", ""),
-            url=data.get("url", ""),
-            avatar=data.get("avatar", ""),
-            created=data.get("created", 0),
-            pro=data.get("pro")
+            id=data.get('id', 0),
+            username=data.get('username', ''),
+            bio=data.get('bio', ''),
+            website=data.get('website', ''),
+            github=data.get('github', ''),
+            url=data.get('url', ''),
+            avatar=data.get('avatar', ''),
+            created=data.get('created', 0),
+            pro=data.get('pro'),
         )
+
 
 @dataclass
 class Node:
@@ -44,17 +45,18 @@ class Node:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'Node':
         return Node(
-            id=data.get("id", 0),
-            url=data.get("url", ""),
-            name=data.get("name", ""),
-            title=data.get("title", ""),
-            header=data.get("header", ""),
-            footer=data.get("footer", ""),
-            avatar=data.get("avatar", ""),
-            topics=data.get("topics", 0),
-            created=data.get("created", 0),
-            last_modified=data.get("last_modified", 0)
+            id=data.get('id', 0),
+            url=data.get('url', ''),
+            name=data.get('name', ''),
+            title=data.get('title', ''),
+            header=data.get('header', ''),
+            footer=data.get('footer', ''),
+            avatar=data.get('avatar', ''),
+            topics=data.get('topics', 0),
+            created=data.get('created', 0),
+            last_modified=data.get('last_modified', 0),
         )
+
 
 @dataclass
 class TopicResult:
@@ -75,20 +77,21 @@ class TopicResult:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'TopicResult':
         return TopicResult(
-            id=data.get("id", 0),
-            title=data.get("title", ""),
-            content=data.get("content", ""),
-            syntax=data.get("syntax", 0),
-            url=data.get("url", ""),
-            replies=data.get("replies", 0),
-            last_reply_by=data.get("last_reply_by", ""),
-            created=data.get("created", 0),
-            last_modified=data.get("last_modified", 0),
-            last_touched=data.get("last_touched", 0),
-            member=Member.from_dict(data.get("member")) if data.get("member") else None,
-            node=Node.from_dict(data.get("node")) if data.get("node") else None,
-            supplements=data.get("supplements", [])
+            id=data.get('id', 0),
+            title=data.get('title', ''),
+            content=data.get('content', ''),
+            syntax=data.get('syntax', 0),
+            url=data.get('url', ''),
+            replies=data.get('replies', 0),
+            last_reply_by=data.get('last_reply_by', ''),
+            created=data.get('created', 0),
+            last_modified=data.get('last_modified', 0),
+            last_touched=data.get('last_touched', 0),
+            member=Member.from_dict(data.get('member')) if data.get('member') else None,
+            node=Node.from_dict(data.get('node')) if data.get('node') else None,
+            supplements=data.get('supplements', []),
         )
+
 
 @dataclass
 class TopicResponse:
@@ -99,7 +102,9 @@ class TopicResponse:
     @staticmethod
     def from_dict(data: dict[str, Any]) -> 'TopicResponse':
         return TopicResponse(
-            success=data.get("success", False),
-            message=data.get("message", ""),
-            result=TopicResult.from_dict(data.get("result")) if data.get("result") else None
+            success=data.get('success', False),
+            message=data.get('message', ''),
+            result=TopicResult.from_dict(data.get('result'))
+            if data.get('result')
+            else None,
         )

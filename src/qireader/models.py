@@ -8,7 +8,8 @@ class Origin:
 
     @staticmethod
     def from_dict(data: dict) -> 'Origin':
-        return Origin(feedId=data.get("feedId"))
+        return Origin(feedId=data.get('feedId'))
+
 
 @dataclass
 class Entry:
@@ -28,19 +29,20 @@ class Entry:
     @staticmethod
     def from_dict(data: dict) -> 'Entry':
         return Entry(
-            id=data.get("id"),
-            isSaved=data.get("isSaved"),
-            sourceEntryId=data.get("sourceEntryId"),
-            origin=Origin.from_dict(data.get("origin")) if data.get("origin") else None,
-            title=data.get("title"),
-            summary=data.get("summary"),
-            url=data.get("url"),
-            publishedAt=data.get("publishedAt"),
-            crawledAt=data.get("crawledAt"),
-            timestamp=data.get("timestamp"),
-            attachments=data.get("attachments", []),
-            tagIds=data.get("tagIds", [])
+            id=data.get('id'),
+            isSaved=data.get('isSaved'),
+            sourceEntryId=data.get('sourceEntryId'),
+            origin=Origin.from_dict(data.get('origin')) if data.get('origin') else None,
+            title=data.get('title'),
+            summary=data.get('summary'),
+            url=data.get('url'),
+            publishedAt=data.get('publishedAt'),
+            crawledAt=data.get('crawledAt'),
+            timestamp=data.get('timestamp'),
+            attachments=data.get('attachments', []),
+            tagIds=data.get('tagIds', []),
         )
+
 
 @dataclass
 class StreamResult:
@@ -51,10 +53,11 @@ class StreamResult:
     @staticmethod
     def from_dict(data: dict) -> 'StreamResult':
         return StreamResult(
-            id=data.get("id"),
-            entries=[Entry.from_dict(e) for e in data.get("entries", [])],
-            hasMore=data.get("hasMore")
+            id=data.get('id'),
+            entries=[Entry.from_dict(e) for e in data.get('entries', [])],
+            hasMore=data.get('hasMore'),
         )
+
 
 @dataclass
 class QiReaderResponse:
@@ -62,6 +65,4 @@ class QiReaderResponse:
 
     @staticmethod
     def from_dict(data: dict) -> 'QiReaderResponse':
-        return QiReaderResponse(
-            result=StreamResult.from_dict(data.get("result", {}))
-        )
+        return QiReaderResponse(result=StreamResult.from_dict(data.get('result', {})))

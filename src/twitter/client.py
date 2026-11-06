@@ -5,6 +5,7 @@ Twitter 网页接口客户端。
 @Date : 2026-08-19
 @Links : https://github.com/bGZo
 """
+
 import os
 import re
 
@@ -20,14 +21,14 @@ from twitter.api_endpoints import (
 )
 
 USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) "
-    "Gecko/20100101 Firefox/144.0"
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) '
+    'Gecko/20100101 Firefox/144.0'
 )
 
 
 def _derive_user_id_from_cookie(cookie: str) -> str | None:
     """从 Cookie 的 twid=u%3D<id>（或已解码的 twid=u=<id>）推导用户 ID。"""
-    match = re.search(r"twid=u(?:%3D|=)(\d+)", cookie, flags=re.IGNORECASE)
+    match = re.search(r'twid=u(?:%3D|=)(\d+)', cookie, flags=re.IGNORECASE)
     if match:
         return match.group(1)
     return None
@@ -40,13 +41,11 @@ class TwitterClient:
         # x.com / twitter.com 是「主域 + 旧域」，浏览器导出的 cookies.txt 常同时
         # 含两域的同名 Cookie（如 ct0），按域名优先级去重，x.com 优先，
         # 避免 Cookie 头出现重复同名条目导致 csrf 取值不确定。
-        cookie = get_cookie_header(
-            ("x.com", "twitter.com"), dedupe_by_name=True
-        )
+        cookie = get_cookie_header(('x.com', 'twitter.com'), dedupe_by_name=True)
 
         csrf_token = os.getenv(TWITTER_CSRF_ENV)
         if not csrf_token:
-            match = re.search(r"ct0=([^;]+)", cookie, flags=re.IGNORECASE)
+            match = re.search(r'ct0=([^;]+)', cookie, flags=re.IGNORECASE)
             if match:
                 csrf_token = match.group(1).strip()
         if not csrf_token:
@@ -54,15 +53,15 @@ class TwitterClient:
             # credential_guard 判为 invalid 走「跳过+提醒」，与改造前语义一致，
             # 不使用 CookiesConfigError 的硬退出语义。
             raise ValueError(
-                f"{TWITTER_CSRF_ENV} environment variable is not set "
-                "or Cookie missing ct0."
+                f'{TWITTER_CSRF_ENV} environment variable is not set '
+                'or Cookie missing ct0.'
             )
 
         user_id = os.getenv(TWITTER_USER_ID_ENV) or _derive_user_id_from_cookie(cookie)
         if not user_id:
             raise ValueError(
-                f"{TWITTER_USER_ID_ENV} environment variable is not set "
-                "or Cookie missing twid."
+                f'{TWITTER_USER_ID_ENV} environment variable is not set '
+                'or Cookie missing twid.'
             )
         self.user_id: str = user_id
 
@@ -78,21 +77,21 @@ class TwitterClient:
             other=2,
             backoff_factor=1,
             status_forcelist=[500, 502, 503, 504],
-            allowed_methods=["GET", "POST"],
+            allowed_methods=['GET', 'POST'],
         )
         adapter = HTTPAdapter(max_retries=retry)
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
         self.session.headers.update(
             {
-                "Authorization": f"Bearer {TWITTER_BEARER_TOKEN}",
-                "Cookie": cookie,
-                "User-Agent": USER_AGENT,
-                "x-csrf-token": csrf_token,
-                "x-twitter-active-user": "yes",
-                "x-twitter-auth-type": "OAuth2Session",
-                "x-twitter-client-language": "en",
-                "content-type": "application/json",
-                "Accept": "*/*",
+                'Authorization': f'Bearer {TWITTER_BEARER_TOKEN}',
+                'Cookie': cookie,
+                'User-Agent': USER_AGENT,
+                'x-csrf-token': csrf_token,
+                'x-twitter-active-user': 'yes',
+                'x-twitter-auth-type': 'OAuth2Session',
+                'x-twitter-client-language': 'en',
+                'content-type': 'application/json',
+                'Accept': '*/*',
             }
         )

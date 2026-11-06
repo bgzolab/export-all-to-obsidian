@@ -20,6 +20,7 @@ class SubjectImages:
     medium: str
     common: str
 
+
 @dataclass
 class PersonImages:
     small: str
@@ -27,6 +28,7 @@ class PersonImages:
     large: str
     medium: str
     common: str
+
 
 # https://github.com/bangumi/server/blob/fb44e70f9fac931fc29964cab9c5b5aec41433b0/web/res/subject.go#L38-L42
 @dataclass
@@ -54,6 +56,7 @@ class SlimSubjectV0:
     collection_total: int
     rank: int
 
+
 # https://github.com/bangumi/server/blob/fb44e70f9fac931fc29964cab9c5b5aec41433b0/internal/collections/domain/collection/model.go#L34
 @dataclass
 class UserSubjectCollection:
@@ -70,12 +73,14 @@ class UserSubjectCollection:
     private: bool
     subject: SlimSubjectV0
 
+
 @dataclass
 class Rating:
     rank: int | None = None
     total: int | None = None
     count: int | None = None
     score: float | None = None
+
 
 @dataclass
 class SubjectCollectionStat:
@@ -85,6 +90,7 @@ class SubjectCollectionStat:
     on_hold: int = 0
     dropped: int = 0
     total: int = 0
+
 
 @dataclass
 class SubjectV0:
@@ -109,15 +115,17 @@ class SubjectV0:
     type_id: int
     redirect: int | None
 
+
 @dataclass
 class Actor:
     id: int
     name: str
     images: PersonImages | None = None
-    short_summary: str = ""
+    short_summary: str = ''
     career: list[str] = None
     type: int = 0
     locked: bool = False
+
 
 @dataclass
 class SubjectRelatedCharacter:
@@ -127,6 +135,7 @@ class SubjectRelatedCharacter:
     actors: list[Actor]
     type: int
     id: int
+
 
 # V0wiki 仅为 infobox 的类型别名，等价于 List[Any]
 V0wiki = list[Any]

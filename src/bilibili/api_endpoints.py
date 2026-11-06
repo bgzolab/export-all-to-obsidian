@@ -4,4 +4,4 @@
 @Links : https://github.com/bGZo
 """
 
-BILIBILI_FAV_URL = "https://api.bilibili.com/x/v3/fav/resource/list"
+BILIBILI_FAV_URL = 'https://api.bilibili.com/x/v3/fav/resource/list'

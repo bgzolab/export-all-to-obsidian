@@ -9,6 +9,7 @@ https://www.v2ex.com/t/1035675
 @Date : 2025-12-13
 @Links : https://github.com/bGZo
 """
+
 from bs4 import BeautifulSoup
 
 from v2ex.api_endpoints import V2EX_FAV
@@ -23,7 +24,7 @@ def get_fav_html_with_page(page: int) -> str:
     :return: HTML内容字符串
     """
     client = V2exClient()
-    response = client.session.get(V2EX_FAV, params={"p": page})
+    response = client.session.get(V2EX_FAV, params={'p': page})
     return response.text
 
 

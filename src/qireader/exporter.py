@@ -31,13 +31,13 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                 output_dir,
                 filename,
                 index_writer=index_writer,
-                section_name="qireader",
+                section_name='qireader',
             ):
                 return
 
             timestamp_seconds = int(entry.timestamp) / 1_000_000_000
             created_at = datetime.fromtimestamp(timestamp_seconds).strftime(
-                "%Y-%m-%dT%H:%M:%S%z",
+                '%Y-%m-%dT%H:%M:%S%z',
             )
             webpage = WebPage(
                 comments=True,
@@ -46,18 +46,18 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                 source=entry.url,
                 created=created_at,
                 modified=created_at,
-                type="archive-web",
+                type='archive-web',
             )
 
-            content = ""
+            content = ''
             try:
                 content = html_to_markdown_with_html2text(
                     get_html_text_from_url(entry.url),
                 )
             except Exception:
                 print(
-                    f"处理{filename}时发生异常，源地址可以已经删除，"
-                    "直接跳过，请考虑手动处理！",
+                    f'处理{filename}时发生异常，源地址可以已经删除，'
+                    '直接跳过，请考虑手动处理！',
                 )
 
             write_markdown_output(
@@ -67,7 +67,7 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                 content,
             )
 
-            print(f"Done: {entry.title}")
+            print(f'Done: {entry.title}')
             add_index_entry(
                 index_writer,
                 link_target=build_link_target(filename),
@@ -75,4 +75,4 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
             )
         older_than = str(entries[-1].timestamp)
 
-    index_writer.flush("qireader", "导出index")
+    index_writer.flush('qireader', '导出index')

@@ -28,24 +28,24 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 result = get_v2ex_topic_info(topic_id)
             except Exception as exc:
                 # 重试耗尽后仍失败则跳过该条目，避免单条故障中断整批同步
-                print(f"Skip v2ex topic {topic_id}: {exc}")
+                print(f'Skip v2ex topic {topic_id}: {exc}')
                 continue
             if not result:
                 continue
             topic = result.result
-            filename = get_clean_filename(f"{topic_id}-{topic.title}")
+            filename = get_clean_filename(f'{topic_id}-{topic.title}')
             if stop_if_output_exists(
                 output_dir,
                 filename,
                 index_writer=index_writer,
-                section_name="v2ex",
+                section_name='v2ex',
             ):
                 return
             created_time = datetime.fromtimestamp(topic.created).strftime(
-                "%Y-%m-%dT%H:%M:%S%z",
+                '%Y-%m-%dT%H:%M:%S%z',
             )
             modified_time = datetime.fromtimestamp(topic.last_modified).strftime(
-                "%Y-%m-%dT%H:%M:%S%z",
+                '%Y-%m-%dT%H:%M:%S%z',
             )
             webpage = WebPage(
                 comments=True,
@@ -54,7 +54,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 source=topic.url,
                 created=created_time,
                 modified=modified_time,
-                type="archive-web",
+                type='archive-web',
             )
             write_markdown_output(
                 output_dir,
@@ -63,10 +63,10 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 topic.content,
             )
 
-            print(f"Done: {topic.title}")
+            print(f'Done: {topic.title}')
             add_index_entry(
                 index_writer,
                 link_target=build_link_target(filename),
                 title=topic.title,
             )
-    index_writer.flush("v2ex", "导出完成index")
+    index_writer.flush('v2ex', '导出完成index')

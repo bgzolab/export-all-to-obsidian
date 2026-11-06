@@ -4,6 +4,7 @@
 @Links : https://github.com/bGZo
 """
 
+
 def get_cnblog_post_body_by_url(url: str):
     """
     获取指定 ID 的博客文章正文内容。
@@ -28,6 +29,6 @@ def get_cnblog_post_body_by_url(url: str):
     if response.status_code == 200:
         return response.text
     else:
-        print(f"Error fetching post body for ID {id}: {response.status_code}")
-        return ""
+        print(f'Error fetching post body for ID {id}: {response.status_code}')
+        return ''
         # response.raise_for_status()  # Raise an error for bad responses

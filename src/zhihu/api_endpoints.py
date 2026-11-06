@@ -4,4 +4,4 @@
 @Links : https://github.com/bGZo
 """
 
-FAV_URL = "https://www.zhihu.com/api/v4/collections/{collection_id}/items"
+FAV_URL = 'https://www.zhihu.com/api/v4/collections/{collection_id}/items'

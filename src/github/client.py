@@ -11,9 +11,9 @@ from github.entity import GitHubStarredResponseItem
 
 def get_github_token() -> str:
     """读取 GitHub 访问令牌。"""
-    token = os.environ.get("GITHUB_TOKEN")
+    token = os.environ.get('GITHUB_TOKEN')
     if not token:
-        raise RuntimeError("GITHUB_TOKEN is required")
+        raise RuntimeError('GITHUB_TOKEN is required')
     return token
 
 
@@ -25,15 +25,15 @@ def get_starred_repositories(
     response = requests.get(
         build_starred_repos_url(page, per_page),
         headers={
-            "Authorization": f"Bearer {get_github_token()}",
-            "Accept": "application/vnd.github.star+json",
-            "X-GitHub-Api-Version": "2022-11-28",
+            'Authorization': f'Bearer {get_github_token()}',
+            'Accept': 'application/vnd.github.star+json',
+            'X-GitHub-Api-Version': '2022-11-28',
         },
         timeout=30,
     )
     if response.status_code != 200:
         raise RuntimeError(
-            f"GitHub starred request failed with status {response.status_code}",
+            f'GitHub starred request failed with status {response.status_code}',
         )
 
     payload = response.json()
@@ -45,28 +45,28 @@ def get_repository_readme(owner: str, repo: str) -> str:
     response = requests.get(
         build_readme_url(owner, repo),
         headers={
-            "Authorization": f"Bearer {get_github_token()}",
-            "Accept": "application/vnd.github.raw+json",
-            "X-GitHub-Api-Version": "2022-11-28",
+            'Authorization': f'Bearer {get_github_token()}',
+            'Accept': 'application/vnd.github.raw+json',
+            'X-GitHub-Api-Version': '2022-11-28',
         },
         timeout=30,
     )
     if response.status_code == 404:
-        return ""
+        return ''
     if response.status_code != 200:
         print(
-            f"GitHub README request failed for {owner}/{repo}: "
-            f"status={response.status_code}",
+            f'GitHub README request failed for {owner}/{repo}: '
+            f'status={response.status_code}',
         )
-        return ""
+        return ''
 
-    content_type = response.headers.get("Content-Type", "")
-    if "application/json" in content_type:
+    content_type = response.headers.get('Content-Type', '')
+    if 'application/json' in content_type:
         payload = response.json()
-        encoded_content = payload.get("content") or ""
+        encoded_content = payload.get('content') or ''
         if not encoded_content:
-            return ""
-        normalized = encoded_content.replace("\n", "")
-        return base64.b64decode(normalized).decode("utf-8", errors="ignore")
+            return ''
+        normalized = encoded_content.replace('\n', '')
+        return base64.b64decode(normalized).decode('utf-8', errors='ignore')
 
     return response.text
