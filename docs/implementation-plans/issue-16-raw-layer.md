@@ -215,7 +215,7 @@
 
 #### T5.1 忽略规则与使用说明
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `.gitignore`
   - `README.md`
@@ -228,7 +228,7 @@
 
 #### T5.2 全量验证
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/`
   - `tests/`
@@ -269,7 +269,9 @@
 | 2026-11-07 | T3.3 | Completed | 其余 8 个平台内容请求全部接入采集器 |
 | 2026-11-07 | T4.1 | Completed | Markdown raw 导入器和 4 个测试 |
 | 2026-11-07 | T4.2 | Completed | `eto import-markdown` 命令和 CLI 测试 |
-| 2026-11-07 | M5 | Planned | 下一步收尾和全量验证 |
+| 2026-11-07 | T5.1 | Completed | README、.gitignore、AGENTS 更新 |
+| 2026-11-07 | T5.2 | Completed | 183 个测试通过，ruff 通过；8 个平台做了单页/单条 live smoke |
+| 2026-11-07 | Smoke | Partial | qireader 缺 cookie；bangumi token 过期；weibo cookie 失效；v2ex token 过期但 HTML 收藏页可用 |
 
 ## 5. 验收标准
 
