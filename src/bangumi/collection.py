@@ -53,9 +53,6 @@ def mark_subject(
         )
         print('Request payload:', payload)
         print('Response:', response.text)
-        print(
-            f'Error marking subject: {response.status_code} {responses[response.status_code]}'
-        )
         return False
 
 

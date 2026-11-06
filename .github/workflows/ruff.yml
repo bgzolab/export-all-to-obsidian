@@ -21,6 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Ruff
+        # 与 pyproject.toml 的 [tool.poetry.group.dev.dependencies] 保持一致
         run: pip install ruff==0.17.4
 
       - name: Lint

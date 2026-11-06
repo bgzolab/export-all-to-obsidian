@@ -26,7 +26,7 @@ def get_subject_info(subject_id: int) -> SubjectV0:
         return _dict_to_subject(result)
     else:
         print(
-            f'Error fetching {subject_id} info with response: {res.status_code} {res[res.status_code]}'
+            f'Error fetching {subject_id} info with response: {res.status_code} {res.text}'
         )
         return None
 

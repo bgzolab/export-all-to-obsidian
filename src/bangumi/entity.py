@@ -122,7 +122,7 @@ class Actor:
     name: str
     images: PersonImages | None = None
     short_summary: str = ''
-    career: list[str] = None
+    career: list[str] | None = None
     type: int = 0
     locked: bool = False
 
