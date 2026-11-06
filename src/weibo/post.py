@@ -5,7 +5,6 @@
 @Date : 2025-12-28
 @Links : https://github.com/bGZo
 """
-from utils.file_utils import output_file_path
 from weibo.api_endpoints import WEIBO_LONGTEXT_URL
 from weibo.cilent import WeiboClient
 

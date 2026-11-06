@@ -7,7 +7,7 @@
 """
 from bangumi.api_endpoints import SUBJECT_QUERY, SUBJECT_CHARACTER_QUERY
 from bangumi.client import BangumiClient
-from bangumi.entity import SubjectV0, SubjectImages, SubjectTag, V0wiki, Rating, SubjectCollectionStat, SubjectRelatedCharacter, PersonImages, Actor
+from bangumi.entity import SubjectV0, SubjectImages, SubjectTag, Rating, SubjectCollectionStat, SubjectRelatedCharacter, PersonImages, Actor
 
 
 def get_subject_info(subject_id: int) -> SubjectV0:

@@ -6,7 +6,6 @@
 @Links : https://github.com/bGZo
 """
 from typing import List, Optional
-from charset_normalizer import from_fp
 
 from qireader.cilent import QiReaderClient
 from qireader.models import QiReaderResponse, Entry

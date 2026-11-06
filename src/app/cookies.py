@@ -98,8 +98,7 @@ def load_cookie_header(
         if len(fields) < 7:
             continue
         cookie_domain = fields[0].strip().lower()
-        if cookie_domain.startswith("."):
-            cookie_domain = cookie_domain[1:]
+        cookie_domain = cookie_domain.removeprefix(".")
         flag = fields[1].strip().upper()
         expiry = fields[4].strip()
         name = fields[5].strip()

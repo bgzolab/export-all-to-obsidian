@@ -7,7 +7,6 @@
 """
 
 import frontmatter
-import sys
 import html2text
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md

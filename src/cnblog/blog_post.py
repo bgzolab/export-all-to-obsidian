@@ -22,8 +22,7 @@ def get_cnblog_post_body_by_url(url: str):
     id = url.split('/')[-1]
     # NOTE: 这里假设 URL 的最后一部分是 ID，且可能以 .html 结尾。如：
     #  https://api.cnblogs.com/api/blogposts/755751.html/body
-    if id.endswith('.html'):
-        id = id[:-5]
+    id = id.removesuffix('.html')
 
     response = client.session.get(BLOG_POST % id)
     # % 是 Python 早期的字符串格式化操作符。它会查找字符串中的 % 占位符（如 %s），并用后面的值替换它。

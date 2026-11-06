@@ -5,7 +5,6 @@
 @Date : 2025-07-27
 @Links : https://github.com/bGZo
 """
-import pytest
 from click.testing import CliRunner
 
 def test_html_to_markdown_html2text():

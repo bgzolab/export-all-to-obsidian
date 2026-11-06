@@ -45,7 +45,7 @@ def mark_subject(subject_id: int, status: int, comment: str = "", tags: list[str
         print(f"Error marking subject: {response.status_code} {responses[response.status_code]}")
         print("Request payload:", payload)
         print("Response:", response.text)
-        print(f"Error marking subject: {response.status_code} {responses[response.status_code]}")  # noqa: E501
+        print(f"Error marking subject: {response.status_code} {responses[response.status_code]}")
         return False
 
 def _dict_to_subject_images(d: dict) -> SubjectImages:

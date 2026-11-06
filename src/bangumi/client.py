@@ -21,7 +21,7 @@ class BangumiClient:
         self.session = self._get_retry_session()
         self.session.headers.update({
             "Authorization": f"Bearer {self.token}",
-            "User-Agent": f"bGZo/self-debug-private-project"
+            "User-Agent": "bGZo/self-debug-private-project"
         })
         self.api_endpoints = api_endpoints
 
