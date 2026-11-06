@@ -74,10 +74,10 @@ def request(
 
     request_info = _request_info(session, method, url, kwargs)
     if database is None or run_id is None:
-        return session.request(method, url, **kwargs)
+        return _send(session, method, url, kwargs)
 
     try:
-        response = session.request(method, url, **kwargs)
+        response = _send(session, method, url, kwargs)
     except Exception as exc:
         raw.record_error(
             database,
@@ -115,7 +115,7 @@ def _request_info(
     url: str,
     kwargs: dict[str, Any],
 ) -> dict[str, Any]:
-    headers = dict(session.headers)
+    headers = dict(getattr(session, 'headers', {}) or {})
     headers.update(kwargs.get('headers') or {})
     return {
         'method': method.upper(),
@@ -124,6 +124,18 @@ def _request_info(
         'headers': _redact_headers(headers),
         'body': _request_body(kwargs),
     }
+
+
+def _send(
+    session: requests.Session,
+    method: str,
+    url: str,
+    kwargs: dict[str, Any],
+) -> requests.Response:
+    sender = getattr(session, method.lower(), None)
+    if callable(sender):
+        return sender(url, **kwargs)
+    return session.request(method, url, **kwargs)
 
 
 def _redact_headers(headers: dict[str, Any]) -> dict[str, str]:
