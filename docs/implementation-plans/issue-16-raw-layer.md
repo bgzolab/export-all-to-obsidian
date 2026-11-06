@@ -107,7 +107,7 @@
 
 #### T2.1 顶层 `--db` 参数与测试
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/app/context.py`
   - `src/app/cli.py`
@@ -238,7 +238,8 @@
 | 2026-11-07 | T0.4 | Completed | 恢复最小脱敏：只处理 Cookie/Authorization header |
 | 2026-11-07 | T1.1 | Completed | 新增 `src/db`，连接、迁移、两张表和权限设置 |
 | 2026-11-07 | T1.2 | Completed | 新增 raw 仓储 API 和 9 个测试 |
-| 2026-11-07 | M2-M5 | Planned | 下一步接 CLI |
+| 2026-11-07 | T2.1 | Completed | 顶层 `--db`、默认路径、run 生命周期和 6 个 CLI 测试 |
+| 2026-11-07 | M3-M5 | Planned | 下一步接 HTTP 采集 |
 
 ## 5. 验收标准
 

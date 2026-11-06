@@ -4,7 +4,7 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
-from app.context import get_output_prefix
+from app.context import get_output_prefix, mark_run_partial
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import output_content_to_file_path
 from utils.md_utils import dump_markdown_with_frontmatter
@@ -58,6 +58,7 @@ def stop_if_output_exists(
     if not os.path.exists(file_path):
         return False
 
+    mark_run_partial()
     print(message.format(filename=filename))
     index_writer.flush(section_name, flush_title)
     return True

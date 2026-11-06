@@ -2,7 +2,12 @@
 
 import click
 
-from app.context import get_index_writer, get_output_prefix, initialize_context
+from app.context import (
+    get_index_writer,
+    get_output_prefix,
+    initialize_context,
+    run_action,
+)
 from app.credential_guard import (
     probe_bangumi_credentials,
     probe_bilibili_credentials,
@@ -45,15 +50,23 @@ from zhihu.exporter import export as export_zhihu
     default=None,
     help='cookies.txt 文件路径；未指定时读取环境变量 COOKIES',
 )
+@click.option(
+    '--db',
+    'db_path',
+    type=click.Path(path_type=str),
+    default=None,
+    help='SQLite 数据库路径；默认 ~/.eto/eto.db',
+)
 @click.pass_context
 def eto(
     ctx: click.Context,
     index_file: str | None,
     prefix: str,
     cookies_file: str | None,
+    db_path: str | None,
 ) -> None:
     """导出命令组。"""
-    initialize_context(ctx, index_file, prefix, cookies_file)
+    initialize_context(ctx, index_file, prefix, cookies_file, db_path)
 
 
 @eto.command()
@@ -63,7 +76,12 @@ def cnblog(output: str) -> None:
     run_with_credential_guard(
         'cnblog',
         probe_cnblog_credentials,
-        lambda: export_cnblog(output, get_index_writer()),
+        lambda: run_action(
+            'cnblog',
+            'bookmarks',
+            None,
+            lambda: export_cnblog(output, get_index_writer()),
+        ),
     )
 
 
@@ -102,7 +120,16 @@ def bangumi(
                 force,
             )
 
-    run_with_credential_guard('bangumi', probe_bangumi_credentials, export_action)
+    run_with_credential_guard(
+        'bangumi',
+        probe_bangumi_credentials,
+        lambda: run_action(
+            'bangumi',
+            'collections',
+            f'{subject_type}:{collection_type or "all"}',
+            export_action,
+        ),
+    )
 
 
 @eto.command()
@@ -113,7 +140,12 @@ def qireader(tag: str, output: str) -> None:
     run_with_credential_guard(
         'qireader',
         lambda: probe_qireader_credentials(tag),
-        lambda: export_qireader(tag, output, get_index_writer()),
+        lambda: run_action(
+            'qireader',
+            'readlater',
+            tag,
+            lambda: export_qireader(tag, output, get_index_writer()),
+        ),
     )
 
 
@@ -124,7 +156,12 @@ def v2ex(output: str) -> None:
     run_with_credential_guard(
         'v2ex',
         probe_v2ex_credentials,
-        lambda: export_v2ex(output, get_index_writer()),
+        lambda: run_action(
+            'v2ex',
+            'favorites',
+            None,
+            lambda: export_v2ex(output, get_index_writer()),
+        ),
     )
 
 
@@ -144,7 +181,12 @@ def twitter(output: str, force: bool, max_pages: int | None) -> None:
     run_with_credential_guard(
         'twitter',
         probe_twitter_credentials,
-        lambda: export_twitter(output, get_index_writer(), force, max_pages),
+        lambda: run_action(
+            'twitter',
+            'likes',
+            None,
+            lambda: export_twitter(output, get_index_writer(), force, max_pages),
+        ),
     )
 
 
@@ -156,7 +198,12 @@ def zhihu(collection: str, output: str) -> None:
     run_with_credential_guard(
         'zhihu',
         lambda: probe_zhihu_credentials(collection),
-        lambda: export_zhihu(collection, output, get_index_writer()),
+        lambda: run_action(
+            'zhihu',
+            'collection',
+            collection,
+            lambda: export_zhihu(collection, output, get_index_writer()),
+        ),
     )
 
 
@@ -169,7 +216,12 @@ def weibo(uid: int, output: str, force: bool) -> None:
     run_with_credential_guard(
         'weibo',
         lambda: probe_weibo_credentials(uid),
-        lambda: export_weibo(uid, output, get_index_writer(), force),
+        lambda: run_action(
+            'weibo',
+            'likes',
+            str(uid),
+            lambda: export_weibo(uid, output, get_index_writer(), force),
+        ),
     )
 
 
@@ -182,7 +234,12 @@ def bilibili(fid: int, output: str, force: bool) -> None:
     run_with_credential_guard(
         'bilibili',
         lambda: probe_bilibili_credentials(fid),
-        lambda: export_bilibili(fid, output, get_index_writer(), force),
+        lambda: run_action(
+            'bilibili',
+            'favlist',
+            str(fid),
+            lambda: export_bilibili(fid, output, get_index_writer(), force),
+        ),
     )
 
 
@@ -192,4 +249,15 @@ def bilibili(fid: int, output: str, force: bool) -> None:
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
 def github(template: str, output: str, force: bool) -> None:
     """导出 GitHub stars。"""
-    export_github(output, template, get_index_writer(), force, get_output_prefix())
+    run_action(
+        'github',
+        'stars',
+        None,
+        lambda: export_github(
+            output,
+            template,
+            get_index_writer(),
+            force,
+            get_output_prefix(),
+        ),
+    )

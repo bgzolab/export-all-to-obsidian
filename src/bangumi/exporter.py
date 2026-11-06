@@ -3,6 +3,7 @@
 import os
 from datetime import datetime
 
+from app.context import mark_run_partial
 from bangumi.client import BangumiClient
 from bangumi.collection import get_all_collections_by_pages
 from bangumi.enum import CollectionType, SubjectType
@@ -134,6 +135,7 @@ def write_subject_markdown(
         prefix,
     )
     if os.path.exists(output_path) and not force:
+        mark_run_partial()
         print(f'已存在，提前结束: {filename}')
         return False, '', ''
 

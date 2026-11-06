@@ -9,6 +9,7 @@ Twitter 点赞导出流程。
 import re
 from datetime import datetime, timedelta, timezone
 
+from app.context import mark_run_partial
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -91,6 +92,7 @@ def export(
 
     while True:
         if len(seen_cursors) >= max_pages:
+            mark_run_partial()
             print(f'Twitter 点赞分页已达上限 {max_pages}，停止导出')
             break
         try:
