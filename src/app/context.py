@@ -86,6 +86,14 @@ def get_run_id() -> int | None:
     return context.find_root().obj.get('run_id')
 
 
+def get_command() -> str | None:
+    """Return the command that started this process."""
+    context = click.get_current_context(silent=True)
+    if context is None:
+        return None
+    return context.find_root().obj.get('command')
+
+
 @contextmanager
 def sync_run(
     platform: str,

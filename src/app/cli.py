@@ -3,6 +3,8 @@
 import click
 
 from app.context import (
+    get_command,
+    get_database,
     get_index_writer,
     get_output_prefix,
     initialize_context,
@@ -23,6 +25,7 @@ from bangumi.exporter import export as export_bangumi
 from bangumi.exporter import sync_all_collections
 from bilibili.exporter import export as export_bilibili
 from cnblog.exporter import export as export_cnblog
+from db.import_markdown import import_markdown
 from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
 from twitter.exporter import TWITTER_MAX_PAGES
@@ -260,4 +263,23 @@ def github(template: str, output: str, force: bool) -> None:
             force,
             get_output_prefix(),
         ),
+    )
+
+
+@eto.command(name='import-markdown')
+@click.argument('path', type=click.Path(path_type=str))
+def import_markdown_command(path: str) -> None:
+    """把已有 Markdown 文件原样导入数据库。"""
+    try:
+        stats = import_markdown(
+            get_database(),
+            path,
+            command=get_command(),
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(
+        f'导入完成: {stats["imported"]} 个，'
+        f'跳过 {stats["skipped"]} 个，失败 {stats["failed"]} 个'
     )

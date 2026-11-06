@@ -126,3 +126,19 @@ def test_cli_marks_run_failed_on_exception(monkeypatch, tmp_path):
     )
     assert run['status'] == 'failed'
     assert 'RuntimeError: boom' in run['error']
+
+
+def test_cli_import_markdown(tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    vault = tmp_path / 'vault'
+    vault.mkdir()
+    (vault / 'a.md').write_text('# A\n', encoding='utf-8')
+
+    runner = CliRunner()
+    first = runner.invoke(eto, ['--db', db_path, 'import-markdown', str(vault)])
+    second = runner.invoke(eto, ['--db', db_path, 'import-markdown', str(vault)])
+
+    assert first.exit_code == 0, first.output
+    assert '导入完成: 1 个' in first.output
+    assert second.exit_code == 0, second.output
+    assert '跳过 1 个' in second.output

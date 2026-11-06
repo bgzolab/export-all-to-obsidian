@@ -185,7 +185,7 @@
 
 #### T4.1 Markdown raw 导入器与测试
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/db/import_markdown.py`
   - `tests/test_import_markdown.py`
@@ -200,7 +200,7 @@
 
 #### T4.2 导入命令与测试
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/app/cli.py`
   - `tests/test_cli_db.py`
@@ -267,7 +267,9 @@
 | 2026-11-07 | T3.1 | Completed | HTTP 采集器、header 脱敏和 4 个测试 |
 | 2026-11-07 | T3.2 | Completed | GitHub 端到端 raw 采集测试 |
 | 2026-11-07 | T3.3 | Completed | 其余 8 个平台内容请求全部接入采集器 |
-| 2026-11-07 | M4-M5 | Planned | 下一步导入旧 Markdown |
+| 2026-11-07 | T4.1 | Completed | Markdown raw 导入器和 4 个测试 |
+| 2026-11-07 | T4.2 | Completed | `eto import-markdown` 命令和 CLI 测试 |
+| 2026-11-07 | M5 | Planned | 下一步收尾和全量验证 |
 
 ## 5. 验收标准
 
