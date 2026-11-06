@@ -71,7 +71,7 @@
 
 #### T1.1 数据库连接与迁移
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/db/__init__.py`
   - `src/db/connection.py`
@@ -89,7 +89,7 @@
 
 #### T1.2 raw 仓储 API 与测试
 
-- Status: Planned
+- Status: Completed
 - Files:
   - `src/db/raw.py`
   - `tests/test_db_raw.py`
@@ -236,7 +236,9 @@
 | 2026-11-07 | T0.2 | Completed | 表名改为 `sync_run` / `sync_response`；删除 cursor 字段和全量脱敏设计 |
 | 2026-11-07 | T0.3 | Completed | `sync_run` 增加纯文本 `command`，保留任务触发命令 |
 | 2026-11-07 | T0.4 | Completed | 恢复最小脱敏：只处理 Cookie/Authorization header |
-| 2026-11-07 | M1-M5 | Planned | 等确认后从 T1.1 开始 |
+| 2026-11-07 | T1.1 | Completed | 新增 `src/db`，连接、迁移、两张表和权限设置 |
+| 2026-11-07 | T1.2 | Completed | 新增 raw 仓储 API 和 9 个测试 |
+| 2026-11-07 | M2-M5 | Planned | 下一步接 CLI |
 
 ## 5. 验收标准
 
