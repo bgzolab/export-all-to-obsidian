@@ -5,7 +5,6 @@
 """
 
 from datetime import datetime
-from http.client import responses
 
 from bangumi.api_endpoints import COLLECTIONS_QUERY_USERS, COLLECTIONS_UPSERT
 from bangumi.client import BangumiClient
@@ -48,9 +47,7 @@ def mark_subject(
     if response.status_code == 202:
         return True
     else:
-        print(
-            f'Error marking subject: {response.status_code} {responses[response.status_code]}'
-        )
+        print(f'Error marking subject: {response.status_code} {response.reason}')
         print('Request payload:', payload)
         print('Response:', response.text)
         return False
@@ -133,6 +130,6 @@ def get_all_collections_by_pages(
         ]
     else:
         print(
-            f'Error fetching collections page with response: {response.status_code} {responses[response.status_code]}'
+            f'Error fetching collections page with response: {response.status_code} {response.reason}'
         )
         return []
