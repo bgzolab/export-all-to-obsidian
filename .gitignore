@@ -86,6 +86,7 @@ tests/import-from-github-url/import-index.md
 # AI export folder
 ai_export/
 docs/implementation-plans/*.md
+!docs/implementation-plans/issue-16-raw-layer.md
 debug/
 bruno/
 cookies.txt
