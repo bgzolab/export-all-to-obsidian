@@ -203,6 +203,42 @@ def test_twitter_none_page_marks_run_partial(monkeypatch, tmp_path):
     assert run['status'] == 'partial'
 
 
+def _run_weibo_with_page(monkeypatch, tmp_path, page):
+    db_path = str(tmp_path / 'eto.db')
+    monkeypatch.setattr(
+        'app.cli.probe_weibo_credentials',
+        lambda uid: CredentialProbeResult.valid('weibo'),
+    )
+    monkeypatch.setattr(
+        'weibo.exporter.get_weibo_like_list',
+        lambda *args, **kwargs: page,
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'weibo', '-u', '1', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_weibo_none_page_marks_run_partial(monkeypatch, tmp_path):
+    _run_weibo_with_page(monkeypatch, tmp_path, None)
+
+
+def test_weibo_error_page_marks_run_partial(monkeypatch, tmp_path):
+    class ErrorPage:
+        ok = 0
+        data = None
+
+    _run_weibo_with_page(monkeypatch, tmp_path, ErrorPage())
+
+
 def test_cli_survives_finish_run_failure(monkeypatch, tmp_path):
     db_path = str(tmp_path / 'eto.db')
     monkeypatch.setattr(

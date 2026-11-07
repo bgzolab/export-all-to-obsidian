@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
+import requests
+
 
 class FakeResponse:
     def __init__(self, json_data=None, text='', status_code=200):
         self.status_code = status_code
         self._json = json_data
         self.text = text
+        self.reason = 'Error'
         self.headers = {'Content-Type': 'application/json'}
         if json_data is not None:
             self.content = json.dumps(json_data).encode()
@@ -17,6 +21,10 @@ class FakeResponse:
 
     def json(self):
         return self._json
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f'HTTP {self.status_code}')
 
 
 class FakeSession:
@@ -267,3 +275,64 @@ def test_twitter_likes_endpoint(monkeypatch):
 
     assert page is not None
     assert endpoints == ['twitter.likes.page']
+
+
+def test_zhihu_non_200_raises(monkeypatch):
+    from zhihu.collection import get_collection_page
+
+    client = FakeClient(FakeResponse({}, status_code=500))
+    monkeypatch.setattr('zhihu.collection.ZhihuClient', lambda: client)
+    monkeypatch.setattr(
+        'zhihu.collection.http.get',
+        lambda session, url, *, endpoint, **kwargs: client.session.response,
+    )
+
+    with pytest.raises(requests.HTTPError):
+        get_collection_page('1', 0, 1)
+
+
+def test_qireader_non_200_raises(monkeypatch):
+    from qireader.readlatter import get_list_from_read_latter
+
+    client = FakeClient(
+        FakeResponse({}, status_code=429),
+        SimpleNamespace(READ_LATER='https://qireader.example/'),
+    )
+    monkeypatch.setattr('qireader.readlatter.QiReaderClient', lambda: client)
+    monkeypatch.setattr(
+        'qireader.readlatter.http.get',
+        lambda session, url, *, endpoint, **kwargs: client.session.response,
+    )
+
+    with pytest.raises(requests.HTTPError):
+        get_list_from_read_latter('tag', None)
+
+
+def test_bangumi_non_200_raises(monkeypatch):
+    from bangumi.collection import get_all_collections_by_pages
+
+    client = FakeClient(FakeResponse({}, status_code=503))
+    monkeypatch.setattr('bangumi.collection.BangumiClient', lambda: client)
+    monkeypatch.setattr(
+        'bangumi.collection.http.get',
+        lambda session, url, *, endpoint, **kwargs: client.session.response,
+    )
+
+    with pytest.raises(requests.HTTPError):
+        get_all_collections_by_pages('user', 1, 1)
+
+
+def test_bilibili_error_code_raises(monkeypatch):
+    from bilibili.favlist import get_bilibili_favlistd
+
+    client = FakeClient(
+        FakeResponse({'code': -101, 'message': 'not logged in', 'ttl': 1, 'data': None})
+    )
+    monkeypatch.setattr('bilibili.favlist.BilibiliClient', lambda: client)
+    monkeypatch.setattr(
+        'bilibili.favlist.http.get',
+        lambda session, url, *, endpoint, **kwargs: client.session.response,
+    )
+
+    with pytest.raises(RuntimeError, match='code=-101'):
+        get_bilibili_favlistd(1, 1, 20)

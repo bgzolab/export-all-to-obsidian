@@ -140,4 +140,5 @@ def get_all_collections_by_pages(
         print(
             f'Error fetching collections page with response: {response.status_code} {response.reason}'
         )
+        response.raise_for_status()
         return []

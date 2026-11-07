@@ -31,6 +31,7 @@ def get_list_from_read_latter(tag_id: str, oldThan: str | None) -> list[Entry]:
 
     if response.status_code == 200:
         return QiReaderResponse.from_dict(response.json()).result.entries
+    response.raise_for_status()
     return []
 
 

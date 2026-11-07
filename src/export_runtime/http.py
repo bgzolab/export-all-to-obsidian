@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import suppress
 from typing import Any
 
 import click
@@ -176,3 +177,10 @@ def _request_body(kwargs: dict[str, Any]) -> Any:
 
 def _warn_record_failure(exc: Exception) -> None:
     print(f'原始响应记录失败: {type(exc).__name__}: {exc}')
+    try:
+        from app.context import mark_run_partial
+    except Exception as import_exc:
+        print(f'标记 sync_run partial 失败: {type(import_exc).__name__}: {import_exc}')
+        return
+    with suppress(Exception):
+        mark_run_partial()

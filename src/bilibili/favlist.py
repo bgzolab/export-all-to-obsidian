@@ -38,7 +38,15 @@ def get_bilibili_favlistd(fid: int, page: int, size: int) -> BilibiliFavListResp
             'web_location': 333.1387,
         },
     )
-    return BilibiliFavListResponse.from_dict(res.json())
+    if res.status_code != 200:
+        res.raise_for_status()
+    response = BilibiliFavListResponse.from_dict(res.json())
+    if response.code != 0:
+        raise RuntimeError(
+            f'Bilibili favlist request failed: code={response.code} '
+            f'message={response.message}'
+        )
+    return response
 
 
 if __name__ == '__main__':

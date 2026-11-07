@@ -24,6 +24,7 @@ def get_collection_page(
 
     if res.status_code == 200:
         return CollectionResponse.from_dict(res.json())
+    res.raise_for_status()
     return None
 
 

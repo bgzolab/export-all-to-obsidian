@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 
+import click
 import pytest
 import requests
 
@@ -161,20 +162,24 @@ def test_record_error_failure_does_not_mask_transport_error(tmp_path, capsys):
     assert '原始响应记录失败' in capsys.readouterr().out
 
 
-def test_record_response_failure_does_not_break_request(tmp_path, capsys):
+def test_record_response_failure_does_not_break_request(capsys):
     class BrokenConnection:
         def execute(self, *args, **kwargs):
             raise sqlite3.OperationalError('database is locked')
 
     session = FakeSession()
+    context = click.Context(click.Command('test'))
+    context.obj = {'run_partial': False}
 
-    response = http.get(
-        session,
-        'https://example.com',
-        endpoint='example.page',
-        database=BrokenConnection(),
-        run_id=1,
-    )
+    with context:
+        response = http.get(
+            session,
+            'https://example.com',
+            endpoint='example.page',
+            database=BrokenConnection(),
+            run_id=1,
+        )
 
     assert response.status_code == 200
+    assert context.obj['run_partial'] is True
     assert '原始响应记录失败' in capsys.readouterr().out
