@@ -181,6 +181,16 @@
 - Verify:
   - `PYTHONPATH=src pytest tests/test_raw_platforms.py tests/test_raw_integration.py -q`
 
+#### T3.4 修复 Qireader 的 www 域 Cookie
+
+- Status: Completed
+- Files:
+  - `src/qireader/cilent.py`
+  - `tests/test_qireader.py`
+- Work: Cookie 匹配先试 `www.qireader.com`，再回退 `qireader.com`，兼容浏览器导出的 host-only Cookie。
+- Verify:
+  - `PYTHONPATH=src pytest tests/test_qireader.py -q`
+
 ### M4 已有 Markdown 导入
 
 #### T4.1 Markdown raw 导入器与测试
@@ -272,6 +282,8 @@
 | 2026-11-07 | T5.1 | Completed | README、.gitignore、AGENTS 更新 |
 | 2026-11-07 | T5.2 | Completed | 183 个测试通过，ruff 通过；8 个平台做了单页/单条 live smoke |
 | 2026-11-07 | Smoke | Partial | qireader 缺 cookie；bangumi token 过期；weibo cookie 失效；v2ex token 过期但 HTML 收藏页可用 |
+| 2026-11-07 | T3.4 | Completed | Qireader 改用 `www.qireader.com` 优先匹配 Cookie |
+| 2026-11-07 | Smoke retest | Completed | Bangumi/V2EX/Qireader 均成功；Weibo 按要求跳过；184 个测试通过 |
 
 ## 5. 验收标准
 
