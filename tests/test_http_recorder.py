@@ -23,6 +23,7 @@ class FakeSession:
             'Cookie': 'SUB=secret',
             'Authorization': 'Bearer secret',
             'X-CSRF-Token': 'csrf-secret',
+            'X-Custom-Token': 'custom-secret',
             'User-Agent': 'eto-test',
         }
         self.response = response or FakeResponse()
@@ -58,6 +59,7 @@ def test_get_records_body_and_redacts_auth_headers(tmp_path):
     assert request_info['headers']['Cookie'] == '[REDACTED]'
     assert request_info['headers']['Authorization'] == '[REDACTED]'
     assert request_info['headers']['X-CSRF-Token'] == '[REDACTED]'
+    assert request_info['headers']['X-Custom-Token'] == '[REDACTED]'
     assert request_info['headers']['User-Agent'] == 'eto-test'
     assert row['status_code'] == 200
     connection.close()

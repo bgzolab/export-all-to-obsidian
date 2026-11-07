@@ -46,7 +46,7 @@ CREATE INDEX idx_sync_response_sha256 ON sync_response(sha256);
 
 非直观字段：
 
-- `sync_run.status`：`running` / `success` / `partial` / `failed`。导出因文件已存在提前结束时标 `partial`。
+- `sync_run.status`：`running` / `success` / `partial` / `failed`。`partial` 表示结果不完整，包括文件已存在提前结束、`--max-pages` 截断和失败路径。
 - `sync_run.command`：`shlex.join(sys.argv)`，一行纯文本，方便复现。
 - `sync_response.request`：请求 JSON，包含 method、url、headers、body、页码和游标。Markdown 导入存 `path` 和 `size`。
 - `sync_response.body`：`response.content` 原始字节，zlib 压缩。异常时为 NULL。

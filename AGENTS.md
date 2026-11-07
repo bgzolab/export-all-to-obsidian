@@ -80,7 +80,7 @@ ruff format src tests                          # apply formatting
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
   `bilibili(-f -o [--force])`, `github(-t -o [--force])`, `import-markdown(<path>)`.
-- `--force` currently only affects bangumi, weibo, bilibili, and twitter.
+- `--force` currently only affects bangumi, github, weibo, bilibili, and twitter.
 
 ## Environment variables (required by module exports)
 
@@ -95,7 +95,8 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
 - Most modules treat "target file already exists" as the local pruning signal and end the
   current sync run immediately — not a remote cursor. When that happens, the active
-  `sync_run` is marked `partial`.
+  `sync_run` is marked `partial`. `partial` means "result is incomplete", including
+  `--max-pages` truncation and failure paths.
 - API responses and imported Markdown are appended to `sync_response`; the database is never
   used as an incremental cursor yet.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls

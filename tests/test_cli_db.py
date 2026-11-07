@@ -176,3 +176,50 @@ def test_twitter_failure_marks_run_partial(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'partial'
+
+
+def test_twitter_none_page_marks_run_partial(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr('twitter.exporter.TwitterClient', lambda: object())
+    monkeypatch.setattr(
+        'twitter.exporter.get_twitter_like_list',
+        lambda *args, **kwargs: None,
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'twitter', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_cli_survives_finish_run_failure(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr('app.cli.export_cnblog', lambda output, index_writer: None)
+
+    def fail_finish(*args, **kwargs):
+        raise sqlite3.OperationalError('database is locked')
+
+    monkeypatch.setattr('app.context.raw.finish_run', fail_finish)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'cnblog', '-o', 'output/cnblog'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '结束 sync_run 失败' in result.output

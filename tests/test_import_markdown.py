@@ -75,3 +75,23 @@ def test_import_markdown_rejects_non_directory(tmp_path):
     with pytest.raises(ValueError, match='Not a directory'):
         import_markdown(connection, tmp_path / 'missing')
     connection.close()
+
+
+def test_import_markdown_marks_run_failed_on_unexpected_error(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    (root / 'a.md').write_text('# A\n', encoding='utf-8')
+    connection = connect(tmp_path / 'eto.db')
+
+    def fail(*args, **kwargs):
+        raise RuntimeError('disk error')
+
+    monkeypatch.setattr('db.import_markdown.raw.record_response', fail)
+
+    with pytest.raises(RuntimeError, match='disk error'):
+        import_markdown(connection, root)
+
+    run = connection.execute('SELECT * FROM sync_run').fetchone()
+    assert run['status'] == 'failed'
+    assert 'RuntimeError: disk error' in run['error']
+    connection.close()

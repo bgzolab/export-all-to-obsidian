@@ -19,6 +19,7 @@ REDACT_HEADERS = {
     'x-auth-token',
     'x-csrf-token',
 }
+REDACT_KEYWORDS = ('auth', 'token', 'csrf', 'session', 'cookie', 'key')
 
 
 def get(
@@ -153,9 +154,16 @@ def _send(
 
 def _redact_headers(headers: dict[str, Any]) -> dict[str, str]:
     return {
-        str(name): REDACTED if str(name).lower() in REDACT_HEADERS else str(value)
+        str(name): REDACTED if _is_sensitive_header(str(name)) else str(value)
         for name, value in headers.items()
     }
+
+
+def _is_sensitive_header(name: str) -> bool:
+    lower = name.lower()
+    return lower in REDACT_HEADERS or any(
+        keyword in lower for keyword in REDACT_KEYWORDS
+    )
 
 
 def _request_body(kwargs: dict[str, Any]) -> Any:

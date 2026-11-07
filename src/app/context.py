@@ -124,7 +124,13 @@ def sync_run(
         raise
     else:
         status = 'partial' if root.obj.get('run_partial') else 'success'
-        raw.finish_run(database, run_id, status)
+        try:
+            raw.finish_run(database, run_id, status)
+        except Exception as finish_exc:
+            print(
+                f'结束 sync_run 失败: {type(finish_exc).__name__}: '
+                f'{finish_exc} (run_id={run_id})'
+            )
     finally:
         root.obj['run_id'] = None
         root.obj['run_partial'] = False

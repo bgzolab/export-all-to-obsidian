@@ -102,6 +102,19 @@ def test_connect_default_path_uses_current_directory(tmp_path, monkeypatch):
     assert (tmp_path / 'data' / 'eto.db').exists()
 
 
+def test_connect_does_not_chmod_existing_parent(tmp_path):
+    if os.name == 'nt':
+        return
+
+    parent = tmp_path / 'notes'
+    parent.mkdir()
+    os.chmod(parent, 0o755)
+    connection = connect(parent / 'eto.db')
+    connection.close()
+
+    assert stat.S_IMODE(parent.stat().st_mode) == 0o755
+
+
 def test_migrate_rolls_back_failed_migration(tmp_path, monkeypatch):
     migrations = tmp_path / 'migrations'
     migrations.mkdir()

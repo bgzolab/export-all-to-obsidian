@@ -32,41 +32,45 @@ def import_markdown(
     existing = _existing_paths(connection)
     stats = {'imported': 0, 'skipped': 0, 'failed': 0}
 
-    for path in sorted(root.rglob('*.md')):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root).as_posix()
-        try:
-            body = path.read_bytes()
-        except OSError as exc:
-            stats['failed'] += 1
-            raw.record_error(
+    try:
+        for path in sorted(root.rglob('*.md')):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root).as_posix()
+            try:
+                body = path.read_bytes()
+            except OSError as exc:
+                stats['failed'] += 1
+                raw.record_error(
+                    connection,
+                    run_id,
+                    endpoint=ENDPOINT,
+                    request={'path': relative},
+                    error=f'{type(exc).__name__}: {exc}',
+                )
+                continue
+
+            digest = hashlib.sha256(body).hexdigest()
+            if (relative, digest) in existing:
+                stats['skipped'] += 1
+                continue
+
+            raw.record_response(
                 connection,
                 run_id,
                 endpoint=ENDPOINT,
-                request={'path': relative},
-                error=f'{type(exc).__name__}: {exc}',
+                request={'path': relative, 'size': len(body)},
+                status_code=None,
+                body=body,
             )
-            continue
-
-        digest = hashlib.sha256(body).hexdigest()
-        if (relative, digest) in existing:
-            stats['skipped'] += 1
-            continue
-
-        raw.record_response(
-            connection,
-            run_id,
-            endpoint=ENDPOINT,
-            request={'path': relative, 'size': len(body)},
-            status_code=None,
-            body=body,
-        )
-        existing.add((relative, digest))
-        stats['imported'] += 1
+            existing.add((relative, digest))
+            stats['imported'] += 1
+    except BaseException as exc:
+        _finish_safely(connection, run_id, 'failed', f'{type(exc).__name__}: {exc}')
+        raise
 
     status = 'partial' if stats['failed'] else 'success'
-    raw.finish_run(connection, run_id, status)
+    _finish_safely(connection, run_id, status)
     return {'run_id': run_id, **stats}
 
 
@@ -85,3 +89,15 @@ def _existing_paths(connection: sqlite3.Connection) -> set[tuple[str, str]]:
         if path and row['sha256']:
             existing.add((path, row['sha256']))
     return existing
+
+
+def _finish_safely(
+    connection: sqlite3.Connection,
+    run_id: int,
+    status: str,
+    error: str | None = None,
+) -> None:
+    try:
+        raw.finish_run(connection, run_id, status, error)
+    except Exception as exc:
+        print(f'结束 sync_run 失败: {type(exc).__name__}: {exc} (run_id={run_id})')

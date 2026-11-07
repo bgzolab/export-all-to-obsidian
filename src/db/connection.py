@@ -22,8 +22,10 @@ def connect(path: str | os.PathLike[str] | None = None) -> sqlite3.Connection:
     in_memory = str(db_path) == ':memory:'
 
     if not in_memory:
+        parent_existed = db_path.parent.exists()
         db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        _chmod(db_path.parent, 0o700)
+        if not parent_existed:
+            _chmod(db_path.parent, 0o700)
 
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
