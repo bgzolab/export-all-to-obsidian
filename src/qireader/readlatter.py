@@ -4,6 +4,7 @@
 @Links : https://github.com/bGZo
 """
 
+from export_runtime import http
 from qireader.cilent import QiReaderClient
 from qireader.models import Entry, QiReaderResponse
 
@@ -15,8 +16,10 @@ def get_list_from_read_latter(tag_id: str, oldThan: str | None) -> list[Entry]:
     :param tag-xxx
     """
     client = QiReaderClient()
-    response = client.session.get(
+    response = http.get(
+        client.session,
         client.api_endpoints.READ_LATER + tag_id,
+        endpoint='qireader.readlater.page',
         params={
             'articleOrder': 0,
             'count': 25,
@@ -28,6 +31,7 @@ def get_list_from_read_latter(tag_id: str, oldThan: str | None) -> list[Entry]:
 
     if response.status_code == 200:
         return QiReaderResponse.from_dict(response.json()).result.entries
+    response.raise_for_status()
     return []
 
 

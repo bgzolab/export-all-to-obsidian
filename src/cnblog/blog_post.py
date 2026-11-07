@@ -4,6 +4,10 @@
 @Links : https://github.com/bGZo
 """
 
+from cnblog.api_endpoints import BLOG_POST
+from cnblog.client import CnblogClient
+from export_runtime import http
+
 
 def get_cnblog_post_body_by_url(url: str):
     """
@@ -12,9 +16,6 @@ def get_cnblog_post_body_by_url(url: str):
     :param id: 博客文章的 ID
     :return: 博客文章正文内容
     """
-    from cnblog.api_endpoints import BLOG_POST
-    from cnblog.client import CnblogClient
-
     client = CnblogClient()
 
     # 从 URL 中提取 ID，并去除 .html 后缀
@@ -23,7 +24,11 @@ def get_cnblog_post_body_by_url(url: str):
     #  https://api.cnblogs.com/api/blogposts/755751.html/body
     id = id.removesuffix('.html')
 
-    response = client.session.get(BLOG_POST % id)
+    response = http.get(
+        client.session,
+        BLOG_POST % id,
+        endpoint='cnblog.post.body',
+    )
     # % 是 Python 早期的字符串格式化操作符。它会查找字符串中的 % 占位符（如 %s），并用后面的值替换它。
 
     if response.status_code == 200:

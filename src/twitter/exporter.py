@@ -9,6 +9,7 @@ Twitter 点赞导出流程。
 import re
 from datetime import datetime, timedelta, timezone
 
+from app.context import mark_run_partial
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -83,6 +84,7 @@ def export(
     try:
         client = TwitterClient()
     except ValueError as exc:
+        mark_run_partial()
         print(exc)
         index_writer.flush('twitter')
         return
@@ -91,14 +93,17 @@ def export(
 
     while True:
         if len(seen_cursors) >= max_pages:
+            mark_run_partial()
             print(f'Twitter 点赞分页已达上限 {max_pages}，停止导出')
             break
         try:
             page = get_twitter_like_list(client, cursor=cursor)
         except Exception as error:
+            mark_run_partial()
             print(f'获取 Twitter 点赞列表异常: {error}')
             break
         if page is None:
+            mark_run_partial()
             print('获取 Twitter 点赞列表失败，请检查接口')
             break
 
@@ -162,6 +167,7 @@ def export(
         next_cursor = page.cursor_bottom.value
         # 游标未推进时视为接口异常或已到末尾，避免 --force 下死循环
         if next_cursor in seen_cursors:
+            mark_run_partial()
             print('Twitter 点赞游标未推进，停止导出')
             break
         seen_cursors.add(next_cursor)

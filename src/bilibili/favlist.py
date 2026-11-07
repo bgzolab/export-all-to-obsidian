@@ -7,12 +7,15 @@
 from bilibili import api_endpoints
 from bilibili.cilent import BilibiliClient
 from bilibili.entity import BilibiliFavListResponse
+from export_runtime import http
 
 
 def get_bilibili_favlistd(fid: int, page: int, size: int) -> BilibiliFavListResponse:
     bc = BilibiliClient()
-    res = bc.session.get(
+    res = http.get(
+        bc.session,
         api_endpoints.BILIBILI_FAV_URL,
+        endpoint='bilibili.favlist.page',
         params={
             # 搜索
             'keyword': '',
@@ -35,7 +38,15 @@ def get_bilibili_favlistd(fid: int, page: int, size: int) -> BilibiliFavListResp
             'web_location': 333.1387,
         },
     )
-    return BilibiliFavListResponse.from_dict(res.json())
+    if res.status_code != 200:
+        res.raise_for_status()
+    response = BilibiliFavListResponse.from_dict(res.json())
+    if response.code != 0:
+        raise RuntimeError(
+            f'Bilibili favlist request failed: code={response.code} '
+            f'message={response.message}'
+        )
+    return response
 
 
 if __name__ == '__main__':

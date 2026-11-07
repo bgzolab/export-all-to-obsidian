@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.context import mark_run_partial
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -28,9 +29,11 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 result = get_v2ex_topic_info(topic_id)
             except Exception as exc:
                 # 重试耗尽后仍失败则跳过该条目，避免单条故障中断整批同步
+                mark_run_partial()
                 print(f'Skip v2ex topic {topic_id}: {exc}')
                 continue
             if not result:
+                mark_run_partial()
                 continue
             topic = result.result
             filename = get_clean_filename(f'{topic_id}-{topic.title}')

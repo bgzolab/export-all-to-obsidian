@@ -4,6 +4,7 @@
 @Links : https://github.com/bGZo
 """
 
+from export_runtime import http
 from zhihu.api_endpoints import FAV_URL
 from zhihu.cilent import ZhihuClient
 from zhihu.entity import CollectionResponse
@@ -14,13 +15,16 @@ def get_collection_page(
 ) -> CollectionResponse:
     zhihuClient = ZhihuClient()
 
-    res = zhihuClient.session.get(
+    res = http.get(
+        zhihuClient.session,
         FAV_URL.format(collection_id=collection_id),
+        endpoint='zhihu.collection.page',
         params={'offset': offset, 'limit': limit},
     )
 
     if res.status_code == 200:
         return CollectionResponse.from_dict(res.json())
+    res.raise_for_status()
     return None
 
 

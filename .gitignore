@@ -90,6 +90,12 @@ debug/
 bruno/
 cookies.txt
 
+# Local raw database
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
 # 本地备份类 env 文件不入库
 .env.bak
 .env.*.bak

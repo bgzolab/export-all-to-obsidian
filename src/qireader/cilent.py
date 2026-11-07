@@ -12,7 +12,9 @@ from qireader import api_endpoints
 
 class QiReaderClient:
     def __init__(self):
-        self.cookie = get_cookie_header(('qireader.com',))
+        # 浏览器常把 qireader 的 Cookie 存成 host-only 的 www.qireader.com；
+        # 先匹配 www 子域，再回退到裸域，兼容 .qireader.com 导出。
+        self.cookie = get_cookie_header(('www.qireader.com', 'qireader.com'))
         self.session = requests.Session()
         self.session.headers.update(
             {

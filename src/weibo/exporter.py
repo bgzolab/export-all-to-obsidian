@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.context import mark_run_partial
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -41,10 +42,12 @@ def export(
     while True:
         page = get_weibo_like_list(uid, page_index)
         if page is None:
+            mark_run_partial()
             print('获取微博喜欢列表失败，请检查接口')
             break
 
         if page.ok != 1:
+            mark_run_partial()
             print('获取微博喜欢列表失败，请检查接口')
             break
 
@@ -77,6 +80,8 @@ def export(
                     longtext = get_weibo_longtext_by_id(post_id)
                     if longtext is not None:
                         article = longtext
+                    else:
+                        mark_run_partial()
 
                 dt_obj = datetime.strptime(
                     item.created_at,

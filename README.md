@@ -63,9 +63,10 @@ eto <command> [options]
 eto --prefix <prefix> <command> [options]
 eto --index-file <path> <command> [options]
 eto --cookies-file <path> <command> [options]
+eto --db <path> <command> [options]
 ```
 
-`--index-file`, `--prefix` and `--cookies-file` are top-level options. Put them before the subcommand.
+`--index-file`, `--prefix`, `--cookies-file` and `--db` are top-level options. Put them before the subcommand.
 
 `--cookies-file` points to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo, bilibili and twitter. When omitted, the `COOKIES` environment variable is used.
 
@@ -210,6 +211,21 @@ Files are written as Markdown files in your output folder, with a `~` filename p
 Use the top-level `--prefix` option to change it (`--prefix ""` disables it).
 The project also writes front matter, so the files work well in Obsidian.
 
+## Raw database
+
+Every API response and imported Markdown file is also stored in SQLite. The default database is `data/eto.db` under the current directory; use the top-level `--db` option to choose another path.
+
+```shell
+eto --db ./data/eto.db zhihu -c your-collection-id -o output/zhihu
+```
+
+Existing Markdown files can be imported without changing them:
+
+```shell
+eto --db ./data/eto.db import-markdown ./output
+```
+
+The database is append-only and keeps full request information. Credential headers such as `Cookie`, `Authorization`, `X-CSRF-Token` and `X-API-Key` are redacted, but URLs and bodies may still contain sensitive data, so treat the database as a credential file: keep it private and do not commit it.
 
 ## Testing
 

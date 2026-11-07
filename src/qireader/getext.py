@@ -4,13 +4,16 @@
 @Links : https://github.com/bGZo
 """
 
+from export_runtime import http
 from qireader.cilent import QiReaderClient
 
 
 def get_html_text_from_url(url) -> str:
     client = QiReaderClient()
-    response = client.session.get(
+    response = http.get(
+        client.session,
         client.api_endpoints.FULL_TEXT,
+        endpoint='qireader.article',
         params={
             'keep-classes': 1,
             'url': url,

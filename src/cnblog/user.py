@@ -8,11 +8,16 @@ import requests
 
 from cnblog.api_endpoints import USER
 from cnblog.client import CnblogClient
+from export_runtime import http
 
 
 def get_current_user_info() -> dict:
     client = CnblogClient()
-    response = client.session.get(USER)
+    response = http.get(
+        client.session,
+        USER,
+        endpoint='cnblog.user.current',
+    )
     if response.status_code == 200:
         return response.json()
     else:

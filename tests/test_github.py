@@ -86,7 +86,7 @@ def test_get_starred_repositories_maps_payload(monkeypatch):
 
     monkeypatch.setenv('GITHUB_TOKEN', 'secret-token')
     monkeypatch.setattr(
-        'github.client.requests.get', lambda *args, **kwargs: FakeResponse()
+        'github.client.http.get', lambda *args, **kwargs: FakeResponse()
     )
 
     result = get_starred_repositories(1)
@@ -107,7 +107,7 @@ def test_get_starred_repositories_raises_without_leaking_token(monkeypatch):
 
     monkeypatch.setenv('GITHUB_TOKEN', 'secret-token')
     monkeypatch.setattr(
-        'github.client.requests.get', lambda *args, **kwargs: FakeResponse()
+        'github.client.http.get', lambda *args, **kwargs: FakeResponse()
     )
 
     with pytest.raises(RuntimeError) as exc_info:
@@ -142,7 +142,7 @@ def test_get_repository_readme_handles_404_and_base64(monkeypatch):
 
     monkeypatch.setenv('GITHUB_TOKEN', 'secret-token')
     monkeypatch.setattr(
-        'github.client.requests.get', lambda *args, **kwargs: responses.pop(0)
+        'github.client.http.get', lambda *args, **kwargs: responses.pop(0)
     )
 
     assert get_repository_readme('octocat', 'missing') == ''

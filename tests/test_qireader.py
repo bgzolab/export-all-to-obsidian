@@ -25,6 +25,17 @@ def test_qireader_client_headers_configured(monkeypatch, tmp_path):
     assert headers['Referer'] == 'https://www.qireader.com/tags/!readlater'
 
 
+def test_qireader_client_accepts_www_host_only_cookie(monkeypatch, tmp_path):
+    path = _write_cookies(
+        tmp_path,
+        'www.qireader.com\tFALSE\t/\tTRUE\t0\tqireader_auth\ttoken\n',
+    )
+    monkeypatch.setenv('COOKIES', path)
+    client = QiReaderClient()
+
+    assert client.session.headers['Cookie'] == 'qireader_auth=token'
+
+
 def test_qireader_client_missing_cookie_raises(monkeypatch, tmp_path):
     path = _write_cookies(tmp_path, '.weibo.com\tTRUE\t/\tTRUE\t0\tname\tvalue\n')
     monkeypatch.setenv('COOKIES', path)

@@ -16,11 +16,16 @@ from bangumi.entity import (
     SubjectTag,
     SubjectV0,
 )
+from export_runtime import http
 
 
 def get_subject_info(subject_id: int) -> SubjectV0:
     client = BangumiClient()
-    res = client.session.get(SUBJECT_QUERY % subject_id)
+    res = http.get(
+        client.session,
+        SUBJECT_QUERY % subject_id,
+        endpoint='bangumi.subject.detail',
+    )
     if res.status_code == 200:
         result = res.json()
         return _dict_to_subject(result)
@@ -138,7 +143,11 @@ def _dict_to_subject_character(data: dict) -> SubjectRelatedCharacter:
 def get_subject_character(subject_id: int) -> list[SubjectRelatedCharacter]:
     """获取条目角色列表。"""
     client = BangumiClient()
-    res = client.session.get(SUBJECT_CHARACTER_QUERY % subject_id)
+    res = http.get(
+        client.session,
+        SUBJECT_CHARACTER_QUERY % subject_id,
+        endpoint='bangumi.subject.characters',
+    )
     if res.status_code == 200:
         result = res.json()
         return [_dict_to_subject_character(item) for item in result]

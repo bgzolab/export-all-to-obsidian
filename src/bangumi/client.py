@@ -12,6 +12,7 @@ from urllib3.util.retry import Retry
 
 from bangumi import api_endpoints
 from bangumi.api_endpoints import USER_CURRENT
+from export_runtime import http
 
 
 class BangumiClient:
@@ -55,5 +56,9 @@ class BangumiClient:
         return wrapper
 
     def get_user(self):
-        resp = self.session.get(USER_CURRENT)
+        resp = http.get(
+            self.session,
+            USER_CURRENT,
+            endpoint='bangumi.user.current',
+        )
         return resp.json()
