@@ -8,7 +8,7 @@ from pathlib import Path
 
 from db.migrate import migrate
 
-DEFAULT_DB_PATH = '~/.eto/eto.db'
+DEFAULT_DB_PATH = 'data/eto.db'
 
 
 def resolve_db_path(path: str | os.PathLike[str] | None = None) -> Path:

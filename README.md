@@ -213,7 +213,7 @@ The project also writes front matter, so the files work well in Obsidian.
 
 ## Raw database
 
-Every API response and imported Markdown file is also stored in SQLite. The default database is `~/.eto/eto.db`; use the top-level `--db` option to choose another path.
+Every API response and imported Markdown file is also stored in SQLite. The default database is `data/eto.db` under the current directory; use the top-level `--db` option to choose another path.
 
 ```shell
 eto --db ./data/eto.db zhihu -c your-collection-id -o output/zhihu

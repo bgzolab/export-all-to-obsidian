@@ -76,7 +76,7 @@ ruff format src tests                          # apply formatting
   come before the subcommand**; when `--index-file` is omitted, the index is printed to the
   terminal. `--cookies-file` points to a Netscape-format `cookies.txt`; when omitted, the
   environment variable `COOKIES` (the file path) is used. `--db` defaults to
-  `~/.eto/eto.db`; the database file is treated as a credential file.
+  `data/eto.db`; the database file is treated as a credential file.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
   `bilibili(-f -o [--force])`, `github(-t -o [--force])`, `import-markdown(<path>)`.

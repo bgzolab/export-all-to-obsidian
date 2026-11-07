@@ -207,7 +207,7 @@ PRAGMA synchronous = NORMAL;
 ```
 
 - `--db <path>` 是顶层选项，必须放在子命令前。
-- 未指定时使用 `~/.eto/eto.db`。
+- 未指定时使用 `data/eto.db`（相对当前目录）。
 - 数据库文件 0600，父目录 0700（Windows 跳过 chmod）。
 - 迁移用编号 SQL 文件 + `PRAGMA user_version`，不引入 Alembic。
 - 每页请求结束后提交一次事务。

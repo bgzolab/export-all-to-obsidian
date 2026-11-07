@@ -58,7 +58,7 @@ from zhihu.exporter import export as export_zhihu
     'db_path',
     type=click.Path(path_type=str),
     default=None,
-    help='SQLite 数据库路径；默认 ~/.eto/eto.db',
+    help='SQLite 数据库路径；默认 data/eto.db',
 )
 @click.pass_context
 def eto(

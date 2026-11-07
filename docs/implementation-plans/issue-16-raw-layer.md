@@ -114,7 +114,7 @@
   - `tests/test_cli_db.py`
 - Work:
   - `--db` 作为顶层选项，必须放在子命令前。
-  - 未指定时使用 `~/.eto/eto.db`。
+  - 未指定时使用 `data/eto.db`（相对当前目录）。
   - 在根 context 初始化数据库连接并暴露 `get_database()`。
   - 用 `shlex.join(sys.argv)` 记录本次命令，传给 `start_run(command=...)`。
   - 目录路径、无法创建、迁移失败给出明确 `ClickException`。
@@ -122,6 +122,20 @@
 - Verify:
   - `PYTHONPATH=src pytest tests/test_cli_db.py -q`
   - `PYTHONPATH=src python -m export_to_obsidian --help` 能看到 `--db`
+
+#### T2.2 默认数据库路径改为 data/eto.db
+
+- Status: Completed
+- Files:
+  - `src/db/connection.py`
+  - `src/app/cli.py`
+  - `tests/test_db_schema.py`
+  - `README.md`
+  - `AGENTS.md`
+  - `docs/design/raw-response-layer.md`
+- Work: 默认数据库从用户目录改到当前目录 `data/eto.db`。
+- Verify:
+  - `PYTHONPATH=src pytest tests/test_db_schema.py tests/test_cli_db.py -q`
 
 ### M3 HTTP 采集与 GitHub 试点
 
@@ -274,6 +288,7 @@
 | 2026-11-07 | T1.1 | Completed | 新增 `src/db`，连接、迁移、两张表和权限设置 |
 | 2026-11-07 | T1.2 | Completed | 新增 raw 仓储 API 和 9 个测试 |
 | 2026-11-07 | T2.1 | Completed | 顶层 `--db`、默认路径、run 生命周期和 6 个 CLI 测试 |
+| 2026-11-07 | T2.2 | Completed | 默认数据库改为 `data/eto.db` |
 | 2026-11-07 | T3.1 | Completed | HTTP 采集器、header 脱敏和 4 个测试 |
 | 2026-11-07 | T3.2 | Completed | GitHub 端到端 raw 采集测试 |
 | 2026-11-07 | T3.3 | Completed | 其余 8 个平台内容请求全部接入采集器 |
@@ -298,6 +313,4 @@
 
 ## 6. 开放问题
 
-- 默认数据库路径选 `~/.eto/eto.db` 是否合适，还是应该放在项目 `data/` 下。
-- 试点平台选 GitHub 是否合适；备选是知乎。
-- `docs/implementation-plans/*.md` 当前被 `.gitignore` 忽略；如果希望本计划进入版本库，需要单独调整忽略规则。
+- 无。默认路径已定为 `data/eto.db`；试点平台已覆盖全部平台；计划文件通过 `.gitignore` 例外进入版本库。

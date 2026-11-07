@@ -3,8 +3,12 @@ from __future__ import annotations
 import os
 import stat
 
-from db.connection import connect
+from db.connection import DEFAULT_DB_PATH, connect
 from db.migrate import migrate
+
+
+def test_default_database_path_is_project_data():
+    assert DEFAULT_DB_PATH == 'data/eto.db'
 
 
 def test_connect_creates_raw_tables_and_indexes(tmp_path):
@@ -70,3 +74,11 @@ def test_connect_supports_memory_database():
     }
     assert {'sync_run', 'sync_response'} <= tables
     connection.close()
+
+
+def test_connect_default_path_uses_current_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    connection = connect()
+    connection.close()
+
+    assert (tmp_path / 'data' / 'eto.db').exists()
