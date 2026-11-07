@@ -41,191 +41,22 @@ chmod +x ./export-env.sh
 source ./export-env.sh
 ```
 
-Main env vars used by the current modules:
+## Usage
 
-- CNBLOG_ACCESS_TOKEN
-- BGM_ACCESS_TOKEN
-- V2EX_ACCESS_TOKEN
-- GITHUB_TOKEN
-- TWITTER_CSRF_TOKEN (optional, derived from the `ct0` cookie)
-- TWITTER_USER_ID (optional, derived from the `twid` cookie)
-- COOKIES (path to a Netscape-format cookies.txt used by qireader, v2ex, zhihu, weibo, bilibili and twitter)
+Full command reference lives in [docs/usages](./docs/usages/README.md). It covers:
 
-Optional reminder env vars:
+- global options (`--index-file`, `--prefix`, `--cookies-file`, `--db`)
+- required environment variables and cookie domains
+- one page per subcommand with parameters, output layout and examples
+- shared behavior for credential checks, incremental exports, index files and the raw database
 
-- TELEGRAM_BOT_TOKEN
-- TELEGRAM_CHAT_ID
-
-## Basic usage
-
-```shell
-eto <command> [options]
-eto --prefix <prefix> <command> [options]
-eto --index-file <path> <command> [options]
-eto --cookies-file <path> <command> [options]
-eto --db <path> <command> [options]
-```
-
-`--index-file`, `--prefix`, `--cookies-file` and `--db` are top-level options. Put them before the subcommand.
-
-`--cookies-file` points to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo, bilibili and twitter. When omitted, the `COOKIES` environment variable is used.
-
-If you do not use `--index-file`, the index is printed to the terminal.
-
-If you use `--index-file`, the index is written to one Markdown file.
-
-Each module is stored under one second-level heading, and repeated exports for the same module are appended in order under that same heading.
-
-## Command examples
-
-### cnblog
-
-```shell
-eto cnblog -o output/cnblog
-```
-
-### bangumi
-
-Use `config/bangumi_template.md` as the template file.
-
-```shell
-eto bangumi -t config/bangumi_template.md -s 1 -o output/bangumi
-eto bangumi -t config/bangumi_template.md -s 2 -o output/bangumi
-eto bangumi -t config/bangumi_template.md -s 3 -o output/bangumi
-eto bangumi -t config/bangumi_template.md -s 4 -o output/bangumi
-```
-
-You can also set one collection type:
-
-```shell
-eto bangumi -t config/bangumi_template.md -s 2 -c 3 -o output/bangumi
-```
-
-`-c` means the status of the subject:
-
-- 1: 想看
-- 2: 看过
-- 3: 在看
-- 4: 搁置
-- 5: 抛弃
-
-### qireader
-
-```shell
-eto qireader -t your-tag -o output/qireader
-```
-
-### github
-
-Use `config/template/github.md` as the default template file.
-
-```shell
-eto github -t config/template/github.md -o output/github
-eto --prefix "" github -t config/template/github.md -o output/github
-```
-
-### v2ex
-
-```shell
-eto v2ex -o output/v2ex
-```
-
-### zhihu
-
-```shell
-eto zhihu -c your-collection-id -o output/zhihu
-```
-
-### weibo
-
-```shell
-eto weibo -u your-user-id -o output/weibo
-```
-
-### bilibili
-
-```shell
-eto bilibili -f your-fav-id -o output/bilibili
-```
-
-### twitter
-
-Exports your Twitter likes.
-
-```shell
-eto twitter -o output/twitter
-```
-
-By default it exports up to the built-in max pages (roughly 100 liked tweets). Use `--max-pages` to adjust:
-
-```shell
-eto twitter --max-pages 5 -o output/twitter
-```
-
-Use `--force` to overwrite existing local files:
-
-```shell
-eto twitter --force -o output/twitter
-```
-
-`TWITTER_CSRF_TOKEN` and `TWITTER_USER_ID` are optional; if not set, they are derived from your cookies.txt Cookie (`ct0` / `twid`).
-
-## Credential health check
-
-Before each module export, the CLI runs a lightweight credential probe.
-
-- If the cookie or token is confirmed expired, the export is skipped.
-- If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are both configured, the tool sends a Telegram bot reminder with the affected module name.
-- If the probe cannot confirm whether the credential is invalid because of a transient network or service problem, the export still continues.
-
-## Index file
-
-Example:
+A typical call looks like:
 
 ```shell
 eto --index-file output/index/export-index.md zhihu -c your-collection-id -o output/zhihu
-eto --index-file output/index/export-index.md bilibili -f your-fav-id -o output/bilibili
-eto --index-file output/index/export-index.md github -t config/template/github.md -o output/github
 ```
 
-The file is grouped by module name.
-One module keeps one `##` section.
-Each export run adds one `###` block under that module.
-
-Example output:
-
-```markdown
-## zhihu
-
-- [[~zhihu-entry-1|First saved item]]
-- [[~zhihu-entry-2|Second saved item]]
-
-## bilibili
-
-- [[~BV1xxxxxx|One saved video]]
-```
-
-## Output
-
-Files are written as Markdown files in your output folder, with a `~` filename prefix by default.
-Use the top-level `--prefix` option to change it (`--prefix ""` disables it).
-The project also writes front matter, so the files work well in Obsidian.
-
-## Raw database
-
-Every API response and imported Markdown file is also stored in SQLite. The default database is `data/eto.db` under the current directory; use the top-level `--db` option to choose another path.
-
-```shell
-eto --db ./data/eto.db zhihu -c your-collection-id -o output/zhihu
-```
-
-Existing Markdown files can be imported without changing them:
-
-```shell
-eto --db ./data/eto.db import-markdown ./output
-```
-
-The database is append-only and keeps full request information. Credential headers such as `Cookie`, `Authorization`, `X-CSRF-Token` and `X-API-Key` are redacted, but URLs and bodies may still contain sensitive data, so treat the database as a credential file: keep it private and do not commit it.
+Run `eto --help` or `eto <command> --help` for the built-in help.
 
 ## Testing
 

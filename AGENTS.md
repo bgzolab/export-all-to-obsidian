@@ -1,8 +1,9 @@
 # AGENTS.md
 
 Instructions for OpenCode. This file is the source of truth for internals; `README.md` is the
-user-facing usage doc. Both are kept in sync manually. Issue-specific design notes may live
-in `docs/design/`; implementation plans live in `docs/implementation-plans/`.
+user-facing overview and `docs/usages/` is the per-command usage reference. All are kept in
+sync manually. Issue-specific design notes may live in `docs/design/`; implementation plans
+live in `docs/implementation-plans/`.
 
 ## Project overview
 
@@ -101,13 +102,13 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   used as an incremental cursor yet.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls
   the filename prefix (default `~`).
-- Index file is grouped by module: module is `##`, each export run is `###`.
+- Index file is grouped by module: module is `##`, entries are appended under that section.
 - Special cases: bangumi and github render from template files, bilibili emits iframe embeds,
   github injects the repo README.
 
 ## Workflow: planning & execution
 
-- Before planning a new feature, read this file (and `README.md` for the user-facing contract).
+- Before planning a new feature, read this file (and `README.md` plus `docs/usages/` for the user-facing contract).
 - Write plans into `docs/implementation-plans/`; tasks must be atomic (with file paths and
   verification steps), status one of `Completed / In progress / Planned / Deprecated / On Hold`.
 - Execute plans TASK by TASK, only advancing after verification passes; update the plan's
