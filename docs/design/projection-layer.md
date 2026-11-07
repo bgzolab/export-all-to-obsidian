@@ -15,10 +15,10 @@
 非目标：
 
 - 不做跨平台统一 `item` 表。
-- 不做删除检测；v1 只记录观察水位，删除策略以后再加。
+- 不做删除检测；v1 只记录 `response_id`，删除策略以后再加。
 - 不做多账号；当前所有表都假设每个平台只有一个认证账号。
 - 不把分页、状态码、`code` / `message` / `has_more` / `ttl` 等响应信封存进实体表。
-- 不承诺上游字段 100% 落列；`raw_json` 兜底。
+- 不承诺上游字段 100% 落列；未落列字段留在 raw 层，需要时再迁移。
 
 ## 2. 核心约定
 
@@ -27,69 +27,110 @@
 3. 业务自然键做主键；关系表用复合主键；不使用自增 id 做业务主键。
 4. 顶层标量字段落列；对象/数组字段落 `*_json` 列，并用
    `CHECK (json_valid(...))` 约束。
-5. 每个实体行保留 `raw_json`，保存最近一次观察到的实体 JSON。
-6. 溯源列固定为 `response_id`、`last_seen_run_id`、`first_seen_at`、`last_seen_at`。
-   时间取对应 `sync_response.fetched_at`，run 取 `sync_run.id`，不取当前时间，保证重放可复现。
-7. 正常查询和导出不 join `sync_run` / `sync_response`；raw 层只在全量重建时读取。
-8. 时间保持 API 原生类型：epoch 用 `INTEGER`，字符串用 `TEXT`；格式化留给导出层。
-9. 新表使用 SQLite `STRICT`，要求 SQLite >= 3.37；当前运行环境 3.45.1。
-10. 单账号假设。以后要多账号时，增加账号列并调整主键，不在 v1 提前设计。
+5. 溯源列固定为 `response_id`，指向产生该行最新主数据的 `sync_response.id`，
+   不是 `sync_run.id`。一次 run 可以包含很多次 HTTP 请求。
+6. 正常查询和导出不 join `sync_run` / `sync_response`；raw 层只用于全量重建、补列和删除扫描。
+7. 数据库时间与平台时间分开：
+   - 数据库时间：`db_created_at`、`db_updated_at`，每张投影表都有，只表示行在数据库里的
+     插入/更新时间。
+   - 平台时间：按平台字段原名、原类型全部保留，不造统一 `fav_at`，不在这里决定导出用哪个。
+8. 新表使用 SQLite `STRICT`，要求 SQLite >= 3.37；当前运行环境 3.45.1。
+9. 单账号假设。以后要多账号时，增加账号列并调整主键，不在 v1 提前设计。
 
 ### 2.1 列选择规则
 
-列按下述优先级选取，其余字段留在 `raw_json`：
+列按下述优先级选取，其余字段留在 raw 层：
 
 1. 当前平台 dataclass/entity 的全部字段。
-2. 自然键、创建/更新时间、收藏/保存时间、状态、计数。
+2. 自然键、平台提供的全部时间字段、状态、计数。
 3. 现有或计划中的导出模板会读取的字段。
 4. 明显会用于过滤或排序的字段。
 
-以后需要新列时，用 `ALTER TABLE ADD COLUMN` 加迁移，再从 `raw_json` 回填：
+以后需要新列时，改对应平台的投影解析器，加 `ALTER TABLE ADD COLUMN`，再
+`rebuild_platform` 从 raw 响应全量回填：
 
 ```sql
 ALTER TABLE github_star ADD COLUMN watchers_count INTEGER NOT NULL DEFAULT 0;
-UPDATE github_star
-SET watchers_count = COALESCE(json_extract(raw_json, '$.repo.watchers_count'), 0);
+-- 解析器补字段后执行 rebuild_platform('github')
 ```
 
 这是“尽量全但不强求全”的边界。GitHub 这类上游对象字段过多，不逐个铺列。
 
 ### 2.2 通用列
 
-实体表统一追加：
+每张投影表统一追加：
 
 ```sql
 response_id INTEGER NOT NULL REFERENCES sync_response(id),
-last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-first_seen_at TEXT NOT NULL,
-last_seen_at TEXT NOT NULL,
-raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+db_created_at TEXT NOT NULL,
+db_updated_at TEXT NOT NULL
 ```
 
 语义：
 
-- `response_id`：最近一次主响应的 id。
-- `last_seen_run_id`：最近一次观察到该实体的 run，留给未来的完整 run 删除扫描。
-- `first_seen_at`：第一次观察时间，只在插入时写。
-- `last_seen_at`：最近一次主响应观察时间，每次主响应更新。
-- `raw_json`：实体 JSON，不含响应信封；序列化使用紧凑格式，保证重放字节稳定。
+- `response_id`：最近一次主响应的 `sync_response.id`。不是 `sync_run.id`；一次 run 可以包含
+  很多次 HTTP 请求，这里记录的是具体哪一条响应产生了这行数据。
+- `db_created_at`：这行第一次写入投影表的时间，插入后再不修改。
+- `db_updated_at`：这行最后一次被 upsert 更新的时间。
 
-`raw_json` 例外：
+实体字段不在投影表里再存一份完整 JSON。需要未落列字段时：
 
-- 纯载荷表 `cnblog_post`、`qireader_article`：`body` / `content` 列本身就是原始载荷，不再重复存
-  `raw_json`。
-- 关系表 `bilibili_fav_item`、`v2ex_favorite`、`zhihu_collection_item`：没有独立实体 JSON，
-  通过 `response_id` 回溯。
+1. 用 `response_id` 取出 `sync_response.body`，解压并解析。
+2. 按自然键在该响应的实体列表/对象里定位这一行。
+3. 新增列走“改解析器 + `ALTER TABLE` + `rebuild_platform`”，不靠行内 JSON 回填。
 
-### 2.3 主响应与辅助响应
+`response_id` 是响应级，不是实体级：一次列表响应可能包含多个实体。定位逻辑由各平台
+投影解析器负责，全量重建时它本来就要遍历这些实体。
+
+### 2.3 数据库时间与平台时间
+
+**数据库时间**：
+
+```sql
+db_created_at TEXT NOT NULL,
+db_updated_at TEXT NOT NULL
+```
+
+- 统一 UTC ISO 8601，例如 `2026-11-07T08:30:00+00:00`。
+- 写入时取当前时间，只描述数据库操作，不表示平台上的创建/更新/收藏时间。
+- 全量重建会重写这两列；幂等测试比较业务列时排除它们。
+- `db_created_at` 只在插入时写；`db_updated_at` 每次 upsert 更新。
+
+**平台时间**：
+
+- 按平台字段原名保留，平台给 epoch 就存 `INTEGER`，给字符串就存 `TEXT`。
+- 不做时区/格式归一化；导出层以后再决定用哪个时间、怎么格式化。
+- 删除统一 `fav_at`。收藏/保存时间用平台自己的字段，例如 `starred_at`、`fav_time`、
+  `date_added`、`created`。
+
+平台时间字段清单：
+
+| 表 | 平台时间字段 |
+| --- | --- |
+| `bangumi_collection` | `updated_at` |
+| `bangumi_subject` | `date` |
+| `bilibili_fav` | `ctime`, `mtime` |
+| `bilibili_media` | `ctime`, `pubtime` |
+| `bilibili_fav_item` | `fav_time` |
+| `cnblog_bookmark` | `date_added` |
+| `cnblog_post` | 无 |
+| `github_star` | `created_at`, `updated_at`, `pushed_at`, `starred_at` |
+| `qireader_entry` | `published_at`, `crawled_at`, `timestamp` |
+| `qireader_article` | 无 |
+| `twitter_tweet` | `created_at` |
+| `v2ex_topic` | `created`, `last_modified`, `last_touched` |
+| `v2ex_favorite` | 无 |
+| `weibo_post` | `created_at` |
+| `zhihu_content` | `created_time`, `updated_time` |
+| `zhihu_collection_item` | `created` |
+
+### 2.4 主响应与辅助响应
 
 一个实体可能由多个接口共同补全：
 
-- 主响应：列表或详情响应，决定 `response_id`、`last_seen_run_id`、`last_seen_at`。
+- 主响应：列表或详情响应，决定 `response_id`。
 - 辅助响应：README、长文、正文、角色列表等，只更新自己的列和 `*_response_id`，
-  不覆盖主响应的溯源列。
-
-这样 `raw_json` 始终与 `response_id` 对应，不会被辅助响应打乱。
+  同时刷新 `db_updated_at`，不覆盖主响应的 `response_id`。
 
 ## 3. 平台表
 
@@ -112,6 +153,7 @@ raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
 - `subject_json` 保存列表里的 slim subject。
 - 角色列表是集合元素，按约定存 `characters_json`，不单独建表。
   `characters_response_id` 单独记录，不覆盖主响应溯源列。
+- 平台时间：收藏记录的 `updated_at`、条目的 `date` 原样保留。
 
 ```sql
 CREATE TABLE bangumi_collection (
@@ -128,10 +170,8 @@ CREATE TABLE bangumi_collection (
     private INTEGER NOT NULL DEFAULT 0 CHECK (private IN (0, 1)),
     subject_json TEXT NOT NULL CHECK (json_valid(subject_json)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_bangumi_collection_type
@@ -161,10 +201,8 @@ CREATE TABLE bangumi_subject (
     characters_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(characters_json)),
     characters_response_id INTEGER REFERENCES sync_response(id),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_bangumi_subject_type
@@ -183,6 +221,8 @@ CREATE INDEX idx_bangumi_subject_type
 - `bilibili_media` 来自 `data.medias[]`，主键 `media_id` 取视频的 `id`。
 - `bilibili_fav_item` 是收藏夹与视频的多对多关系。`fav_time` 放在关系表，因为同一视频
   可以出现在多个收藏夹，收藏时间不同。
+- 平台时间：收藏夹 `ctime` / `mtime`，视频 `ctime` / `pubtime`，关系 `fav_time`，
+  全部按原类型保留。
 - `code` / `message` / `ttl` / `has_more` 不落表。
 
 ```sql
@@ -206,10 +246,8 @@ CREATE TABLE bilibili_fav (
     media_count INTEGER NOT NULL DEFAULT 0,
     is_top INTEGER NOT NULL DEFAULT 0 CHECK (is_top IN (0, 1)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_bilibili_fav_fid
@@ -236,10 +274,8 @@ CREATE TABLE bilibili_media (
     season_json TEXT CHECK (json_valid(season_json)),
     ogv_json TEXT CHECK (json_valid(ogv_json)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_bilibili_media_bvid
@@ -250,9 +286,8 @@ CREATE TABLE bilibili_fav_item (
     media_id INTEGER NOT NULL REFERENCES bilibili_media(media_id),
     fav_time INTEGER NOT NULL DEFAULT 0,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL,
     PRIMARY KEY (fav_id, media_id)
 ) STRICT;
 
@@ -270,8 +305,8 @@ CREATE INDEX idx_bilibili_fav_item_media
 说明：
 
 - `cnblog_bookmark` 主键 `wz_link_id` 对应 API 的 `WzLinkId`。
-- `cnblog_post` 主键是从正文请求 URL 中解析出的 post id；`body` 是 HTML 原始载荷，
-  所以不设 `raw_json`。
+- 平台时间 `DateAdded` 原样保留为 `date_added`。
+- `cnblog_post` 主键是从正文请求 URL 中解析出的 post id；`body` 是 HTML 原始载荷。
 
 ```sql
 CREATE TABLE cnblog_bookmark (
@@ -283,10 +318,8 @@ CREATE TABLE cnblog_bookmark (
     date_added TEXT,
     from_cnblogs INTEGER NOT NULL DEFAULT 0 CHECK (from_cnblogs IN (0, 1)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_cnblog_bookmark_link_url
@@ -297,9 +330,8 @@ CREATE TABLE cnblog_post (
     source_url TEXT NOT NULL DEFAULT '',
     body TEXT NOT NULL,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 ```
 
@@ -313,10 +345,10 @@ CREATE TABLE cnblog_post (
 说明：
 
 - 主键 `repo_id` 取 API 的 `repo.id`。当前 dataclass 没有这个字段，投影解析器直接读
-  `raw_json` 补上；仓库改名时仍能按 id 更新同一行。
+  raw JSON 补上；仓库改名时仍能按 id 更新同一行。
 - `full_name` 唯一，用于展示和文件名。
-- 当前 entity 字段全部落列；上游其余字段留在 `raw_json`，以后按 2.1 的规则加列。
-- README 是辅助响应，只更新 `readme` 和 `readme_response_id`。
+- 平台时间 `created_at`、`updated_at`、`pushed_at`、`starred_at` 全部保留。
+- README 是辅助响应，只更新 `readme` 和 `readme_response_id`，并刷新 `db_updated_at`。
 
 ```sql
 CREATE TABLE github_star (
@@ -343,10 +375,8 @@ CREATE TABLE github_star (
     readme TEXT NOT NULL DEFAULT '',
     readme_response_id INTEGER REFERENCES sync_response(id),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_github_star_owner
@@ -366,9 +396,9 @@ CREATE INDEX idx_github_star_starred_at
 说明：
 
 - 正文接口只按 URL 取内容，不返回 entry id，所以正文单独一张表，按 URL 与 entry 关联。
-- `timestamp` 是 API 的纳秒字符串，也是分页游标，保持 `TEXT`。
-- `published_at` / `crawled_at` 是毫秒 epoch，保持 `INTEGER`。
-- `content` 是正文原始载荷，不设 `raw_json`。
+- 平台时间 `published_at`（毫秒）、`crawled_at`（毫秒）、`timestamp`（纳秒字符串）
+  全部按原类型保留。
+- `content` 是正文原始载荷。
 
 ```sql
 CREATE TABLE qireader_entry (
@@ -385,10 +415,8 @@ CREATE TABLE qireader_entry (
     attachments_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(attachments_json)),
     tag_ids_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tag_ids_json)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_qireader_entry_url
@@ -401,9 +429,8 @@ CREATE TABLE qireader_article (
     url TEXT PRIMARY KEY,
     content TEXT NOT NULL,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 ```
 
@@ -417,8 +444,8 @@ CREATE TABLE qireader_article (
 
 - 主键 `tweet_id` 对应 `Tweet.id_str`。
 - `author_json` 存归一化后的作者对象（`screen_name` / `name` / `id`）；完整 GraphQL
-  节点留在 `raw_json`。
-- 点赞列表不提供点赞时间，不造 `liked_at`。
+  节点留在 raw 响应。
+- 平台时间只有 `created_at`，原样保留。
 - 单账号，表内每一行都表示当前账号的点赞，不另建关系表。
 
 ```sql
@@ -432,10 +459,8 @@ CREATE TABLE twitter_tweet (
     reply_count INTEGER NOT NULL DEFAULT 0,
     view_count INTEGER NOT NULL DEFAULT 0,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_twitter_tweet_created_at
@@ -451,9 +476,10 @@ CREATE INDEX idx_twitter_tweet_created_at
 
 说明：
 
-- 收藏列表是 HTML，没有对应实体 JSON；`v2ex_favorite` 只保存 membership 和溯源列。
+- 收藏列表是 HTML，没有对应实体 JSON；`v2ex_favorite` 只保存 membership 和 `response_id`。
 - 不建 `v2ex_favorite.topic_id -> v2ex_topic.topic_id` 外键：收藏列表先到，主题详情可能
   抓取失败，外键会让合法收藏无法入库。
+- 平台时间 `created`、`last_modified`、`last_touched` 全部保留。
 - `member_json` / `node_json` / `supplements_json` 保存嵌套结构。
 
 ```sql
@@ -472,10 +498,8 @@ CREATE TABLE v2ex_topic (
     node_json TEXT CHECK (json_valid(node_json)),
     supplements_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(supplements_json)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_v2ex_topic_last_touched
@@ -484,9 +508,8 @@ CREATE INDEX idx_v2ex_topic_last_touched
 CREATE TABLE v2ex_favorite (
     topic_id INTEGER PRIMARY KEY,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 ```
 
@@ -501,8 +524,9 @@ CREATE TABLE v2ex_favorite (
 
 - 主键 `post_id` 用 `idstr`，避免大整数在跨语言工具里失真；`numeric_id` 保留原 `id`。
 - `mblogid` 用于构造微博 URL，唯一但允许为空。
+- 平台时间 `created_at` 原样保留。
 - `user_json`、`pic_ids_json`、`pic_infos_json` 保存嵌套结构。
-- 长文是辅助响应，只更新 `long_text` 和 `long_text_response_id`。
+- 长文是辅助响应，只更新 `long_text` 和 `long_text_response_id`，并刷新 `db_updated_at`。
 
 ```sql
 CREATE TABLE weibo_post (
@@ -527,10 +551,8 @@ CREATE TABLE weibo_post (
     long_text TEXT,
     long_text_response_id INTEGER REFERENCES sync_response(id),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_weibo_post_created_at
@@ -549,6 +571,8 @@ CREATE INDEX idx_weibo_post_created_at
 - `content_json` 保存原始 `content` 字段：普通回答是 HTML 字符串，文章可能是数组；
   统一 `json.dumps` 后入库，保证 `json_valid` 成立。
 - `body_html` 和 `title` 是为导出准备的派生列。
+- 平台时间 `created_time`、`updated_time` 保留；membership 的 `created`（加入收藏时间）
+  也保留。
 - `collection_id` 不在响应 body 里，从 `sync_response.request` 的 URL/query 解析；
   投影解析器可以读 request 元数据，但实体表不依赖 raw 层做日常查询。
 
@@ -567,10 +591,8 @@ CREATE TABLE zhihu_content (
     author_json TEXT CHECK (json_valid(author_json)),
     question_json TEXT CHECK (json_valid(question_json)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    raw_json TEXT NOT NULL CHECK (json_valid(raw_json))
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
 ) STRICT;
 
 CREATE INDEX idx_zhihu_content_type
@@ -582,11 +604,10 @@ CREATE INDEX idx_zhihu_content_updated_time
 CREATE TABLE zhihu_collection_item (
     collection_id TEXT NOT NULL,
     content_id TEXT NOT NULL REFERENCES zhihu_content(content_id),
-    saved_at TEXT NOT NULL DEFAULT '',
+    created TEXT NOT NULL DEFAULT '',
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
-    last_seen_run_id INTEGER NOT NULL REFERENCES sync_run(id),
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL,
     PRIMARY KEY (collection_id, content_id)
 ) STRICT;
 
@@ -635,32 +656,33 @@ rebuild_platform(conn, platform):
 ### 4.2 Upsert 规则
 
 ```sql
-INSERT INTO <table> (...) VALUES (...)
+INSERT INTO <table> (..., response_id, db_created_at, db_updated_at)
+VALUES (..., :response_id, :now, :now)
 ON CONFLICT(<natural key>) DO UPDATE SET
     ...,
     response_id = excluded.response_id,
-    last_seen_run_id = excluded.last_seen_run_id,
-    last_seen_at = excluded.last_seen_at
+    db_updated_at = excluded.db_updated_at
 WHERE excluded.response_id > <table>.response_id;
 ```
 
-- 插入时 `first_seen_at = last_seen_at = response.fetched_at`。
-- 更新时保留 `first_seen_at`。
+- `response_id` 始终指向最新主响应。
+- `db_created_at` 只在插入时写；冲突更新时不动。
+- `db_updated_at` 每次 upsert 更新。
 - `WHERE` 防止旧响应覆盖新响应；全量重建按顺序回放，不依赖增量游标。
 - 辅助响应只更新自己的列：
 
 ```sql
 UPDATE <table>
-SET readme = ?, readme_response_id = ?
+SET readme = ?, readme_response_id = ?, db_updated_at = ?
 WHERE <natural key> = ?;
 ```
 
-不修改 `response_id` / `last_seen_run_id` / `last_seen_at`。
+不修改主响应的 `response_id` 和 `db_created_at`。
 
 ### 4.3 幂等性
 
-时间全部来自 `sync_response`，不使用 `datetime.now()`。同一份 raw 数据连续重建两次，
-所有投影行逐列相等。测试必须覆盖这一点。
+业务列只来自 raw 响应，不使用 `datetime.now()`。同一份 raw 数据连续重建两次，
+除 `db_created_at` / `db_updated_at` 外，所有投影行逐列相等。测试必须覆盖这一点。
 
 ### 4.4 失败处理
 
@@ -672,12 +694,14 @@ WHERE <natural key> = ?;
 
 ### 5.1 删除
 
-v1 不删除。`last_seen_run_id` 已经足够支持以后实现：
+v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即可：
 
 1. 只允许 `sync_run.status = 'success'` 的完整列表 run 驱动删除。
-2. 删除条件是 `last_seen_run_id < 当前 run_id`。
-3. `partial` / `failed` run 一律跳过。
-4. 删除范围由 `sync_run.scope` 决定，例如 Bangumi 的
+2. 行是否在本次 run 看到过，由 `response_id -> sync_response.run_id` 判断。
+3. 删除条件是
+   `response_id IN (SELECT id FROM sync_response WHERE run_id < :current_run_id)`。
+4. `partial` / `failed` run 一律跳过。
+5. 删除范围由 `sync_run.scope` 决定，例如 Bangumi 的
    `<subject_type>:<collection_type>`。
 
 ### 5.2 多账号
@@ -704,10 +728,12 @@ v1 不删除。`last_seen_run_id` 已经足够支持以后实现：
 
 ## 7. 风险与待确认
 
-- 宽表会随上游 API 增加字段而需要迁移；`raw_json` + `json_extract` 回填是兜底路径。
+- 宽表会随上游 API 增加字段而需要迁移；改解析器 + 全量重建是回填路径。
 - `STRICT` 和 JSON1 要求 SQLite >= 3.37；当前 3.45.1，Python 3.12 环境满足。
 - GitHub `repo_id` 需要解析器直接读 raw JSON，不复用现有 dataclass 的字段集合。
 - Bangumi `characters_json` 把两个响应合到一行，已用 `characters_response_id` 单独溯源。
 - QiReader 正文按 URL 关联；同一 URL 对应多个 entry 时共享同一份正文，这是预期行为。
+- 平台时间保持原类型（epoch 是 INTEGER，字符串是 TEXT），导出层需要按平台处理格式。
+- 全量重建会改写 `db_created_at` / `db_updated_at`，幂等测试必须排除这两列。
 - v1 不删除，取消收藏/取消点赞的旧行会保留到删除策略实现。
 - 单账号假设；换账号同步会混入同一张表，直到多账号迁移完成。
