@@ -97,3 +97,7 @@ Markdown：
 ## 7. 暂缓
 
 跨平台规范表、删除检测、内容寻址去重、统计、搜索、Telegram bot、多账号。
+
+## 8. 后续
+
+Layer 2 平台投影层见 [projection-layer.md](projection-layer.md)。`sync_response.id` 是投影表的溯源锚点。
