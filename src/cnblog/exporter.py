@@ -1,5 +1,6 @@
 """博客园导出流程。"""
 
+from app.context import mark_run_partial
 from cnblog.blog_post import get_cnblog_post_body_by_url
 from cnblog.bookmark import get_bookmark_list
 from export_runtime.exporter_support import (
@@ -44,13 +45,15 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     type='archive-web',
                 )
 
+                body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
+                if not body:
+                    mark_run_partial()
+
                 write_markdown_output(
                     output_dir,
                     filename,
                     webpage.__dict__,
-                    html_to_markdown_with_bs(
-                        get_cnblog_post_body_by_url(bookmark.LinkUrl),
-                    ),
+                    html_to_markdown_with_bs(body),
                 )
 
                 print(f'Done: {bookmark.Title}')

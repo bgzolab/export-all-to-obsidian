@@ -69,6 +69,24 @@ def test_import_markdown_adds_changed_file(tmp_path):
     connection.close()
 
 
+def test_import_markdown_scopes_idempotency_by_directory(tmp_path):
+    first = tmp_path / 'vault-a'
+    second = tmp_path / 'vault-b'
+    first.mkdir()
+    second.mkdir()
+    for root in (first, second):
+        (root / 'same.md').write_text('# Same\n', encoding='utf-8')
+    connection = connect(tmp_path / 'eto.db')
+
+    first_stats = import_markdown(connection, first)
+    second_stats = import_markdown(connection, second)
+
+    assert first_stats['imported'] == 1
+    assert second_stats['imported'] == 1
+    assert connection.execute('SELECT COUNT(*) FROM sync_response').fetchone()[0] == 2
+    connection.close()
+
+
 def test_import_markdown_rejects_non_directory(tmp_path):
     connection = connect(tmp_path / 'eto.db')
 

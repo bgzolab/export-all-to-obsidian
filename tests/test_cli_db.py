@@ -259,3 +259,29 @@ def test_cli_survives_finish_run_failure(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert '结束 sync_run 失败' in result.output
+
+
+def test_v2ex_list_failure_marks_run_failed(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+
+    def fail(page):
+        raise RuntimeError('list page failed')
+
+    monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fail)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'v2ex', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code != 0
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'failed'
+    assert 'RuntimeError: list page failed' in run['error']

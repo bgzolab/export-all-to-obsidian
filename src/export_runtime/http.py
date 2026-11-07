@@ -76,10 +76,10 @@ def request(
     **kwargs: Any,
 ) -> requests.Response:
     """Send a request and persist its raw response before returning it."""
-    if database is None or run_id is None:
-        context_database, context_run = _active_run()
-        database = database or context_database
-        run_id = run_id or context_run
+    if database is None and run_id is None:
+        database, run_id = _active_run()
+    elif (database is None) != (run_id is None):
+        raise ValueError('database and run_id must be provided together')
 
     request_info = _request_info(session, method, url, kwargs)
     if database is None or run_id is None:

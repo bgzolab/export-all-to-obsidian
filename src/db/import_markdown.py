@@ -26,10 +26,10 @@ def import_markdown(
         connection,
         platform='local',
         operation='import.markdown',
-        scope=str(root),
+        scope=str(root.resolve()),
         command=command,
     )
-    existing = _existing_paths(connection)
+    existing = _existing_paths(connection, str(root.resolve()))
     stats = {'imported': 0, 'skipped': 0, 'failed': 0}
 
     try:
@@ -74,10 +74,15 @@ def import_markdown(
     return {'run_id': run_id, **stats}
 
 
-def _existing_paths(connection: sqlite3.Connection) -> set[tuple[str, str]]:
+def _existing_paths(
+    connection: sqlite3.Connection,
+    scope: str,
+) -> set[tuple[str, str]]:
     rows = connection.execute(
-        'SELECT request, sha256 FROM sync_response WHERE endpoint = ?',
-        (ENDPOINT,),
+        'SELECT r.request, r.sha256 '
+        'FROM sync_response r JOIN sync_run s ON s.id = r.run_id '
+        'WHERE r.endpoint = ? AND s.scope = ?',
+        (ENDPOINT, scope),
     )
     existing: set[tuple[str, str]] = set()
     for row in rows:

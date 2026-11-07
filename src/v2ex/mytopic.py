@@ -31,6 +31,8 @@ def get_fav_html_with_page(page: int) -> str:
         endpoint='v2ex.fav.page',
         params={'p': page},
     )
+    if response.status_code != 200:
+        response.raise_for_status()
     return response.text
 
 

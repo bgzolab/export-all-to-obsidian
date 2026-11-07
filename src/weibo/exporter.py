@@ -80,6 +80,8 @@ def export(
                     longtext = get_weibo_longtext_by_id(post_id)
                     if longtext is not None:
                         article = longtext
+                    else:
+                        mark_run_partial()
 
                 dt_obj = datetime.strptime(
                     item.created_at,

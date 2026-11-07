@@ -120,6 +120,20 @@ def test_v2ex_fav_endpoint(monkeypatch):
     assert endpoints == ['v2ex.fav.page']
 
 
+def test_v2ex_non_200_raises(monkeypatch):
+    from v2ex.mytopic import get_fav_html_with_page
+
+    client = FakeClient(FakeResponse(text='error', status_code=503))
+    monkeypatch.setattr('v2ex.mytopic.V2exClient', lambda: client)
+    monkeypatch.setattr(
+        'v2ex.mytopic.http.get',
+        lambda session, url, *, endpoint, **kwargs: client.session.response,
+    )
+
+    with pytest.raises(requests.HTTPError):
+        get_fav_html_with_page(1)
+
+
 def test_v2ex_topic_endpoint(monkeypatch):
     from v2ex.topic import get_v2ex_topic_info
 

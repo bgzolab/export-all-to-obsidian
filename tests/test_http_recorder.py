@@ -143,6 +143,26 @@ def test_delete_falls_back_to_session_request(tmp_path):
     connection.close()
 
 
+def test_database_and_run_id_must_be_paired():
+    session = FakeSession()
+
+    with pytest.raises(ValueError, match='provided together'):
+        http.get(
+            session,
+            'https://example.com',
+            endpoint='example.page',
+            database=connect(':memory:'),
+        )
+
+    with pytest.raises(ValueError, match='provided together'):
+        http.get(
+            session,
+            'https://example.com',
+            endpoint='example.page',
+            run_id=1,
+        )
+
+
 def test_record_error_failure_does_not_mask_transport_error(tmp_path, capsys):
     class BrokenConnection:
         def execute(self, *args, **kwargs):
