@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 import pytest
 import requests
@@ -21,6 +22,7 @@ class FakeSession:
         self.headers = {
             'Cookie': 'SUB=secret',
             'Authorization': 'Bearer secret',
+            'X-CSRF-Token': 'csrf-secret',
             'User-Agent': 'eto-test',
         }
         self.response = response or FakeResponse()
@@ -55,6 +57,7 @@ def test_get_records_body_and_redacts_auth_headers(tmp_path):
     assert request_info['params'] == {'page': 1}
     assert request_info['headers']['Cookie'] == '[REDACTED]'
     assert request_info['headers']['Authorization'] == '[REDACTED]'
+    assert request_info['headers']['X-CSRF-Token'] == '[REDACTED]'
     assert request_info['headers']['User-Agent'] == 'eto-test'
     assert row['status_code'] == 200
     connection.close()
@@ -115,3 +118,61 @@ def test_no_active_run_does_not_record(tmp_path):
     assert response.status_code == 200
     assert connection.execute('SELECT COUNT(*) FROM sync_response').fetchone()[0] == 0
     connection.close()
+
+
+def test_delete_falls_back_to_session_request(tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    run_id = start_run(connection, 'cnblog', 'bookmarks', None)
+    session = FakeSession()
+
+    http.request(
+        session,
+        'DELETE',
+        'https://api.cnblogs.com/api/bookmarks/1',
+        endpoint='cnblog.bookmark.delete',
+        database=connection,
+        run_id=run_id,
+    )
+
+    assert session.calls[0][0] == 'DELETE'
+    row = connection.execute('SELECT * FROM sync_response').fetchone()
+    assert row['endpoint'] == 'cnblog.bookmark.delete'
+    connection.close()
+
+
+def test_record_error_failure_does_not_mask_transport_error(tmp_path, capsys):
+    class BrokenConnection:
+        def execute(self, *args, **kwargs):
+            raise sqlite3.OperationalError('database is locked')
+
+    session = FakeSession(error=requests.Timeout('timed out'))
+
+    with pytest.raises(requests.Timeout):
+        http.get(
+            session,
+            'https://example.com',
+            endpoint='example.page',
+            database=BrokenConnection(),
+            run_id=1,
+        )
+
+    assert '原始响应记录失败' in capsys.readouterr().out
+
+
+def test_record_response_failure_does_not_break_request(tmp_path, capsys):
+    class BrokenConnection:
+        def execute(self, *args, **kwargs):
+            raise sqlite3.OperationalError('database is locked')
+
+    session = FakeSession()
+
+    response = http.get(
+        session,
+        'https://example.com',
+        endpoint='example.page',
+        database=BrokenConnection(),
+        run_id=1,
+    )
+
+    assert response.status_code == 200
+    assert '原始响应记录失败' in capsys.readouterr().out

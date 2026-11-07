@@ -142,3 +142,37 @@ def test_cli_import_markdown(tmp_path):
     assert '导入完成: 1 个' in first.output
     assert second.exit_code == 0, second.output
     assert '跳过 1 个' in second.output
+
+
+def test_twitter_failure_marks_run_partial(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr('twitter.exporter.TwitterClient', lambda: object())
+
+    def fail(*args, **kwargs):
+        raise RuntimeError('network down')
+
+    monkeypatch.setattr('twitter.exporter.get_twitter_like_list', fail)
+
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            db_path,
+            'twitter',
+            '-o',
+            str(tmp_path / 'output'),
+            '--max-pages',
+            '1',
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'

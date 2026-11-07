@@ -225,7 +225,7 @@ Existing Markdown files can be imported without changing them:
 eto --db ./data/eto.db import-markdown ./output
 ```
 
-The database is append-only and keeps full request information. `Cookie` and `Authorization` headers are redacted, but URLs and bodies may still contain sensitive data, so treat the database as a credential file: keep it private and do not commit it.
+The database is append-only and keeps full request information. Credential headers such as `Cookie`, `Authorization`, `X-CSRF-Token` and `X-API-Key` are redacted, but URLs and bodies may still contain sensitive data, so treat the database as a credential file: keep it private and do not commit it.
 
 ## Testing
 

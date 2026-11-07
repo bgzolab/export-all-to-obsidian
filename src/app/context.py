@@ -32,7 +32,9 @@ def initialize_context(
     ctx.obj['cookies_file'] = cookies_file
     ctx.obj['command'] = shlex.join(sys.argv)
     ctx.obj['run_partial'] = False
-    ctx.obj['database'] = _open_database(db_path)
+    database = _open_database(db_path)
+    ctx.obj['database'] = database
+    ctx.call_on_close(database.close)
 
 
 def _open_database(db_path: str | None) -> sqlite3.Connection:
@@ -115,7 +117,10 @@ def sync_run(
     try:
         yield run_id
     except BaseException as exc:
-        raw.finish_run(database, run_id, 'failed', f'{type(exc).__name__}: {exc}')
+        try:
+            raw.finish_run(database, run_id, 'failed', f'{type(exc).__name__}: {exc}')
+        except Exception as finish_exc:
+            print(f'结束 sync_run 失败: {type(finish_exc).__name__}: {finish_exc}')
         raise
     else:
         status = 'partial' if root.obj.get('run_partial') else 'success'

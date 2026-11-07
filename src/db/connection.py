@@ -32,10 +32,18 @@ def connect(path: str | os.PathLike[str] | None = None) -> sqlite3.Connection:
     connection.execute('PRAGMA busy_timeout = 5000')
     connection.execute('PRAGMA synchronous = NORMAL')
     migrate(connection)
-
-    if not in_memory:
-        _chmod(db_path, 0o600)
+    secure_database_files(connection)
     return connection
+
+
+def secure_database_files(connection: sqlite3.Connection) -> None:
+    """Restrict the database and SQLite sidecar files to the owner."""
+    for row in connection.execute('PRAGMA database_list'):
+        path = row['file'] if isinstance(row, sqlite3.Row) else row[2]
+        if not path:
+            continue
+        for suffix in ('', '-wal', '-shm', '-journal'):
+            _chmod(Path(f'{path}{suffix}'), 0o600)
 
 
 def _chmod(path: Path, mode: int) -> None:

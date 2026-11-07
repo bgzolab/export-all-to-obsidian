@@ -15,9 +15,14 @@ def migrate(connection: sqlite3.Connection) -> None:
         version = _migration_version(path)
         if version <= current:
             continue
-        connection.executescript(path.read_text(encoding='utf-8'))
-        connection.execute(f'PRAGMA user_version = {version}')
-        connection.commit()
+        script = path.read_text(encoding='utf-8')
+        try:
+            connection.executescript(
+                f'BEGIN;\n{script}\nPRAGMA user_version = {version};\nCOMMIT;'
+            )
+        except Exception:
+            connection.rollback()
+            raise
         current = version
 
 

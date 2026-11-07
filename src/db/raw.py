@@ -10,6 +10,8 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 
+from db.connection import secure_database_files
+
 VALID_RUN_STATUSES = {'success', 'partial', 'failed'}
 
 
@@ -33,6 +35,7 @@ def start_run(
         (platform, operation, scope, command, utc_now(), 'running'),
     )
     connection.commit()
+    secure_database_files(connection)
     return int(cursor.lastrowid)
 
 
@@ -50,6 +53,7 @@ def finish_run(
         (utc_now(), status, error, run_id),
     )
     connection.commit()
+    secure_database_files(connection)
 
 
 def record_response(
@@ -82,6 +86,7 @@ def record_response(
         ),
     )
     connection.commit()
+    secure_database_files(connection)
     return int(cursor.lastrowid)
 
 

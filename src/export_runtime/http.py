@@ -11,7 +11,14 @@ import requests
 from db import raw
 
 REDACTED = '[REDACTED]'
-REDACT_HEADERS = {'cookie', 'authorization'}
+REDACT_HEADERS = {
+    'authorization',
+    'cookie',
+    'proxy-authorization',
+    'x-api-key',
+    'x-auth-token',
+    'x-csrf-token',
+}
 
 
 def get(
@@ -79,23 +86,29 @@ def request(
     try:
         response = _send(session, method, url, kwargs)
     except Exception as exc:
-        raw.record_error(
+        try:
+            raw.record_error(
+                database,
+                run_id,
+                endpoint=endpoint,
+                request=request_info,
+                error=f'{type(exc).__name__}: {exc}',
+            )
+        except Exception as record_exc:
+            _warn_record_failure(record_exc)
+        raise
+
+    try:
+        raw.record_response(
             database,
             run_id,
             endpoint=endpoint,
             request=request_info,
-            error=f'{type(exc).__name__}: {exc}',
+            status_code=response.status_code,
+            body=response.content,
         )
-        raise
-
-    raw.record_response(
-        database,
-        run_id,
-        endpoint=endpoint,
-        request=request_info,
-        status_code=response.status_code,
-        body=response.content,
-    )
+    except Exception as record_exc:
+        _warn_record_failure(record_exc)
     return response
 
 
@@ -151,3 +164,7 @@ def _request_body(kwargs: dict[str, Any]) -> Any:
     if 'data' in kwargs:
         return kwargs['data']
     return None
+
+
+def _warn_record_failure(exc: Exception) -> None:
+    print(f'原始响应记录失败: {type(exc).__name__}: {exc}')

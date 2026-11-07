@@ -61,7 +61,7 @@ CREATE INDEX idx_sync_response_sha256 ON sync_response(sha256);
 - 重复请求不去重，每次观察一行。
 - `endpoint` 用稳定语义键：`<platform>.<resource>.<action>`，如 `github.stars.list`、`zhihu.collection.page`、`import.markdown`。一旦写入不要改名。
 - 时间统一 UTC ISO 8601。
-- 请求头只脱敏 `Cookie` 和 `Authorization`（大小写不敏感，值替换为 `[REDACTED]`）。URL、query、body 和其他 header 原样保存。
+- 请求头只脱敏 `Cookie`、`Authorization`、`X-CSRF-Token`、`X-API-Key` 等凭证类 header（大小写不敏感，值替换为 `[REDACTED]`）。URL、query、body 和其他 header 原样保存。
 - 凭证探测不记录。
 - 数据库按凭证文件保护：文件 0600，父目录 0700，不提交 git，不公开备份。URL/body 中仍可能含敏感信息。
 
@@ -90,7 +90,8 @@ Markdown：
 
 - `--db` 是顶层选项，默认 `data/eto.db`（相对当前目录）。
 - WAL、foreign_keys、busy_timeout、synchronous=NORMAL。
-- 迁移用编号 SQL + `PRAGMA user_version`，不引入 ORM 或 Alembic。
+- 主库、`-wal`、`-shm` 文件都限制为 0600；连接随 CLI 结束关闭。
+- 迁移用编号 SQL + `PRAGMA user_version`，每个迁移在事务内执行，不引入 ORM 或 Alembic。
 - 备份使用 SQLite 备份或 `VACUUM INTO`，不要只复制 WAL 模式下的主文件。
 
 ## 7. 暂缓
