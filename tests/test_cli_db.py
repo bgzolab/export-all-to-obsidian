@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from types import SimpleNamespace
 
 from click.testing import CliRunner
 
@@ -466,6 +467,56 @@ def test_db_only_projection_failure_marks_run_partial(monkeypatch, tmp_path):
     ).fetchone()
     assert run['status'] == 'partial'
     connection.close()
+
+
+def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
+    pages = {1: [1], 2: [2], 3: []}
+    page_calls = []
+    topic_calls = []
+    reply_calls = []
+
+    def fake_page(page):
+        page_calls.append(page)
+        return pages[page]
+
+    def fake_topic(topic_id):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+                replies=1 if topic_id == 1 else 0,
+            )
+        )
+
+    output_dir = tmp_path / 'output'
+    output_dir.mkdir()
+    (output_dir / '~1-Topic-1.md').write_text('exists', encoding='utf-8')
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+    monkeypatch.setattr(
+        'v2ex.exporter.fetch_all_replies',
+        lambda topic_id: reply_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), '--db-only', 'v2ex', '-o', str(output_dir)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1, 2, 3]
+    assert topic_calls == [1, 2]
+    assert reply_calls == [1]
+    assert (output_dir / '~1-Topic-1.md').read_text(encoding='utf-8') == 'exists'
 
 
 def test_db_rebuild_bangumi(tmp_path):
