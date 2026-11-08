@@ -843,6 +843,59 @@ def test_db_only_v2ex_skips_known_topic(monkeypatch, tmp_path):
     assert replies_calls == []
 
 
+def test_db_only_v2ex_refetches_incomplete_replies(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(
+        connection,
+        'v2ex.topic.detail',
+        {**V2EX_TOPIC, 'result': {**V2EX_TOPIC['result'], 'replies': 2}},
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1'},
+    )
+    # 只有第 1 条回复入库：上一次 run 在回复第 2 页中断，raw/投影都不完整
+    record_json(
+        connection,
+        'v2ex.topic.replies.page',
+        {'success': True, 'message': '', 'result': [{'id': 11, 'content': 'one'}]},
+        request={
+            'url': 'https://www.v2ex.com/api/v2/topics/1/replies',
+            'params': {'p': 1},
+        },
+    )
+    rebuild_platform(connection, 'v2ex')
+    connection.close()
+
+    topic_calls = []
+    replies_calls = []
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_fav_list_topic_id_page',
+        lambda page, client=None: [1] if page == 1 else [],
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter.get_v2ex_topic_info',
+        lambda topic_id: topic_calls.append(topic_id),
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter.fetch_all_replies',
+        lambda topic_id, client=None: replies_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert topic_calls == []
+    assert replies_calls == [1]
+
+
 def test_db_rebuild_bangumi(tmp_path):
     db_path = tmp_path / 'eto.db'
     _seed_bangumi_raw(db_path)

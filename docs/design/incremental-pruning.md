@@ -60,8 +60,9 @@ Stage 1 uses the same keys for detail/aux checks:
 - github: skip `repo.readme` if `readme_response_id IS NOT NULL`.
 - qireader: skip `article` if `qireader_article.url` exists.
 - cnblog: skip `post.body` if `cnblog_post.source_url` exists.
-- v2ex: skip `topic.detail` if `v2ex_topic` exists; skip reply pages if
-  `v2ex_reply` has rows for the topic.
+- v2ex: skip `topic.detail` if `v2ex_topic` exists; skip reply pages only when the
+  projected reply count reaches `v2ex_topic.replies` (an interrupted reply fetch
+  leaves a partial thread and must be retried).
 - weibo: skip `longtext` if `long_text_response_id IS NOT NULL` for the `mblogid`.
 
 Bilibili, Twitter and Zhihu have no detail/aux calls in Stage 1; they participate

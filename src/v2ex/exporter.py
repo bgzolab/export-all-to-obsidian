@@ -41,9 +41,10 @@ def export(
                         topic_id,
                     )
                     if reply_count is not None:
-                        if reply_count > 0 and not v2ex_projection.replies_exist(
+                        if reply_count > 0 and not v2ex_projection.replies_complete(
                             connection,
                             topic_id,
+                            reply_count,
                         ):
                             fetch_all_replies(topic_id, client)
                         continue
@@ -57,9 +58,10 @@ def export(
                     and topic.replies
                     and (
                         force
-                        or not v2ex_projection.replies_exist(
+                        or not v2ex_projection.replies_complete(
                             get_database(),
                             topic_id,
+                            topic.replies,
                         )
                     )
                 ):

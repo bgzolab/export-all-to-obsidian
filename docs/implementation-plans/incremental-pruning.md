@@ -26,7 +26,8 @@
   - weibo: `long_text_response_id` 非空则跳过 `longtext`。
   - qireader: `qireader_article.url` 存在则跳过 `article`。
   - cnblog: `cnblog_post.source_url` 存在则跳过 `post.body`。
-  - v2ex: `v2ex_topic` 存在则跳过 `topic.detail`；已有 replies 则跳过回复分页。
+  - v2ex: `v2ex_topic` 存在则跳过 `topic.detail`；投影回复数达到
+    `v2ex_topic.replies` 才跳过回复分页（中断的分页抓取必须重抓）。
   - 给 cnblog/qireader/v2ex/zhihu 补 `--force`，并传到 exporter；`--force` 在
     `--db-only` 下关闭 Stage 1/2 剪枝。
 - Verify:
@@ -69,6 +70,9 @@
 - 2026-11-08: Stage 2 completed for github/bilibili/twitter. A fully known page
   stops pagination and marks the run `partial`; `--force` disables the stop.
   qireader is deferred until tag membership is modeled.
+- 2026-11-08: v2ex reply pruning compares the projected reply count with
+  `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
+  instead of being skipped forever; dropped the unused `topic_exists` helper.
 
 ## Notes
 
