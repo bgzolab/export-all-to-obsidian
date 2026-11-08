@@ -135,6 +135,7 @@ def test_missing_article_content_is_skipped():
 
     result = rebuild_platform(connection, 'qireader')
 
+    assert result.responses == 0
     assert result.skipped == 1
     assert business_rows(connection, ('qireader_article',))['qireader_article'] == []
     connection.close()
@@ -144,7 +145,7 @@ def test_missing_result_rolls_back():
     connection = connect(':memory:')
     record_json(connection, 'qireader.readlater.page', {'error': 'bad'})
 
-    with pytest.raises(ProjectionError, match='KeyError'):
+    with pytest.raises(ProjectionError, match='missing result object'):
         rebuild_platform(connection, 'qireader')
 
     assert business_rows(connection, TABLES) == {

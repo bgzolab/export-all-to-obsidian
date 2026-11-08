@@ -15,7 +15,7 @@ from db.projections._upsert import (
     json_or_null,
     request_payload,
     reset_tables,
-    skip_response,
+    skip_handler_response,
     upsert,
 )
 
@@ -63,7 +63,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 now,
             )
         except SkipResponse as exc:
-            skip_response(result, ARTICLE_ENDPOINT, response, str(exc))
+            skip_handler_response(result, ARTICLE_ENDPOINT, response, str(exc))
 
     return result
 
@@ -74,7 +74,10 @@ def _upsert_entries(
     response_id: int,
     now: str,
 ) -> int:
-    entries = payload['result']['entries'] or []
+    result = payload.get('result') if isinstance(payload, dict) else None
+    if not isinstance(result, dict):
+        raise TypeError('missing result object')
+    entries = result.get('entries') or []
     rows = 0
     for entry in entries:
         rows += upsert(

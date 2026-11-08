@@ -199,8 +199,12 @@
 - 2026-11-08: Eighth review follow-up. GitHub README updates require a unique
   `full_name` match; `RebuildResult.aux_missed` surfaces auxiliary misses in the
   summary; Weibo/Bilibili treat null `data` as an empty page; V2EX per-topic write
-  errors mark partial and continue; replies without an id are skipped. Full suite:
-  290 passed, 2 skipped; ruff passes.
+  errors mark partial and continue; replies without an id are skipped.
+- 2026-11-08: Ninth review follow-up. Handler-skipped responses no longer remain
+  in the `responses` count; db-only Bangumi character capture has a regression
+  test; main-entry error messages clarify invalid payload shapes; remaining
+  exporter pagination caps are recorded as follow-up risk. Full suite: 295 passed,
+  2 skipped; ruff passes.
 
 ## Notes
 

@@ -15,7 +15,7 @@ from db.projections._upsert import (
     json_or_null,
     request_payload,
     reset_tables,
-    skip_response,
+    skip_handler_response,
     update_aux,
     upsert,
 )
@@ -66,7 +66,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 result,
             )
         except SkipResponse as exc:
-            skip_response(result, LONGTEXT_ENDPOINT, response, str(exc))
+            skip_handler_response(result, LONGTEXT_ENDPOINT, response, str(exc))
 
     return result
 

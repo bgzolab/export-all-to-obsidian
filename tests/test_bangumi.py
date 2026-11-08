@@ -5,6 +5,7 @@
 """
 
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,6 +50,24 @@ def test_dict_to_subject_tag_list_with_total_count():
     assert tags[0].name == '科幻'
     assert tags[0].total_count == 100
     assert tags[1].total_count == 50
+
+
+def test_db_only_records_subject_characters(monkeypatch):
+    from bangumi import exporter
+
+    calls = []
+    monkeypatch.setattr('bangumi.exporter.is_db_only', lambda: True)
+    monkeypatch.setattr(
+        'bangumi.exporter.get_subject_info',
+        lambda subject_id: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.get_output_character_string',
+        lambda subject_id: calls.append(subject_id) or '',
+    )
+
+    assert exporter.write_subject_markdown(1, 3, '', '', False) == (True, '', '')
+    assert calls == [1]
 
 
 def test_dict_to_slim_subject_v0_with_api_tags():

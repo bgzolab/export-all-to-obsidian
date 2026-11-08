@@ -124,6 +124,18 @@ def skip_response(
     print(f'投影跳过无效响应: {endpoint} (id={response["id"]}): {reason}')
 
 
+def skip_handler_response(
+    result: RebuildResult | None,
+    endpoint: str,
+    response: dict[str, Any],
+    reason: str,
+) -> None:
+    """Skip a response that the iterator already counted as processed."""
+    if result is not None:
+        result.responses -= 1
+    skip_response(result, endpoint, response, reason)
+
+
 def _should_skip(response: dict[str, Any], status_ok_only: bool) -> bool:
     if response['body'] is None or response.get('error'):
         return True
