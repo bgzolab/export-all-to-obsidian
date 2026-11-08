@@ -57,6 +57,7 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                         get_html_text_from_url(entry.url),
                     )
                 except Exception:
+                    mark_run_partial()
                     print(
                         f'处理{filename}时发生异常，源地址可以已经删除，'
                         '直接跳过，请考虑手动处理！',

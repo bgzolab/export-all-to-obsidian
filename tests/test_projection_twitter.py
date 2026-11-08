@@ -103,7 +103,7 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
-def test_missing_data_rolls_back():
+def test_errors_only_payload_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'twitter.likes.page', PAGE)
     rebuild_platform(connection, 'twitter')
@@ -111,7 +111,22 @@ def test_missing_data_rolls_back():
 
     record_json(connection, 'twitter.likes.page', {'errors': []})
 
-    with pytest.raises(ProjectionError, match='missing data'):
+    result = rebuild_platform(connection, 'twitter')
+
+    assert result.skipped == 1
+    assert business_rows(connection, TABLES) == before
+    connection.close()
+
+
+def test_non_dict_payload_rolls_back():
+    connection = connect(':memory:')
+    record_json(connection, 'twitter.likes.page', PAGE)
+    rebuild_platform(connection, 'twitter')
+    before = business_rows(connection, TABLES)
+
+    record_json(connection, 'twitter.likes.page', [])
+
+    with pytest.raises(ProjectionError, match='invalid likes payload'):
         rebuild_platform(connection, 'twitter')
 
     assert business_rows(connection, TABLES) == before

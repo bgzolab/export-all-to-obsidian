@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from db.connection import connect
-from db.projections import ProjectionError, rebuild_platform
+from db.projections import rebuild_platform
 from tests.projection_helpers import business_rows, record_json
 
 TABLES = ('weibo_post',)
@@ -174,7 +172,7 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
-def test_business_error_rolls_back():
+def test_business_error_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'weibo.likes.page', _likes())
     rebuild_platform(connection, 'weibo')
@@ -187,8 +185,8 @@ def test_business_error_rolls_back():
         request={'url': 'https://weibo.com/ajax/statuses/likelist'},
     )
 
-    with pytest.raises(ProjectionError, match='ok=0'):
-        rebuild_platform(connection, 'weibo')
+    result = rebuild_platform(connection, 'weibo')
 
+    assert result.skipped == 1
     assert business_rows(connection, TABLES) == before
     connection.close()

@@ -175,6 +175,7 @@ def test_null_replies_result_is_skipped():
 
     result = rebuild_platform(connection, 'v2ex')
 
+    assert result.responses == 0
     assert result.skipped == 1
     assert business_rows(connection, ('v2ex_reply',))['v2ex_reply'] == []
     connection.close()
@@ -233,7 +234,7 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
-def test_missing_topic_result_rolls_back():
+def test_null_topic_result_is_skipped():
     connection = connect(':memory:')
     _seed(connection)
     rebuild_platform(connection, 'v2ex')
@@ -243,6 +244,26 @@ def test_missing_topic_result_rolls_back():
         connection,
         'v2ex.topic.detail',
         {'success': False, 'message': '', 'result': None},
+        request={'url': 'https://www.v2ex.com/api/v2/topics/3'},
+    )
+
+    result = rebuild_platform(connection, 'v2ex')
+
+    assert result.skipped == 1
+    assert business_rows(connection, TABLES) == before
+    connection.close()
+
+
+def test_missing_topic_result_key_rolls_back():
+    connection = connect(':memory:')
+    _seed(connection)
+    rebuild_platform(connection, 'v2ex')
+    before = business_rows(connection, TABLES)
+
+    record_json(
+        connection,
+        'v2ex.topic.detail',
+        {'success': False, 'message': ''},
         request={'url': 'https://www.v2ex.com/api/v2/topics/3'},
     )
 

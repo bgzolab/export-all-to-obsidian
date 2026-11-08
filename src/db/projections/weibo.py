@@ -37,16 +37,19 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         LIKES_ENDPOINT,
         result=result,
     ):
-        result.rows += apply_handler(
-            LIKES_ENDPOINT,
-            response,
-            _upsert_posts,
-            connection,
-            payload,
-            response['id'],
-            now,
-            result,
-        )
+        try:
+            result.rows += apply_handler(
+                LIKES_ENDPOINT,
+                response,
+                _upsert_posts,
+                connection,
+                payload,
+                response['id'],
+                now,
+                result,
+            )
+        except SkipResponse as exc:
+            skip_handler_response(result, LIKES_ENDPOINT, response, str(exc))
 
     for response, payload in iter_json_responses(
         connection,
@@ -79,7 +82,7 @@ def _upsert_posts(
     result: RebuildResult,
 ) -> int:
     if payload.get('ok') != 1:
-        raise ValueError(f'ok={payload.get("ok")}')
+        raise SkipResponse(f'ok={payload.get("ok")}')
     if 'data' not in payload:
         raise ValueError('missing data')
     data = payload['data']

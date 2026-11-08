@@ -773,6 +773,8 @@ WHERE <natural key> = ?;
   它们表示“这次抓取失败”，不是投影数据损坏。
 - 主实体接口的 200 响应 body 无法解析、字段无法满足非空约束、JSON 校验失败，
   整个平台重建回滚。
+- 主实体接口的业务级无数据负载（V2EX `result: null`、Twitter errors-only / 空 data、
+  Weibo `ok != 1`）按“无数据”处理：跳过并计数，不阻塞后续重建；缺键或类型错误仍回滚。
 - 辅助接口（README、角色、长文、正文、回复）的 200 非 JSON 响应、或 200 JSON 但
   缺少业务字段（如回复列表、正文、长文内容）时跳过并计数；辅助数据不应因为一条坏响应
   阻塞整个平台。
@@ -895,6 +897,8 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
   旧 README 可能更新到当前同名仓库。`repo_id` 是主键，实体本身不会串行。
 - `weibo_post.numeric_id` 使用 SQLite INTEGER；如果微博雪花 id 超出 int64，
   需要迁移为 TEXT 或跳过该列。
+- `twitter_tweet.created_at` 保留平台英文格式字符串，`idx_twitter_tweet_created_at`
+  不是时间序索引；按时间排序的消费方需要另建 ISO 规范列。
 - raw 层只增不删，长期运行会持续累积；按 run 清理或限制回放窗口属于后续任务，
   不影响当前投影正确性。
 - bangumi / bilibili / zhihu / weibo 的 exporter 分页仍依赖空页终止；`--db-only`

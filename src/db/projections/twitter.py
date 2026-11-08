@@ -8,10 +8,12 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_json_responses,
     json_dumps,
     reset_tables,
+    skip_handler_response,
     upsert,
 )
 from twitter.entity import LikesPage
@@ -32,15 +34,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         ENDPOINT,
         result=result,
     ):
-        result.rows += apply_handler(
-            ENDPOINT,
-            response,
-            _upsert_tweets,
-            connection,
-            payload,
-            response['id'],
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                ENDPOINT,
+                response,
+                _upsert_tweets,
+                connection,
+                payload,
+                response['id'],
+                now,
+            )
+        except SkipResponse as exc:
+            skip_handler_response(result, ENDPOINT, response, str(exc))
 
     return result
 
@@ -51,9 +56,15 @@ def _upsert_tweets(
     response_id: int,
     now: str,
 ) -> int:
-    data = payload.get('data') if isinstance(payload, dict) else None
-    if not isinstance(data, dict) or not data:
-        raise ValueError('missing data')
+    if not isinstance(payload, dict):
+        raise TypeError('invalid likes payload')
+    if 'data' not in payload:
+        raise SkipResponse('missing data')
+    data = payload['data']
+    if data is None or data == {}:
+        raise SkipResponse('empty likes data')
+    if not isinstance(data, dict):
+        raise TypeError('invalid likes data')
     page = LikesPage.from_dict(data)
     rows = 0
     for tweet in page.tweets:

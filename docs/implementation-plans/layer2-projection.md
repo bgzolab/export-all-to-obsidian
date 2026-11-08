@@ -212,8 +212,13 @@
   replay-order invariant test.
 - 2026-11-08: Twelfth review follow-up. GitHub README skips HTML error pages and
   JSON without `content`; V2EX reply fetching reuses the exporter client; Bangumi
-  no longer prints “处理完成” after a skipped subject. Full suite: 303 passed,
-  2 skipped; ruff passes.
+  no longer prints “处理完成” after a skipped subject.
+- 2026-11-08: Thirteenth review follow-up (BLOCK fix). Main-entity business-level
+  no-data payloads (V2EX `result: null`, Twitter errors-only/empty data, Weibo
+  `ok != 1`) are skipped and counted instead of poisoning rebuilds; missing keys
+  and type violations still roll back. Qireader article downgrade marks partial;
+  docs note db-only still requires credentials. Full suite: 304 passed, 2 skipped;
+  ruff passes.
 
 ## Notes
 

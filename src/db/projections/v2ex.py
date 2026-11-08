@@ -59,15 +59,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         TOPIC_ENDPOINT,
         result=result,
     ):
-        result.rows += apply_handler(
-            TOPIC_ENDPOINT,
-            response,
-            _upsert_topic,
-            connection,
-            payload,
-            response['id'],
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                TOPIC_ENDPOINT,
+                response,
+                _upsert_topic,
+                connection,
+                payload,
+                response['id'],
+                now,
+            )
+        except SkipResponse as exc:
+            skip_handler_response(result, TOPIC_ENDPOINT, response, str(exc))
 
     for response, payload in iter_json_responses(
         connection,
@@ -120,9 +123,15 @@ def _upsert_topic(
     response_id: int,
     now: str,
 ) -> int:
-    topic = payload.get('result')
-    if not topic:
+    if not isinstance(payload, dict):
+        raise TypeError('invalid topic payload')
+    if 'result' not in payload:
         raise ValueError('missing result')
+    topic = payload['result']
+    if topic is None:
+        raise SkipResponse('topic result is null')
+    if not isinstance(topic, dict):
+        raise TypeError('invalid topic result')
     return upsert(
         connection,
         'v2ex_topic',

@@ -115,6 +115,7 @@ eto --db ./data/eto.db zhihu -c your-collection-id -o output/zhihu
 `--db-only` 仍然请求 API、写入 `sync_run` / `sync_response`，但：
 
 - 不要求 `-o` / `-t`，不写 Markdown，不写索引，不创建输出目录。
+- 不豁免凭证：各平台的 token / cookie 仍然必需。
 - 不因目标文件已存在而提前结束；`--max-pages` 等显式抓取范围参数仍然生效。
 - 抓取结束后在同一 `sync_run` 内重建该平台的投影表。
 - 传输错误和非 200 响应在重建时跳过并计数；200 响应解析失败或违反约束仍会整体回滚。
