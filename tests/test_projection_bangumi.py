@@ -230,6 +230,25 @@ def test_missing_body_is_skipped_without_losing_rows():
     connection.close()
 
 
+def test_invalid_characters_payload_is_skipped():
+    connection = connect(':memory:')
+    record_json(connection, 'bangumi.subject.detail', SUBJECT)
+    record_json(
+        connection,
+        'bangumi.subject.characters',
+        {'success': False, 'message': 'auth required'},
+        request={'url': 'https://api.bgm.tv/v0/subjects/1/characters'},
+    )
+
+    result = rebuild_platform(connection, 'bangumi')
+
+    assert result.skipped == 1
+    subject = connection.execute('SELECT * FROM bangumi_subject').fetchone()
+    assert subject['characters_json'] == '[]'
+    assert subject['characters_response_id'] is None
+    connection.close()
+
+
 def test_characters_without_subject_are_reported(capsys):
     connection = connect(':memory:')
     record_json(

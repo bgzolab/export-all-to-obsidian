@@ -170,6 +170,10 @@ def _update_characters(
     if match is None:
         raise SkipResponse('cannot determine subject id from request URL')
     subject_id = int(match.group(1))
+    if not isinstance(payload, list) or not all(
+        isinstance(item, dict) for item in payload
+    ):
+        raise SkipResponse('expected character list')
     rows = update_aux(
         connection,
         'bangumi_subject',
