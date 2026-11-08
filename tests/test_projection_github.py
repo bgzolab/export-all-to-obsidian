@@ -98,6 +98,24 @@ def test_repository_rename_updates_the_same_row():
     connection.close()
 
 
+def test_unexpected_readme_status_is_skipped():
+    connection = connect(':memory:')
+    record_json(connection, 'github.stars.list', [STAR])
+    record_text(
+        connection,
+        'github.repo.readme',
+        'error',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+        status_code=500,
+    )
+
+    result = rebuild_platform(connection, 'github')
+
+    assert result.skipped == 1
+    assert connection.execute('SELECT readme FROM github_star').fetchone()[0] == ''
+    connection.close()
+
+
 def test_readme_without_star_is_reported(capsys):
     connection = connect(':memory:')
     record_text(

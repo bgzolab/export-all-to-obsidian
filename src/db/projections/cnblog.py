@@ -9,12 +9,14 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_body_responses,
     iter_json_responses,
     json_dumps,
     request_payload,
     reset_tables,
+    skip_response,
     upsert,
 )
 
@@ -53,15 +55,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         result=result,
         status_ok_only=True,
     ):
-        result.rows += apply_handler(
-            POST_ENDPOINT,
-            response,
-            _upsert_post,
-            connection,
-            body,
-            response,
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                POST_ENDPOINT,
+                response,
+                _upsert_post,
+                connection,
+                body,
+                response,
+                now,
+            )
+        except SkipResponse as exc:
+            skip_response(result, POST_ENDPOINT, response, str(exc))
 
     return result
 
@@ -102,7 +107,7 @@ def _upsert_post(
     url = request_payload(response).get('url') or ''
     match = _POST_URL_RE.search(url)
     if match is None:
-        raise ValueError('cannot determine post id from request URL')
+        raise SkipResponse('cannot determine post id from request URL')
     post_id = int(match.group(1))
     return upsert(
         connection,

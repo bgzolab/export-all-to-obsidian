@@ -121,6 +121,25 @@ def test_null_entries_is_empty():
     connection.close()
 
 
+def test_missing_article_content_is_skipped():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'qireader.article',
+        {'content': None},
+        request={
+            'url': 'https://nettools3.oxyry.com/text',
+            'params': {'url': 'https://example.com/a'},
+        },
+    )
+
+    result = rebuild_platform(connection, 'qireader')
+
+    assert result.skipped == 1
+    assert business_rows(connection, ('qireader_article',))['qireader_article'] == []
+    connection.close()
+
+
 def test_missing_result_rolls_back():
     connection = connect(':memory:')
     record_json(connection, 'qireader.readlater.page', {'error': 'bad'})

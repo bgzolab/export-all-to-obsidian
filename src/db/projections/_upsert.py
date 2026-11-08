@@ -11,6 +11,10 @@ from typing import Any
 from db import raw
 
 
+class SkipResponse(Exception):
+    """An auxiliary response does not carry usable data."""
+
+
 class ProjectionError(RuntimeError):
     """A raw response could not be projected."""
 
@@ -71,12 +75,7 @@ def iter_json_responses(
             payload = json.loads(response['body'])
         except (TypeError, ValueError) as exc:
             if skip_invalid_json:
-                if result is not None:
-                    result.skipped += 1
-                print(
-                    f'投影跳过无效响应: {endpoint} '
-                    f'(id={response["id"]}): invalid JSON: {exc}',
-                )
+                skip_response(result, endpoint, response, f'invalid JSON: {exc}')
                 continue
             raise ProjectionError(
                 endpoint,
@@ -110,6 +109,18 @@ def iter_body_responses(
         yield response, response['body']
 
 
+def skip_response(
+    result: RebuildResult | None,
+    endpoint: str,
+    response: dict[str, Any],
+    reason: str,
+) -> None:
+    """Count and report an auxiliary response that was not projected."""
+    if result is not None:
+        result.skipped += 1
+    print(f'投影跳过无效响应: {endpoint} (id={response["id"]}): {reason}')
+
+
 def _should_skip(response: dict[str, Any], status_ok_only: bool) -> bool:
     if response['body'] is None or response.get('error'):
         return True
@@ -125,7 +136,7 @@ def apply_handler(
     """Run a projection handler and wrap failures with response provenance."""
     try:
         return handler(*args)
-    except ProjectionError:
+    except (ProjectionError, SkipResponse):
         raise
     except Exception as exc:
         raise ProjectionError(

@@ -9,12 +9,14 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_json_responses,
     json_dumps,
     json_or_null,
     request_payload,
     reset_tables,
+    skip_response,
     update_aux,
     upsert,
 )
@@ -70,15 +72,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         result=result,
         skip_invalid_json=True,
     ):
-        result.rows += apply_handler(
-            CHARACTERS_ENDPOINT,
-            response,
-            _update_characters,
-            connection,
-            payload,
-            response,
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                CHARACTERS_ENDPOINT,
+                response,
+                _update_characters,
+                connection,
+                payload,
+                response,
+                now,
+            )
+        except SkipResponse as exc:
+            skip_response(result, CHARACTERS_ENDPOINT, response, str(exc))
 
     return result
 
@@ -161,7 +166,7 @@ def _update_characters(
     url = request_payload(response).get('url') or ''
     match = _CHARACTERS_SUBJECT_RE.search(url)
     if match is None:
-        raise ValueError('cannot determine subject id from request URL')
+        raise SkipResponse('cannot determine subject id from request URL')
     subject_id = int(match.group(1))
     rows = update_aux(
         connection,

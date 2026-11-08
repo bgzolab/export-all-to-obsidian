@@ -184,7 +184,10 @@
 - 2026-11-08: Third review follow-up. V2EX signin pages are detected during fetch
   and projection so favorites are not cleared; auxiliary `update_aux` misses are
   reported; auxiliary endpoints skip invalid 200 JSON while main entities still
-  roll back. Full suite: 276 passed, 2 skipped; ruff passes.
+  roll back.
+- 2026-11-08: Fourth review follow-up. Auxiliary endpoints now also skip 200 JSON
+  with missing business fields via `SkipResponse`; Weibo warns when a long post
+  has no `mblogid`. Full suite: 282 passed, 2 skipped; ruff passes.
 
 ## Notes
 

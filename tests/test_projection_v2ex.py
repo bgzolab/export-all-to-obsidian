@@ -164,6 +164,22 @@ def test_signin_page_rolls_back_favorites():
     connection.close()
 
 
+def test_null_replies_result_is_skipped():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'v2ex.topic.replies.page',
+        {'success': True, 'result': None},
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1/replies'},
+    )
+
+    result = rebuild_platform(connection, 'v2ex')
+
+    assert result.skipped == 1
+    assert business_rows(connection, ('v2ex_reply',))['v2ex_reply'] == []
+    connection.close()
+
+
 def test_invalid_reply_json_is_skipped():
     connection = connect(':memory:')
     _seed(connection)

@@ -8,12 +8,14 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_json_responses,
     json_dumps,
     json_or_null,
     request_payload,
     reset_tables,
+    skip_response,
     update_aux,
     upsert,
 )
@@ -51,15 +53,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         result=result,
         skip_invalid_json=True,
     ):
-        result.rows += apply_handler(
-            LONGTEXT_ENDPOINT,
-            response,
-            _update_long_text,
-            connection,
-            payload,
-            response,
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                LONGTEXT_ENDPOINT,
+                response,
+                _update_long_text,
+                connection,
+                payload,
+                response,
+                now,
+            )
+        except SkipResponse as exc:
+            skip_response(result, LONGTEXT_ENDPOINT, response, str(exc))
 
     return result
 
@@ -78,6 +83,8 @@ def _upsert_posts(
 
     rows = 0
     for item in data.get('list') or []:
+        if item.get('isLongText') and not item.get('mblogid'):
+            print(f'长文缺少 mblogid: weibo_post post_id={item["idstr"]}')
         rows += upsert(
             connection,
             'weibo_post',
@@ -116,12 +123,12 @@ def _update_long_text(
     data = payload.get('data') if isinstance(payload, dict) else None
     long_text = data.get('longTextContent') if isinstance(data, dict) else None
     if not isinstance(long_text, str):
-        return 0
+        raise SkipResponse('missing long text content')
 
     params = request_payload(response).get('params') or {}
     mblogid = params.get('id') if isinstance(params, dict) else None
     if not mblogid:
-        raise ValueError('cannot determine mblogid from request params')
+        raise SkipResponse('cannot determine mblogid from request params')
     rows = update_aux(
         connection,
         'weibo_post',

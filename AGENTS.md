@@ -115,9 +115,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip
-  invalid 200 JSON. A main-entity 200 body that cannot parse or violates constraints rolls
-  back the whole platform. `response_id` points at the producing `sync_response`, not
-  `sync_run`.
+  invalid 200 JSON or missing auxiliary fields. A main-entity 200 body that cannot parse or
+  violates constraints rolls back the whole platform. `response_id` points at the producing
+  `sync_response`, not `sync_run`.
 - Projection failures under `--db-only` mark the run `partial` and exit non-zero; raw data
   remains available for `eto db rebuild <platform>`.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls

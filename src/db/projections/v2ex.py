@@ -9,6 +9,7 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_body_responses,
     iter_json_responses,
@@ -16,6 +17,7 @@ from db.projections._upsert import (
     json_or_null,
     request_payload,
     reset_tables,
+    skip_response,
     upsert,
 )
 from v2ex.html import is_signin_page, parse_fav_topic_ids
@@ -72,15 +74,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         result=result,
         skip_invalid_json=True,
     ):
-        result.rows += apply_handler(
-            REPLIES_ENDPOINT,
-            response,
-            _upsert_replies,
-            connection,
-            payload,
-            response,
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                REPLIES_ENDPOINT,
+                response,
+                _upsert_replies,
+                connection,
+                payload,
+                response,
+                now,
+            )
+        except SkipResponse as exc:
+            skip_response(result, REPLIES_ENDPOINT, response, str(exc))
 
     return result
 
@@ -148,7 +153,7 @@ def _upsert_replies(
     topic_id = _replies_topic_id(response)
     replies = payload.get('result')
     if not isinstance(replies, list):
-        raise TypeError('missing result list')
+        raise SkipResponse('missing result list')
     rows = 0
     for reply in replies:
         rows += upsert(
@@ -174,5 +179,5 @@ def _replies_topic_id(response: dict[str, Any]) -> int:
     url = request_payload(response).get('url') or ''
     match = _REPLIES_TOPIC_RE.search(url)
     if match is None:
-        raise ValueError('cannot determine topic id from request URL')
+        raise SkipResponse('cannot determine topic id from request URL')
     return int(match.group(1))

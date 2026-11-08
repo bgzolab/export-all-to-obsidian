@@ -73,7 +73,7 @@ def test_rebuild_projects_posts_and_long_text():
     connection.close()
 
 
-def test_missing_long_text_is_ignored():
+def test_missing_long_text_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'weibo.likes.page', _likes())
     record_json(
@@ -86,11 +86,23 @@ def test_missing_long_text_is_ignored():
         },
     )
 
-    rebuild_platform(connection, 'weibo')
+    result = rebuild_platform(connection, 'weibo')
 
+    assert result.skipped == 1
     row = connection.execute('SELECT * FROM weibo_post').fetchone()
     assert row['long_text'] is None
     assert row['long_text_response_id'] is None
+    connection.close()
+
+
+def test_long_text_post_without_mblogid_is_reported(capsys):
+    connection = connect(':memory:')
+    post = dict(POST, mblogid=None)
+    record_json(connection, 'weibo.likes.page', _likes([post]))
+
+    rebuild_platform(connection, 'weibo')
+
+    assert '长文缺少 mblogid' in capsys.readouterr().out
     connection.close()
 
 

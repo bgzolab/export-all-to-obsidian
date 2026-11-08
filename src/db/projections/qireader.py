@@ -8,12 +8,14 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_json_responses,
     json_dumps,
     json_or_null,
     request_payload,
     reset_tables,
+    skip_response,
     upsert,
 )
 
@@ -50,15 +52,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         result=result,
         skip_invalid_json=True,
     ):
-        result.rows += apply_handler(
-            ARTICLE_ENDPOINT,
-            response,
-            _upsert_article,
-            connection,
-            payload,
-            response,
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                ARTICLE_ENDPOINT,
+                response,
+                _upsert_article,
+                connection,
+                payload,
+                response,
+                now,
+            )
+        except SkipResponse as exc:
+            skip_response(result, ARTICLE_ENDPOINT, response, str(exc))
 
     return result
 
@@ -103,11 +108,11 @@ def _upsert_article(
 ) -> int:
     content = payload.get('content')
     if not isinstance(content, str):
-        raise TypeError('missing article content')
+        raise SkipResponse('missing article content')
     params = request_payload(response).get('params') or {}
     url = params.get('url') if isinstance(params, dict) else None
     if not url:
-        raise ValueError('cannot determine article URL from request params')
+        raise SkipResponse('cannot determine article URL from request params')
     return upsert(
         connection,
         'qireader_article',

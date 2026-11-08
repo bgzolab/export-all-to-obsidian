@@ -11,12 +11,14 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_body_responses,
     iter_json_responses,
     json_dumps,
     request_payload,
     reset_tables,
+    skip_response,
     update_aux,
     upsert,
 )
@@ -55,15 +57,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         README_ENDPOINT,
         result=result,
     ):
-        result.rows += apply_handler(
-            README_ENDPOINT,
-            response,
-            _update_readme,
-            connection,
-            body,
-            response,
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                README_ENDPOINT,
+                response,
+                _update_readme,
+                connection,
+                body,
+                response,
+                now,
+            )
+        except SkipResponse as exc:
+            skip_response(result, README_ENDPOINT, response, str(exc))
 
     return result
 
@@ -120,7 +125,7 @@ def _update_readme(
     url = request_payload(response).get('url') or ''
     match = _README_URL_RE.search(url)
     if match is None:
-        raise ValueError('cannot determine repository from request URL')
+        raise SkipResponse('cannot determine repository from request URL')
     full_name = f'{match.group(1)}/{match.group(2)}'
     status_code = response.get('status_code')
     if status_code == 404:
@@ -128,7 +133,7 @@ def _update_readme(
     elif status_code == 200:
         readme = _decode_readme(body)
     else:
-        return 0
+        raise SkipResponse(f'unexpected HTTP {status_code}')
     rows = update_aux(
         connection,
         'github_star',

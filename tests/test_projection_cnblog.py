@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from db.connection import connect
-from db.projections import ProjectionError, rebuild_platform
+from db.projections import rebuild_platform
 from tests.projection_helpers import business_rows, record_json, record_text
 
 TABLES = ('cnblog_post', 'cnblog_bookmark')
@@ -132,7 +130,7 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
-def test_invalid_post_url_rolls_back():
+def test_invalid_post_url_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'cnblog.bookmarks.page', BOOKMARKS)
     record_text(
@@ -142,11 +140,9 @@ def test_invalid_post_url_rolls_back():
         request={'url': 'https://api.cnblogs.com/api/blogposts/body'},
     )
 
-    with pytest.raises(ProjectionError, match='post id'):
-        rebuild_platform(connection, 'cnblog')
+    result = rebuild_platform(connection, 'cnblog')
 
-    assert business_rows(connection, TABLES) == {
-        'cnblog_post': [],
-        'cnblog_bookmark': [],
-    }
+    assert result.skipped == 1
+    assert len(business_rows(connection, ('cnblog_bookmark',))['cnblog_bookmark']) == 2
+    assert business_rows(connection, ('cnblog_post',))['cnblog_post'] == []
     connection.close()
