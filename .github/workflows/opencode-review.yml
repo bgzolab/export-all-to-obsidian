@@ -78,12 +78,17 @@ jobs:
           for name in configure-opencode-permissions.sh install_opencode.sh \
                       opencode_review_turn.sh review_verdict.sh; do
             body="$RUNNER_TEMP/review/fetch/${name}.json"
-            if ! code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 30 \
-                 -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                 "${api}/${name}?ref=${BASE_SHA}"); then
-              echo "::error::无法从基线 ${BASE_SHA} 获取 ${name}" >&2
-              exit 1
-            fi
+            # 瞬态失败（网络错误 / 5xx / 429）等 5 秒重试一次；404 立即按缺失处理
+            code=""
+            for wait in 0 5; do
+              [ "$wait" -gt 0 ] && sleep "$wait"
+              code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 30 \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                "${api}/${name}?ref=${BASE_SHA}") || code="000"
+              case "$code" in
+                200 | 404) break ;;
+              esac
+            done
             case "$code" in
               200) ;;
               404)
@@ -99,7 +104,7 @@ jobs:
                 ;;
               *)
                 echo "::error::无法从基线 ${BASE_SHA} 获取 ${name}（HTTP ${code}）" >&2
-                cat "$body" >&2
+                cat "$body" >&2 || true
                 exit 1
                 ;;
             esac

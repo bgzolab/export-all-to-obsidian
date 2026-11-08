@@ -36,7 +36,7 @@ pkg="opencode-linux-${arch}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-if ! curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 60 \
+if ! curl -fsSL --retry 2 --retry-delay 2 --retry-max-time 50 --retry-all-errors --max-time 30 \
      -o "$tmp/meta.json" "https://registry.npmjs.org/${pkg}/${version}"; then
   echo "::error::${pkg}@${version} 的 npm 元数据获取失败（版本未发布或 registry 不可用）" >&2
   exit 1
@@ -55,8 +55,9 @@ case "$integrity" in
     ;;
 esac
 
-# -f：4xx/5xx 直接失败，绝不把错误页喂给 tar；--retry-all-errors 覆盖 5xx 与连接重置
-curl -fL --retry 3 --retry-delay 3 --retry-all-errors --max-time 300 \
+# -f：4xx/5xx 直接失败，绝不把错误页喂给 tar；--retry-max-time 把整个重试窗口
+# （含每次重试的 --max-time）压在 workflow 的 step 上限内，避免挂起被 harness 强杀
+curl -fL --retry 2 --retry-delay 3 --retry-max-time 240 --retry-all-errors --max-time 120 \
   -o "$tmp/pkg.tgz" "$tarball"
 
 actual="sha512-$(openssl dgst -sha512 -binary "$tmp/pkg.tgz" | base64 | tr -d '\n')"
