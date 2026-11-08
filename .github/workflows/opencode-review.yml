@@ -118,15 +118,13 @@ jobs:
           key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
       - name: Install opencode
         if: steps.cache.outputs.cache-hit != 'true'
-        # 安装必须有时限：curl 默认无最大时长，挂起会吃掉 attempt 与门禁的余量
-        timeout-minutes: 5
+        # 安装必须有时限：下载挂起会吃掉 attempt 与门禁的余量
+        timeout-minutes: 8
         env:
           PINNED_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -o pipefail
-          # 版本始终固定（查询失败时为 OPENCODE_FALLBACK_VERSION）；
-          # --retry-max-time 把最坏重试总耗时（≤240s + 安装）压在 step 上限内
-          curl -fsSL --max-time 90 --retry 2 --retry-delay 2 --retry-max-time 240 https://opencode.ai/install | bash -s -- --version "${PINNED_VERSION}"
+        # 版本始终固定（查询失败时为 OPENCODE_FALLBACK_VERSION）；脚本内部按该版本
+        # 的 npm sha512 校验安装包，并重试临时 5xx
+        run: bash .github/scripts/install_opencode.sh "${PINNED_VERSION}"
       - name: Add opencode to PATH
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       # 第一轮（20 分钟）：完整审查。handler 自己负责发评论；provider 卡死/网络抖动

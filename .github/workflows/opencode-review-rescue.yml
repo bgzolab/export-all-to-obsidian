@@ -121,6 +121,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/review"
           cp .github/scripts/configure-opencode-permissions.sh "$RUNNER_TEMP/review/configure-opencode-permissions.sh"
+          cp .github/scripts/install_opencode.sh "$RUNNER_TEMP/review/install_opencode.sh"
           cp .github/scripts/opencode_review_turn.sh "$RUNNER_TEMP/review/opencode_review_turn.sh"
       # 再签出快照记录的提交：import 会把会话的项目 / 目录重写到当前工作区，
       # 上下文与当初一致时收尾结果最可信（收尾 agent 无工具，不会改文件）。
@@ -143,12 +144,11 @@ jobs:
       - name: Install opencode (the version recorded in the snapshot)
         if: steps.cache.outputs.cache-hit != 'true'
         # 安装必须有时限，避免挂起吃掉收尾预算
-        timeout-minutes: 5
+        timeout-minutes: 8
         env:
           PINNED_VERSION: ${{ steps.snapshot.outputs.version }}
-        run: |
-          set -o pipefail
-          curl -fsSL --max-time 90 --retry 2 --retry-delay 2 --retry-max-time 240 https://opencode.ai/install | bash -s -- --version "${PINNED_VERSION}"
+        # 用工作区之外的副本：这里可能已签出被审查的 head 提交，未必带这个脚本
+        run: bash "$RUNNER_TEMP/review/install_opencode.sh" "${PINNED_VERSION}"
       - name: Add opencode to PATH
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       # 用与审查 run 完全一致的 opencode 版本 import，避免跨版本 schema 不兼容
