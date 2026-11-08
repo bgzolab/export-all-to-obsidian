@@ -78,6 +78,24 @@ def test_single_bookmark_object_is_supported():
     connection.close()
 
 
+def test_ambiguous_source_url_is_left_empty():
+    connection = connect(':memory:')
+    bookmark = dict(BOOKMARKS[0], LinkUrl='https://example.com/123')
+    record_json(connection, 'cnblog.bookmarks.page', [bookmark])
+    record_text(
+        connection,
+        'cnblog.post.body',
+        '<p>post body</p>',
+        request={'url': 'https://api.cnblogs.com/api/blogposts/123/body'},
+    )
+
+    rebuild_platform(connection, 'cnblog')
+
+    post = connection.execute('SELECT * FROM cnblog_post').fetchone()
+    assert post['source_url'] == ''
+    connection.close()
+
+
 def test_non_200_post_body_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'cnblog.bookmarks.page', BOOKMARKS)

@@ -176,7 +176,11 @@
   skipped and counted instead of poisoning rebuilds; JSON non-200 handling moved
   into the shared iterators; V2EX reply pagination got a page cap and session
   reuse; empty/null list pages are tolerated; live Bangumi tests skip without
-  `BGM_ACCESS_TOKEN`. Full suite: 274 passed, 2 skipped; ruff passes.
+  `BGM_ACCESS_TOKEN`.
+- 2026-11-08: Second review follow-up. CNBlog only backfills `source_url` on a
+  unique `/<post_id>.html` bookmark match; V2EX reply page-limit path has a test;
+  the design doc now states that `null` list values are empty pages while missing
+  keys are structural errors. Full suite: 276 passed, 2 skipped; ruff passes.
 
 ## Notes
 

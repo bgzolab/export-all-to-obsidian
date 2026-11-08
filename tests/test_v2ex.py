@@ -114,6 +114,31 @@ def test_fetch_all_replies_reads_pages_until_empty(monkeypatch):
     ]
 
 
+def test_fetch_all_replies_stops_at_page_limit(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {'result': [{'id': 1}]}
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        calls.append(kwargs['params']['p'])
+        return FakeResponse()
+
+    monkeypatch.setattr('v2ex.replies.V2EX_MAX_REPLY_PAGES', 2)
+    monkeypatch.setattr(
+        'v2ex.replies.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr('v2ex.replies.http.get', fake_get)
+
+    with pytest.raises(RuntimeError, match='reply page limit 2'):
+        fetch_all_replies(1)
+    assert calls == [1, 2]
+
+
 def test_replies_page_rejects_unexpected_result(monkeypatch):
     class FakeResponse:
         status_code = 200

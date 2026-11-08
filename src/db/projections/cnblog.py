@@ -118,10 +118,9 @@ def _upsert_post(
 
 
 def _source_url(connection: sqlite3.Connection, post_id: int) -> str:
-    row = connection.execute(
-        'SELECT link_url FROM cnblog_bookmark '
-        'WHERE link_url LIKE ? OR link_url LIKE ? '
-        'ORDER BY wz_link_id LIMIT 1',
-        (f'%/{post_id}.html', f'%/{post_id}'),
-    ).fetchone()
-    return row['link_url'] if row else ''
+    rows = connection.execute(
+        'SELECT link_url FROM cnblog_bookmark WHERE link_url LIKE ?',
+        (f'%/{post_id}.html',),
+    ).fetchall()
+    # 多候选说明关联不唯一，宁可留空也不要写一个无法确认的 URL。
+    return rows[0]['link_url'] if len(rows) == 1 else ''
