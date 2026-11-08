@@ -610,3 +610,34 @@ def test_v2ex_list_failure_marks_run_failed(monkeypatch, tmp_path):
     )
     assert run['status'] == 'failed'
     assert 'RuntimeError: list page failed' in run['error']
+
+
+def test_v2ex_null_topic_result_marks_partial(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    pages = {1: [1], 2: []}
+
+    def fake_page(page, client=None):
+        return pages[page]
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
+    monkeypatch.setattr(
+        'v2ex.exporter.get_v2ex_topic_info',
+        lambda topic_id: SimpleNamespace(result=None),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'v2ex', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'

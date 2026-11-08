@@ -193,8 +193,10 @@
   signin-template limitation and raw-layer accumulation.
 - 2026-11-08: Sixth review follow-up. Removed GitHub `full_name` UNIQUE (slug can
   be inherited) and indexed it instead; V2EX favorite pages now reuse one client;
-  documented how a recorded signin page blocks rebuild. Full suite: 287 passed,
-  2 skipped; ruff passes.
+  documented how a recorded signin page blocks rebuild.
+- 2026-11-08: Seventh review follow-up. V2EX topic responses with a null result
+  are now marked partial and skipped instead of raising outside the item loop.
+  Full suite: 289 passed, 2 skipped; ruff passes.
 
 ## Notes
 

@@ -30,17 +30,17 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
         for topic_id in id_list:
             try:
                 result = get_v2ex_topic_info(topic_id)
-                if is_db_only() and result and result.result and result.result.replies:
+                if not (result and result.result):
+                    mark_run_partial()
+                    continue
+                topic = result.result
+                if is_db_only() and topic.replies:
                     fetch_all_replies(topic_id)
             except Exception as exc:
                 # 重试耗尽后仍失败则跳过该条目，避免单条故障中断整批同步
                 mark_run_partial()
                 print(f'Skip v2ex topic {topic_id}: {exc}')
                 continue
-            if not result:
-                mark_run_partial()
-                continue
-            topic = result.result
             filename = get_clean_filename(f'{topic_id}-{topic.title}')
             if stop_if_output_exists(
                 output_dir,
