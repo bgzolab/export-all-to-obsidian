@@ -189,4 +189,4 @@ def _rebuild_projection(platform: str) -> None:
         print(f'projection not implemented: {platform}')
         return
     result = rebuild_platform(get_database(), platform)
-    click.echo(f'投影完成: {result.responses} 个响应，{result.rows} 行')
+    click.echo(f'投影完成: {result.summary()}')

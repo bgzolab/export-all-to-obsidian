@@ -215,7 +215,7 @@ def test_bad_json_rolls_back_projection_table():
     connection.close()
 
 
-def test_missing_body_rolls_back_projection_table():
+def test_missing_body_is_skipped_without_losing_rows():
     connection = connect(':memory:')
     _seed(connection)
     rebuild_platform(connection, 'bangumi')
@@ -223,8 +223,21 @@ def test_missing_body_rolls_back_projection_table():
 
     record_missing(connection, 'bangumi.collections.page')
 
-    with pytest.raises(ProjectionError, match='missing response body'):
-        rebuild_platform(connection, 'bangumi')
+    result = rebuild_platform(connection, 'bangumi')
 
+    assert result.skipped == 1
     assert business_rows(connection, TABLES) == before
+    connection.close()
+
+
+def test_null_collection_page_is_empty():
+    connection = connect(':memory:')
+    record_json(connection, 'bangumi.collections.page', {'data': None})
+
+    result = rebuild_platform(connection, 'bangumi')
+
+    assert result.rows == 0
+    assert (
+        business_rows(connection, ('bangumi_collection',))['bangumi_collection'] == []
+    )
     connection.close()

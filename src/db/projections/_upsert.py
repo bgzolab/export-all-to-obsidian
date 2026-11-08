@@ -29,10 +29,17 @@ class ProjectionError(RuntimeError):
 
 @dataclass
 class RebuildResult:
-    """Number of raw responses replayed and projection rows written."""
+    """Number of raw responses replayed, rows written and errors skipped."""
 
     responses: int = 0
     rows: int = 0
+    skipped: int = 0
+
+    def summary(self) -> str:
+        message = f'{self.responses} 个响应，{self.rows} 行'
+        if self.skipped:
+            message += f'，跳过 {self.skipped} 条错误响应'
+        return message
 
 
 def reset_tables(connection: sqlite3.Connection, tables: tuple[str, ...]) -> None:
@@ -44,11 +51,22 @@ def reset_tables(connection: sqlite3.Connection, tables: tuple[str, ...]) -> Non
 def iter_json_responses(
     connection: sqlite3.Connection,
     endpoint: str,
+    *,
+    result: RebuildResult | None = None,
+    status_ok_only: bool = True,
 ) -> Iterator[tuple[dict[str, Any], Any]]:
-    """Yield raw responses with a parsed JSON body."""
+    """Yield non-error responses with a parsed JSON body.
+
+    Transport errors and non-200 responses are skipped and counted. A 200
+    response that is not valid JSON is still fatal: the raw data itself is bad.
+    """
     for response in raw.iter_responses(connection, endpoint=endpoint):
-        if response['body'] is None:
-            raise ProjectionError(endpoint, response['id'], 'missing response body')
+        if _should_skip(response, status_ok_only):
+            if result is not None:
+                result.skipped += 1
+            continue
+        if result is not None:
+            result.responses += 1
         try:
             payload = json.loads(response['body'])
         except (TypeError, ValueError) as exc:
@@ -63,12 +81,29 @@ def iter_json_responses(
 def iter_body_responses(
     connection: sqlite3.Connection,
     endpoint: str,
+    *,
+    result: RebuildResult | None = None,
+    status_ok_only: bool = False,
 ) -> Iterator[tuple[dict[str, Any], bytes]]:
-    """Yield raw responses with an undecoded body (HTML or text)."""
+    """Yield non-error responses with an undecoded body (HTML or text).
+
+    Parsers that receive non-200 bodies can decide whether 404 means an empty
+    body or another error. Transport errors are always skipped and counted.
+    """
     for response in raw.iter_responses(connection, endpoint=endpoint):
-        if response['body'] is None:
-            raise ProjectionError(endpoint, response['id'], 'missing response body')
+        if _should_skip(response, status_ok_only):
+            if result is not None:
+                result.skipped += 1
+            continue
+        if result is not None:
+            result.responses += 1
         yield response, response['body']
+
+
+def _should_skip(response: dict[str, Any], status_ok_only: bool) -> bool:
+    if response['body'] is None or response.get('error'):
+        return True
+    return status_ok_only and response.get('status_code') != 200
 
 
 def apply_handler(

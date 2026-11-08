@@ -138,6 +138,22 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
+def test_null_page_is_empty():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'zhihu.collection.page',
+        {'paging': {}, 'data': None},
+        request=REQUEST,
+    )
+
+    result = rebuild_platform(connection, 'zhihu')
+
+    assert result.rows == 0
+    assert business_rows(connection, ('zhihu_content',))['zhihu_content'] == []
+    connection.close()
+
+
 def test_missing_collection_id_rolls_back():
     connection = connect(':memory:')
     record_json(

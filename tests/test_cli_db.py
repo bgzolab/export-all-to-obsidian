@@ -8,7 +8,7 @@ from click.testing import CliRunner
 from app.credential_guard import CredentialProbeResult
 from db.connection import connect
 from export_to_obsidian import eto
-from tests.projection_helpers import record_json
+from tests.projection_helpers import record_json, record_missing
 
 BANGUMI_COLLECTION = {
     'subject_id': 1,
@@ -537,6 +537,25 @@ def test_db_rebuild_bangumi(tmp_path):
         ).fetchone()[0]
         == '条目'
     )
+    connection.close()
+
+
+def test_db_rebuild_skips_transport_errors(tmp_path):
+    db_path = tmp_path / 'eto.db'
+    _seed_bangumi_raw(db_path)
+    connection = connect(db_path)
+    record_missing(connection, 'bangumi.subject.characters')
+    connection.close()
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), 'db', 'rebuild', 'bangumi'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '跳过 1 条错误响应' in result.output
+    connection = connect(db_path)
+    assert connection.execute('SELECT count(*) FROM bangumi_subject').fetchone()[0] == 1
     connection.close()
 
 

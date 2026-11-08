@@ -8,10 +8,18 @@ from export_runtime import http
 from v2ex.api_endpoints import V2EX_API_REPLIES
 from v2ex.cilent import V2exClient
 
+# shortcut: 单主题回复分页上限 1000 页，防止接口忽略 p 参数时无限循环；
+# 遇到超长主题再提高或改为按游标终止。
+V2EX_MAX_REPLY_PAGES = 1000
 
-def get_replies_page(topic_id: int, page: int) -> list[dict[str, Any]]:
+
+def get_replies_page(
+    topic_id: int,
+    page: int,
+    client: V2exClient | None = None,
+) -> list[dict[str, Any]]:
     """Fetch one reply page from the V2 API."""
-    client = V2exClient()
+    client = client or V2exClient()
     response = http.get(
         client.session,
         V2EX_API_REPLIES.format(topic_id=topic_id),
@@ -22,16 +30,24 @@ def get_replies_page(topic_id: int, page: int) -> list[dict[str, Any]]:
         response.raise_for_status()
     payload = response.json()
     result = payload.get('result') if isinstance(payload, dict) else None
-    return result if isinstance(result, list) else []
+    if result is None:
+        return []
+    if not isinstance(result, list):
+        raise TypeError('unexpected replies result')
+    return result
 
 
 def fetch_all_replies(topic_id: int) -> int:
     """Fetch every reply page so the raw layer has the full thread."""
+    client = V2exClient()
     page = 1
     total = 0
-    while True:
-        replies = get_replies_page(topic_id, page)
+    while page <= V2EX_MAX_REPLY_PAGES:
+        replies = get_replies_page(topic_id, page, client)
         if not replies:
             return total
         total += len(replies)
         page += 1
+    raise RuntimeError(
+        f'reply page limit {V2EX_MAX_REPLY_PAGES} reached for topic {topic_id}',
+    )

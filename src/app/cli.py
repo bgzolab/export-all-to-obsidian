@@ -321,7 +321,7 @@ def db_rebuild(platform: str) -> None:
         result = rebuild_platform(get_database(), platform)
     except Exception as exc:
         raise click.ClickException(f'投影失败: {exc}') from exc
-    click.echo(f'重建完成: {result.responses} 个响应，{result.rows} 行')
+    click.echo(f'重建完成: {result.summary()}')
 
 
 @eto.command(name='import-markdown')

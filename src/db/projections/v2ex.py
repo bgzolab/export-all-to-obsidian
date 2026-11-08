@@ -35,8 +35,12 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, body in iter_body_responses(connection, FAV_ENDPOINT):
-        result.responses += 1
+    for response, body in iter_body_responses(
+        connection,
+        FAV_ENDPOINT,
+        result=result,
+        status_ok_only=True,
+    ):
         result.rows += apply_handler(
             FAV_ENDPOINT,
             response,
@@ -47,8 +51,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, payload in iter_json_responses(connection, TOPIC_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        TOPIC_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             TOPIC_ENDPOINT,
             response,
@@ -59,8 +66,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, payload in iter_json_responses(connection, REPLIES_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        REPLIES_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             REPLIES_ENDPOINT,
             response,

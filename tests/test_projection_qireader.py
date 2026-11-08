@@ -110,6 +110,17 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
+def test_null_entries_is_empty():
+    connection = connect(':memory:')
+    record_json(connection, 'qireader.readlater.page', {'result': {'entries': None}})
+
+    result = rebuild_platform(connection, 'qireader')
+
+    assert result.rows == 0
+    assert business_rows(connection, ('qireader_entry',))['qireader_entry'] == []
+    connection.close()
+
+
 def test_missing_result_rolls_back():
     connection = connect(':memory:')
     record_json(connection, 'qireader.readlater.page', {'error': 'bad'})

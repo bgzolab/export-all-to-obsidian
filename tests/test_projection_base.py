@@ -133,16 +133,32 @@ def test_unsupported_platform_raises():
     connection.close()
 
 
-def test_missing_body_raises_with_response_id():
+def test_missing_body_is_skipped_and_counted():
     connection = connect(':memory:')
-    response_id = record_missing(connection, 'bangumi.collections.page')
+    record_missing(connection, 'bangumi.collections.page')
 
-    with pytest.raises(ProjectionError) as error:
-        rebuild_platform(connection, 'bangumi')
+    result = rebuild_platform(connection, 'bangumi')
 
-    assert error.value.endpoint == 'bangumi.collections.page'
-    assert error.value.response_id == response_id
-    assert str(response_id) in str(error.value)
+    assert result.responses == 0
+    assert result.rows == 0
+    assert result.skipped == 1
+    assert result.summary() == '0 个响应，0 行，跳过 1 条错误响应'
+    connection.close()
+
+
+def test_non_200_response_is_skipped_and_counted():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'bangumi.collections.page',
+        {'data': []},
+        status_code=500,
+    )
+
+    result = rebuild_platform(connection, 'bangumi')
+
+    assert result.responses == 0
+    assert result.skipped == 1
     connection.close()
 
 

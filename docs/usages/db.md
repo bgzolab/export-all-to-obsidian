@@ -34,10 +34,20 @@ eto [全局参数] db rebuild PLATFORM
 
 1. 在一个事务里删除该平台的全部投影行（子表先删）。
 2. 按固定接口顺序回放 raw 响应并 upsert。
-3. 任何响应缺失、JSON 非法或字段不满足约束时整体回滚，命令非零退出。
+3. 传输错误（无 body 或 `error` 非空）和非 200 响应会被跳过并计数。
+4. 200 响应 JSON 非法或字段不满足约束时整体回滚，命令非零退出。
 
-成功后输出处理的响应数和写入行数。投影表的 `response_id` 指向产生该行最新主数据的
-`sync_response.id`，不是 `sync_run.id`。
+成功后输出处理的响应数和写入行数；有跳过的错误响应时额外输出“跳过 N 条错误响应”。
+投影表的 `response_id` 指向产生该行最新主数据的 `sync_response.id`，不是 `sync_run.id`。
+
+如果 200 响应本身损坏导致重建回滚，可先定位出问题的 raw 行：
+
+```shell
+sqlite3 data/eto.db \
+  "SELECT id, endpoint, status_code, error FROM sync_response WHERE endpoint = 'bangumi.collections.page';"
+```
+
+raw 层默认只增不改；确认该响应确实可以废弃后再手动处理，不要直接清空整个 run。
 
 ## 示例
 

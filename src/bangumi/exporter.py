@@ -106,6 +106,8 @@ def write_subject_markdown(
         return True, '', ''
 
     if is_db_only():
+        # db-only 不写 Markdown，但仍要抓角色列表，projection 的 characters_json
+        # 依赖这条 raw 响应。
         get_output_character_string(subject_id)
         return True, '', ''
 

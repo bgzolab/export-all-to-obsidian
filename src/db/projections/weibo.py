@@ -30,8 +30,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, payload in iter_json_responses(connection, LIKES_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        LIKES_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             LIKES_ENDPOINT,
             response,
@@ -42,8 +45,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, payload in iter_json_responses(connection, LONGTEXT_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        LONGTEXT_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             LONGTEXT_ENDPOINT,
             response,
@@ -106,8 +112,6 @@ def _update_long_text(
     response: dict[str, Any],
     now: str,
 ) -> int:
-    if response.get('status_code') != 200:
-        return 0
     data = payload.get('data') if isinstance(payload, dict) else None
     long_text = data.get('longTextContent') if isinstance(data, dict) else None
     if not isinstance(long_text, str):

@@ -34,8 +34,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, payload in iter_json_responses(connection, COLLECTIONS_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        COLLECTIONS_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             COLLECTIONS_ENDPOINT,
             response,
@@ -46,8 +49,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, payload in iter_json_responses(connection, SUBJECT_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        SUBJECT_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             SUBJECT_ENDPOINT,
             response,
@@ -58,8 +64,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, payload in iter_json_responses(connection, CHARACTERS_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        CHARACTERS_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             CHARACTERS_ENDPOINT,
             response,
@@ -80,7 +89,7 @@ def _upsert_collections(
     now: str,
 ) -> int:
     rows = 0
-    for item in payload['data']:
+    for item in payload['data'] or []:
         values = {
             'collection_id': item.get('id') or None,
             'updated_at': item.get('updated_at'),

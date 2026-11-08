@@ -31,8 +31,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, payload in iter_json_responses(connection, ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             ENDPOINT,
             response,
@@ -54,7 +57,7 @@ def _upsert_page(
 ) -> int:
     collection_id = _collection_id(response)
     rows = 0
-    for item in payload['data']:
+    for item in payload['data'] or []:
         content = item['content']
         content_id = str(content['id'])
         title, body_html = _title_and_body(content)

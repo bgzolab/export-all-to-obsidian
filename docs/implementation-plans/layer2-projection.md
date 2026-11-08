@@ -47,10 +47,11 @@
   - 平台级事务：删除投影行 -> 按固定接口顺序回放 -> upsert。
   - `upsert` 更新业务列和 `response_id`；插入写 `db_created_at` / `db_updated_at`，
     更新只刷新 `db_updated_at`。
-  - 任何解析失败回滚并抛出带 endpoint / response id 的异常。
+  - 传输错误和非 200 响应跳过并计数；200 响应解析失败回滚并抛出带 endpoint /
+    response id 的异常。
   - 删除顺序：子表先于父表。
-- Verify: 单元测试覆盖 upsert 插入、更新、旧响应不覆盖新响应、异常回滚、
-  重建两次除 `db_*` 外逐列一致。
+- Verify: 单元测试覆盖 upsert 插入、更新、旧响应不覆盖新响应、200 异常回滚、
+  传输错误/非 200 跳过计数、重建两次除 `db_*` 外逐列一致。
 
 ### T4. Bangumi pilot
 
@@ -120,7 +121,7 @@
   8. `twitter`：点赞时间线。
 - Verify per platform:
   - `rebuild_platform` 两次结果除 `db_*` 外逐列相等。
-  - 缺失/异常 body 回滚。
+  - 200 异常 body 回滚；传输错误/非 200 跳过并计数。
   - 平台时间字段按设计文档 2.3 原样保留。
   - `PYTHONPATH=src pytest tests/test_projection_<platform>.py -q`。
 
@@ -141,6 +142,7 @@
 - 平台时间字段保持原类型：epoch 是 `INTEGER`，字符串是 `TEXT`。
 - `v2ex_reply` 与 `v2ex_topic` 独立入库，可按 `(topic_id, thanks DESC)` 查询热门回复。
 - 日常导出只读投影表，不读 `sync_run` / `sync_response`。
+- 传输错误和非 200 响应不阻塞重建，跳过数量会出现在命令输出里。
 - `--db-only` 只入库：不写 Markdown、不写索引、不要求 `-o` / `-t`。
 - `--db-only` 下 raw 层和投影层都有数据；投影失败时 run 为 `partial`，命令非零退出。
 - v1 不做删除；`response_id` 已写入，供后续完整 run 删除扫描回查。
@@ -170,7 +172,11 @@
   instead of being stored as content.
 - 2026-11-08: T8 completed. Updated design status, `AGENTS.md`, `README.md`,
   `docs/usages/README.md` and per-command pages; added `docs/usages/db.md`.
-  Full suite: 269 passed; `ruff check` and `ruff format --check` pass.
+- 2026-11-08: Review follow-up. Transport errors and non-200 responses are now
+  skipped and counted instead of poisoning rebuilds; JSON non-200 handling moved
+  into the shared iterators; V2EX reply pagination got a page cap and session
+  reuse; empty/null list pages are tolerated; live Bangumi tests skip without
+  `BGM_ACCESS_TOKEN`. Full suite: 274 passed, 2 skipped; ruff passes.
 
 ## Notes
 

@@ -29,8 +29,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, payload in iter_json_responses(connection, READLATER_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        READLATER_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             READLATER_ENDPOINT,
             response,
@@ -41,8 +44,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, payload in iter_json_responses(connection, ARTICLE_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        ARTICLE_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             ARTICLE_ENDPOINT,
             response,
@@ -62,7 +68,7 @@ def _upsert_entries(
     response_id: int,
     now: str,
 ) -> int:
-    entries = payload['result']['entries']
+    entries = payload['result']['entries'] or []
     rows = 0
     for entry in entries:
         rows += upsert(
@@ -94,8 +100,6 @@ def _upsert_article(
     response: dict[str, Any],
     now: str,
 ) -> int:
-    if response.get('status_code') != 200:
-        return 0
     content = payload.get('content')
     if not isinstance(content, str):
         raise TypeError('missing article content')

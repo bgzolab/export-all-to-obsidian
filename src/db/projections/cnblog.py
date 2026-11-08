@@ -32,8 +32,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, payload in iter_json_responses(connection, BOOKMARKS_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        BOOKMARKS_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             BOOKMARKS_ENDPOINT,
             response,
@@ -44,8 +47,12 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, body in iter_body_responses(connection, POST_ENDPOINT):
-        result.responses += 1
+    for response, body in iter_body_responses(
+        connection,
+        POST_ENDPOINT,
+        result=result,
+        status_ok_only=True,
+    ):
         result.rows += apply_handler(
             POST_ENDPOINT,
             response,
@@ -92,8 +99,6 @@ def _upsert_post(
     response: dict[str, Any],
     now: str,
 ) -> int:
-    if response.get('status_code') != 200:
-        return 0
     url = request_payload(response).get('url') or ''
     match = _POST_URL_RE.search(url)
     if match is None:

@@ -113,8 +113,10 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - API responses and imported Markdown are appended to `sync_response`; the database is never
   used as an incremental cursor yet.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
-  raw responses in fixed endpoint order, then commit. Any invalid/missing body rolls back the
-  whole platform. `response_id` points at the producing `sync_response`, not `sync_run`.
+  raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
+  `error` set) and non-200 responses are skipped and counted; a 200 body that cannot parse
+  or violates constraints rolls back the whole platform. `response_id` points at the
+  producing `sync_response`, not `sync_run`.
 - Projection failures under `--db-only` mark the run `partial` and exit non-zero; raw data
   remains available for `eto db rebuild <platform>`.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls

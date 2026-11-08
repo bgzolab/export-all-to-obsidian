@@ -35,8 +35,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     reset_tables(connection, DELETE_ORDER)
     result = RebuildResult()
 
-    for response, payload in iter_json_responses(connection, STARS_ENDPOINT):
-        result.responses += 1
+    for response, payload in iter_json_responses(
+        connection,
+        STARS_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             STARS_ENDPOINT,
             response,
@@ -47,8 +50,11 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
-    for response, body in iter_body_responses(connection, README_ENDPOINT):
-        result.responses += 1
+    for response, body in iter_body_responses(
+        connection,
+        README_ENDPOINT,
+        result=result,
+    ):
         result.rows += apply_handler(
             README_ENDPOINT,
             response,
@@ -69,7 +75,7 @@ def _upsert_stars(
     now: str,
 ) -> int:
     rows = 0
-    for item in payload:
+    for item in payload or []:
         repo = item.get('repo') or item
         owner = repo.get('owner') or {}
         license_data = repo.get('license') or {}
