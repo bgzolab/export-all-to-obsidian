@@ -766,9 +766,63 @@ WHERE <natural key> = ?;
 - 不静默跳过单条坏响应；否则会得到“看起来完整”的投影。
 - 命令输出失败接口、`sync_response.id` 和原因。
 
-## 5. 删除与多账号
+## 5. CLI 运行模式
 
-### 5.1 删除
+### 5.1 `--db-only`（第二层）
+
+顶层 flag，和 `--db` / `--cookies-file` 一样放在子命令前：
+
+```shell
+eto --db-only bangumi -s 2 -c 3
+eto --db-only github
+eto --db-only v2ex
+```
+
+行为：
+
+- 照常请求 API，照常写 `sync_run` / `sync_response`。
+- 跳过 Markdown 输出：不要求 `-o`，不要求 `-t`，不写文件，不写索引，不创建输出目录。
+- 跳过 `stop_if_output_exists` 的“文件已存在就提前结束”；db-only 必须抓完整列表。
+- 抓取结束后调用 `rebuild_platform`，把该平台 raw 投影到第二层。
+- 平台还没有投影解析器时：raw 照常入库，打印“projection not implemented”，退出 0。
+- 投影失败：标记当前 run 为 `partial`，命令返回非零；raw 已保存，可重新执行
+  `eto db rebuild <platform>`。
+- `--force`、`--prefix` 在 db-only 下无意义，忽略；`--index-file` 与 `--db-only`
+  同时出现直接报错。
+- `--max-pages` 等抓取范围参数仍然有效。
+
+CLI 契约：
+
+- `-o` / `-t` 改为可选；非 db-only 时仍必须提供，缺失时报 `UsageError`。
+- `--db-only` 放在子命令前，和现有全局选项一致。
+- `import-markdown` 本来就是只入库，忽略该 flag。
+
+实现约束：
+
+- 输出抑制集中在 `export_runtime.exporter_support`：`stop_if_output_exists` 返回 False，
+  `write_markdown_output` / `write_raw_markdown_output` / `add_index_entry` 直接返回。
+- `IndexWriter` 增加 `enabled` 开关，`flush` 在 db-only 下不写文件、不打印空索引。
+- 不要在 9 个 exporter 里复制 `if db_only` 分支。
+- 两个例外必须单独处理：
+  - `bangumi/exporter.py` 的 `write_subject_markdown` 自己写文件、自己检查文件是否存在、
+    自己读模板；db-only 下要跳过模板读取、文件存在检查和最终写入。
+  - `github/exporter.py` 启动时读模板；db-only 下不能要求模板存在，`-t` 可以为空。
+- 其余平台通过共享输出函数拦截即可。
+- 投影在 `sync_run` 内、抓取完成后执行；失败调用 `mark_run_partial()`，命令非零退出。
+
+### 5.2 `--output-only`（第三层预留）
+
+第三层引入：
+
+- 不请求 API，不写 `sync_run` / `sync_response`。
+- 只读投影表，渲染 Markdown。
+- 与 `--db-only` 互斥；两者都不传时保持当前“抓取 + 导出”行为。
+
+本层只实现 `--db-only`，`--output-only` 只保留语义，不写代码。
+
+## 6. 删除与多账号
+
+### 6.1 删除
 
 v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即可：
 
@@ -780,7 +834,7 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 5. 删除范围由 `sync_run.scope` 决定，例如 Bangumi 的
    `<subject_type>:<collection_type>`。
 
-### 5.2 多账号
+### 6.2 多账号
 
 当前主键不带账号维度。以后需要多账号时，统一迁移：
 
@@ -790,7 +844,7 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 
 不在 v1 预留空列，避免每张表多一列无用数据。
 
-## 6. 迁移与实现顺序
+## 7. 迁移与实现顺序
 
 1. `002_projection_layer.sql`：一次创建 17 张表、索引，全部使用 `STRICT`。
 2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言到 2；增加建表、JSON 约束、
@@ -802,7 +856,7 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 
 分层理由：表结构先固定，解析器逐个交付，避免九个平台的解析逻辑同时半成品。
 
-## 7. 风险与待确认
+## 8. 风险与待确认
 
 - 宽表会随上游 API 增加字段而需要迁移；改解析器 + 全量重建是回填路径。
 - `STRICT` 和 JSON1 要求 SQLite >= 3.37；当前 3.45.1，Python 3.12 环境满足。
