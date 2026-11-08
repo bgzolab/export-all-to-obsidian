@@ -142,6 +142,7 @@ def test_invalid_post_url_is_skipped():
 
     result = rebuild_platform(connection, 'cnblog')
 
+    assert result.responses == 1
     assert result.skipped == 1
     assert len(business_rows(connection, ('cnblog_bookmark',))['cnblog_bookmark']) == 2
     assert business_rows(connection, ('cnblog_post',))['cnblog_post'] == []
