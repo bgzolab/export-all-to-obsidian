@@ -196,7 +196,11 @@
   documented how a recorded signin page blocks rebuild.
 - 2026-11-08: Seventh review follow-up. V2EX topic responses with a null result
   are now marked partial and skipped instead of raising outside the item loop.
-  Full suite: 289 passed, 2 skipped; ruff passes.
+- 2026-11-08: Eighth review follow-up. GitHub README updates require a unique
+  `full_name` match; `RebuildResult.aux_missed` surfaces auxiliary misses in the
+  summary; Weibo/Bilibili treat null `data` as an empty page; V2EX per-topic write
+  errors mark partial and continue; replies without an id are skipped. Full suite:
+  290 passed, 2 skipped; ruff passes.
 
 ## Notes
 

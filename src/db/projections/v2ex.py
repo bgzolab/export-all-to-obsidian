@@ -83,6 +83,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 payload,
                 response,
                 now,
+                result,
             )
         except SkipResponse as exc:
             skip_response(result, REPLIES_ENDPOINT, response, str(exc))
@@ -149,6 +150,7 @@ def _upsert_replies(
     payload: dict[str, Any],
     response: dict[str, Any],
     now: str,
+    result: RebuildResult,
 ) -> int:
     topic_id = _replies_topic_id(response)
     replies = payload.get('result')
@@ -156,6 +158,9 @@ def _upsert_replies(
         raise SkipResponse('missing result list')
     rows = 0
     for reply in replies:
+        if not isinstance(reply, dict) or 'id' not in reply:
+            skip_response(result, REPLIES_ENDPOINT, response, 'reply missing id')
+            continue
         rows += upsert(
             connection,
             'v2ex_reply',

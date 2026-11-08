@@ -118,6 +118,8 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   invalid 200 JSON or missing auxiliary fields. A main-entity 200 body that cannot parse or
   violates constraints rolls back the whole platform. `response_id` points at the producing
   `sync_response`, not `sync_run`.
+- Auxiliary data that misses or ambiguously matches its main row is skipped and counted in
+  `RebuildResult.aux_missed`; the rebuild summary prints the count.
 - Projection failures under `--db-only` mark the run `partial` and exit non-zero; raw data
   remains available for `eto db rebuild <platform>`.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls

@@ -36,45 +36,45 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 topic = result.result
                 if is_db_only() and topic.replies:
                     fetch_all_replies(topic_id)
+                filename = get_clean_filename(f'{topic_id}-{topic.title}')
+                if stop_if_output_exists(
+                    output_dir,
+                    filename,
+                    index_writer=index_writer,
+                    section_name='v2ex',
+                ):
+                    return
+                created_time = datetime.fromtimestamp(topic.created).strftime(
+                    '%Y-%m-%dT%H:%M:%S%z',
+                )
+                modified_time = datetime.fromtimestamp(topic.last_modified).strftime(
+                    '%Y-%m-%dT%H:%M:%S%z',
+                )
+                webpage = WebPage(
+                    comments=True,
+                    draft=True,
+                    title=topic.title,
+                    source=topic.url,
+                    created=created_time,
+                    modified=modified_time,
+                    type='archive-web',
+                )
+                write_markdown_output(
+                    output_dir,
+                    filename,
+                    webpage.__dict__,
+                    topic.content,
+                )
+
+                print(f'Done: {topic.title}')
+                add_index_entry(
+                    index_writer,
+                    link_target=build_link_target(filename),
+                    title=topic.title,
+                )
             except Exception as exc:
-                # 重试耗尽后仍失败则跳过该条目，避免单条故障中断整批同步
+                # 单条主题失败只跳过该条，抓取、写文件和索引异常都不中断整批同步
                 mark_run_partial()
                 print(f'Skip v2ex topic {topic_id}: {exc}')
                 continue
-            filename = get_clean_filename(f'{topic_id}-{topic.title}')
-            if stop_if_output_exists(
-                output_dir,
-                filename,
-                index_writer=index_writer,
-                section_name='v2ex',
-            ):
-                return
-            created_time = datetime.fromtimestamp(topic.created).strftime(
-                '%Y-%m-%dT%H:%M:%S%z',
-            )
-            modified_time = datetime.fromtimestamp(topic.last_modified).strftime(
-                '%Y-%m-%dT%H:%M:%S%z',
-            )
-            webpage = WebPage(
-                comments=True,
-                draft=True,
-                title=topic.title,
-                source=topic.url,
-                created=created_time,
-                modified=modified_time,
-                type='archive-web',
-            )
-            write_markdown_output(
-                output_dir,
-                filename,
-                webpage.__dict__,
-                topic.content,
-            )
-
-            print(f'Done: {topic.title}')
-            add_index_entry(
-                index_writer,
-                link_target=build_link_target(filename),
-                title=topic.title,
-            )
     index_writer.flush('v2ex', '导出完成index')

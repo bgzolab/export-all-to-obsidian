@@ -131,6 +131,25 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
+def test_null_data_is_empty():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'bilibili.favlist.page',
+        {'code': 0, 'message': '', 'ttl': 1, 'data': None},
+    )
+
+    result = rebuild_platform(connection, 'bilibili')
+
+    assert result.rows == 0
+    assert business_rows(connection, TABLES) == {
+        'bilibili_fav_item': [],
+        'bilibili_media': [],
+        'bilibili_fav': [],
+    }
+    connection.close()
+
+
 def test_business_error_rolls_back():
     connection = connect(':memory:')
     record_json(connection, 'bilibili.favlist.page', _page())

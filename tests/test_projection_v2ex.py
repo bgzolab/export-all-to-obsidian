@@ -197,6 +197,29 @@ def test_invalid_reply_json_is_skipped():
     connection.close()
 
 
+def test_reply_item_without_id_is_skipped():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'v2ex.topic.replies.page',
+        {
+            'success': True,
+            'result': [
+                {'content': 'missing id'},
+                {'id': 11, 'content': 'valid', 'created': 1},
+            ],
+        },
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1/replies'},
+    )
+
+    result = rebuild_platform(connection, 'v2ex')
+
+    assert result.skipped == 1
+    replies = business_rows(connection, ('v2ex_reply',))['v2ex_reply']
+    assert [row['reply_id'] for row in replies] == [11]
+    connection.close()
+
+
 def test_rebuild_is_idempotent():
     connection = connect(':memory:')
     _seed(connection)

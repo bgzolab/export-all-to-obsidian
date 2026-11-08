@@ -100,9 +100,21 @@ def test_long_text_post_without_mblogid_is_reported(capsys):
     post = dict(POST, mblogid=None)
     record_json(connection, 'weibo.likes.page', _likes([post]))
 
-    rebuild_platform(connection, 'weibo')
+    result = rebuild_platform(connection, 'weibo')
 
+    assert result.aux_missed == 1
     assert '长文缺少 mblogid' in capsys.readouterr().out
+    connection.close()
+
+
+def test_null_data_is_empty():
+    connection = connect(':memory:')
+    record_json(connection, 'weibo.likes.page', {'ok': 1, 'data': None})
+
+    result = rebuild_platform(connection, 'weibo')
+
+    assert result.rows == 0
+    assert business_rows(connection, TABLES) == {'weibo_post': []}
     connection.close()
 
 
@@ -121,6 +133,7 @@ def test_long_text_without_post_is_reported(capsys):
     result = rebuild_platform(connection, 'weibo')
 
     assert result.rows == 0
+    assert result.aux_missed == 1
     assert '辅助数据未命中主行' in capsys.readouterr().out
     connection.close()
 

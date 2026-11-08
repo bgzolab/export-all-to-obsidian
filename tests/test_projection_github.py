@@ -157,7 +157,33 @@ def test_readme_without_star_is_reported(capsys):
     result = rebuild_platform(connection, 'github')
 
     assert result.rows == 0
-    assert '辅助数据未命中主行' in capsys.readouterr().out
+    assert result.aux_missed == 1
+    assert '辅助数据未命中' in capsys.readouterr().out
+    connection.close()
+
+
+def test_ambiguous_readme_is_not_written(capsys):
+    connection = connect(':memory:')
+    first = json.loads(json.dumps(STAR))
+    first['repo']['id'] = 123
+    first['repo']['full_name'] = 'octocat/foo'
+    second = json.loads(json.dumps(STAR))
+    second['repo']['id'] = 456
+    second['repo']['full_name'] = 'octocat/foo'
+    record_json(connection, 'github.stars.list', [first, second])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/foo/readme'},
+    )
+
+    result = rebuild_platform(connection, 'github')
+
+    readmes = connection.execute('SELECT readme FROM github_star').fetchall()
+    assert [row[0] for row in readmes] == ['', '']
+    assert result.aux_missed == 1
+    assert '歧义' in capsys.readouterr().out
     connection.close()
 
 

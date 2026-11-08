@@ -66,6 +66,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 body,
                 response,
                 now,
+                result,
             )
         except SkipResponse as exc:
             skip_response(result, README_ENDPOINT, response, str(exc))
@@ -121,6 +122,7 @@ def _update_readme(
     body: bytes,
     response: dict[str, Any],
     now: str,
+    result: RebuildResult,
 ) -> int:
     url = request_payload(response).get('url') or ''
     match = _README_URL_RE.search(url)
@@ -134,18 +136,26 @@ def _update_readme(
         readme = _decode_readme(body)
     else:
         raise SkipResponse(f'unexpected HTTP {status_code}')
-    rows = update_aux(
+    matches = connection.execute(
+        'SELECT repo_id FROM github_star WHERE full_name = ?',
+        (full_name,),
+    ).fetchall()
+    if len(matches) != 1:
+        result.aux_missed += 1
+        print(
+            '辅助数据未命中或存在歧义: '
+            f'github_star full_name={full_name} matches={len(matches)}',
+        )
+        return 0
+    return update_aux(
         connection,
         'github_star',
-        {'full_name': full_name},
+        {'repo_id': matches[0]['repo_id']},
         {'readme': readme},
         'readme_response_id',
         response['id'],
         now,
     )
-    if rows == 0:
-        print(f'辅助数据未命中主行: github_star full_name={full_name}')
-    return rows
 
 
 def _decode_readme(body: bytes) -> str:

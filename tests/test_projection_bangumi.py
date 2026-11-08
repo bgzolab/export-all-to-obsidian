@@ -242,6 +242,8 @@ def test_characters_without_subject_are_reported(capsys):
     result = rebuild_platform(connection, 'bangumi')
 
     assert result.rows == 0
+    assert result.aux_missed == 1
+    assert '辅助未命中 1 条' in result.summary()
     assert '辅助数据未命中主行' in capsys.readouterr().out
     connection.close()
 

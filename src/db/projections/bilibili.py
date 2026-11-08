@@ -54,9 +54,13 @@ def _upsert_page(
         raise ValueError(
             f'code={payload.get("code")} message={payload.get("message")}',
         )
-    data = payload.get('data')
-    if not data:
+    if 'data' not in payload:
         raise ValueError('missing data')
+    data = payload['data']
+    if data is None:
+        return 0
+    if not isinstance(data, dict):
+        raise TypeError('invalid data')
     info = data.get('info')
     if not info:
         raise ValueError('missing data.info')

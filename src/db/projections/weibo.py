@@ -45,6 +45,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             payload,
             response['id'],
             now,
+            result,
         )
 
     for response, payload in iter_json_responses(
@@ -62,6 +63,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 payload,
                 response,
                 now,
+                result,
             )
         except SkipResponse as exc:
             skip_response(result, LONGTEXT_ENDPOINT, response, str(exc))
@@ -74,16 +76,22 @@ def _upsert_posts(
     payload: dict[str, Any],
     response_id: int,
     now: str,
+    result: RebuildResult,
 ) -> int:
     if payload.get('ok') != 1:
         raise ValueError(f'ok={payload.get("ok")}')
-    data = payload.get('data')
-    if not data:
+    if 'data' not in payload:
         raise ValueError('missing data')
+    data = payload['data']
+    if data is None:
+        return 0
+    if not isinstance(data, dict):
+        raise TypeError('invalid data')
 
     rows = 0
     for item in data.get('list') or []:
         if item.get('isLongText') and not item.get('mblogid'):
+            result.aux_missed += 1
             print(f'长文缺少 mblogid: weibo_post post_id={item["idstr"]}')
         rows += upsert(
             connection,
@@ -119,6 +127,7 @@ def _update_long_text(
     payload: dict[str, Any],
     response: dict[str, Any],
     now: str,
+    result: RebuildResult,
 ) -> int:
     data = payload.get('data') if isinstance(payload, dict) else None
     long_text = data.get('longTextContent') if isinstance(data, dict) else None
@@ -139,5 +148,6 @@ def _update_long_text(
         now,
     )
     if rows == 0:
+        result.aux_missed += 1
         print(f'辅助数据未命中主行: weibo_post mblogid={mblogid}')
     return rows

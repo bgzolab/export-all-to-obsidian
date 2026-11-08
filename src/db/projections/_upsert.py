@@ -38,11 +38,14 @@ class RebuildResult:
     responses: int = 0
     rows: int = 0
     skipped: int = 0
+    aux_missed: int = 0
 
     def summary(self) -> str:
         message = f'{self.responses} 个响应，{self.rows} 行'
         if self.skipped:
             message += f'，跳过 {self.skipped} 条错误响应'
+        if self.aux_missed:
+            message += f'，辅助未命中 {self.aux_missed} 条'
         return message
 
 

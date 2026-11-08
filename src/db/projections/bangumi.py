@@ -81,6 +81,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 payload,
                 response,
                 now,
+                result,
             )
         except SkipResponse as exc:
             skip_response(result, CHARACTERS_ENDPOINT, response, str(exc))
@@ -162,6 +163,7 @@ def _update_characters(
     payload: Any,
     response: dict[str, Any],
     now: str,
+    result: RebuildResult,
 ) -> int:
     url = request_payload(response).get('url') or ''
     match = _CHARACTERS_SUBJECT_RE.search(url)
@@ -178,5 +180,6 @@ def _update_characters(
         now,
     )
     if rows == 0:
+        result.aux_missed += 1
         print(f'辅助数据未命中主行: bangumi_subject subject_id={subject_id}')
     return rows
