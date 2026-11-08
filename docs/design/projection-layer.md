@@ -119,6 +119,7 @@ db_updated_at TEXT NOT NULL
 | `qireader_article` | 无 |
 | `twitter_tweet` | `created_at` |
 | `v2ex_topic` | `created`, `last_modified`, `last_touched` |
+| `v2ex_reply` | `created`, `last_modified`（接口提供时） |
 | `v2ex_favorite` | 无 |
 | `weibo_post` | `created_at` |
 | `zhihu_content` | `created_time`, `updated_time` |
@@ -134,7 +135,7 @@ db_updated_at TEXT NOT NULL
 
 ## 3. 平台表
 
-迁移 `002_projection_layer.sql` 一次建好下列 16 张表和索引。解析器按平台逐步实现，
+迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引。解析器按平台逐步实现，
 未实现的平台表保持为空。
 
 ### 3.1 Bangumi（pilot）
@@ -514,6 +515,7 @@ CREATE INDEX idx_twitter_tweet_created_at
 
 - `v2ex.fav.page` -> `v2ex_favorite`
 - `v2ex.topic.detail` -> `v2ex_topic`
+- `v2ex.topic.replies.page` -> `v2ex_reply`
 
 说明：
 
@@ -522,6 +524,19 @@ CREATE INDEX idx_twitter_tweet_created_at
   抓取失败，外键会让合法收藏无法入库。
 - 平台时间 `created`、`last_modified`、`last_touched` 全部保留。
 - `member_json` / `node_json` / `supplements_json` 保存嵌套结构。
+- 回复用独立的分页接口 `GET /api/v2/topics/{topic_id}/replies?p=N`（每页 20 条），
+  全部页都抓，全部入库；后续按 `v2ex_reply.thanks` 排序取“热门回复”。
+- V2 回复文档未明确列出 `thanks`。解析器有就写入，没有就保留默认 0；如果实测确认没有，
+  又必须严格按感谢数排序，则改用 V1 `/api/replies/show.json?topic_id=` 或在后续补字段。
+
+#### 为什么回复单独一张表
+
+1. 一条主题对多条回复，回复有自己的 id、作者、正文、创建时间和感谢数。
+2. 把回复塞进主题行的 JSON 数组，无法按 `thanks` 排序/筛选，也无法单独 upsert 某条回复。
+3. 回复走独立分页接口，有独立 `response_id` 和失败边界；主题详情失败不影响已抓到的回复入库。
+4. 先全量入库，再按 `thanks` 取热门；只存热门会丢数据，无法重算。
+
+V2EX 因此是 3 张表，仍在“每平台 1-3 张表”的预算内。
 
 ```sql
 CREATE TABLE v2ex_topic (
@@ -545,6 +560,26 @@ CREATE TABLE v2ex_topic (
 
 CREATE INDEX idx_v2ex_topic_last_touched
     ON v2ex_topic(last_touched);
+
+CREATE TABLE v2ex_reply (
+    reply_id INTEGER PRIMARY KEY,
+    topic_id INTEGER NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    content_rendered TEXT NOT NULL DEFAULT '',
+    thanks INTEGER NOT NULL DEFAULT 0,
+    created INTEGER NOT NULL DEFAULT 0,
+    last_modified INTEGER NOT NULL DEFAULT 0,
+    member_json TEXT CHECK (json_valid(member_json)),
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
+) STRICT;
+
+CREATE INDEX idx_v2ex_reply_topic_thanks
+    ON v2ex_reply(topic_id, thanks DESC);
+
+CREATE INDEX idx_v2ex_reply_created
+    ON v2ex_reply(created);
 
 CREATE TABLE v2ex_favorite (
     topic_id INTEGER PRIMARY KEY,
@@ -688,7 +723,7 @@ rebuild_platform(conn, platform):
 | github | `github.stars.list` -> `github.repo.readme` |
 | qireader | `qireader.readlater.page` -> `qireader.article` |
 | twitter | `twitter.likes.page` |
-| v2ex | `v2ex.fav.page` -> `v2ex.topic.detail` |
+| v2ex | `v2ex.fav.page` -> `v2ex.topic.detail` -> `v2ex.topic.replies.page` |
 | weibo | `weibo.likes.page` -> `weibo.longtext` |
 | zhihu | `zhihu.collection.page` |
 
@@ -757,7 +792,7 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 
 ## 6. 迁移与实现顺序
 
-1. `002_projection_layer.sql`：一次创建 16 张表、索引，全部使用 `STRICT`。
+1. `002_projection_layer.sql`：一次创建 17 张表、索引，全部使用 `STRICT`。
 2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言到 2；增加建表、JSON 约束、
    外键约束测试。
 3. pilot：Bangumi 解析器 + `rebuild_platform` + 幂等测试。
