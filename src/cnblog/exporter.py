@@ -24,45 +24,50 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
         if not bookmarks:
             break
         for bookmark in bookmarks:
-            filename = get_clean_filename(bookmark.Title)
-            if stop_if_output_exists(
-                output_dir,
-                filename,
-                index_writer=index_writer,
-                section_name='cnblog',
-                flush_title=None,
-                message='已存在，提前结束: {filename}.md',
-            ):
-                return
-            if bookmark.FromCNBlogs:
-                webpage = WebPage(
-                    comments=True,
-                    draft=True,
-                    title=bookmark.Title,
-                    source=bookmark.LinkUrl,
-                    created=bookmark.DateAdded,
-                    modified=bookmark.DateAdded,
-                    type='archive-web',
-                )
-
-                body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
-                if not body:
-                    mark_run_partial()
-
-                write_markdown_output(
+            try:
+                filename = get_clean_filename(bookmark.Title)
+                if stop_if_output_exists(
                     output_dir,
                     filename,
-                    webpage.__dict__,
-                    html_to_markdown_with_bs(body),
-                )
+                    index_writer=index_writer,
+                    section_name='cnblog',
+                    flush_title=None,
+                    message='已存在，提前结束: {filename}.md',
+                ):
+                    return
+                if bookmark.FromCNBlogs:
+                    webpage = WebPage(
+                        comments=True,
+                        draft=True,
+                        title=bookmark.Title,
+                        source=bookmark.LinkUrl,
+                        created=bookmark.DateAdded,
+                        modified=bookmark.DateAdded,
+                        type='archive-web',
+                    )
 
-                print(f'Done: {bookmark.Title}')
-            else:
-                print(f'Skip: {bookmark.Title}')
-            add_index_entry(
-                index_writer,
-                link_target=build_link_target(filename),
-                title=bookmark.Title,
-            )
+                    body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
+                    if not body:
+                        mark_run_partial()
+
+                    write_markdown_output(
+                        output_dir,
+                        filename,
+                        webpage.__dict__,
+                        html_to_markdown_with_bs(body),
+                    )
+
+                    print(f'Done: {bookmark.Title}')
+                else:
+                    print(f'Skip: {bookmark.Title}')
+                add_index_entry(
+                    index_writer,
+                    link_target=build_link_target(filename),
+                    title=bookmark.Title,
+                )
+            except Exception as error:
+                mark_run_partial()
+                print(f'Skip cnblog bookmark: {error}')
+                continue
         page_index += 1
     index_writer.flush('cnblog')

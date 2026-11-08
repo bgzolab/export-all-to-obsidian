@@ -122,6 +122,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   `RebuildResult.aux_missed`; the rebuild summary prints the count.
 - Projection failures under `--db-only` mark the run `partial` and exit non-zero; raw data
   remains available for `eto db rebuild <platform>`.
+- Per-item failures in exporters are isolated: the item is skipped, the run is marked
+  `partial`, and the batch continues. This applies to zhihu/cnblog/qireader as well as the
+  platforms that already had item-level guards.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls
   the filename prefix (default `~`).
 - Index file is grouped by module: module is `##`, entries are appended under that section.

@@ -203,8 +203,11 @@
 - 2026-11-08: Ninth review follow-up. Handler-skipped responses no longer remain
   in the `responses` count; db-only Bangumi character capture has a regression
   test; main-entry error messages clarify invalid payload shapes; remaining
-  exporter pagination caps are recorded as follow-up risk. Full suite: 295 passed,
-  2 skipped; ruff passes.
+  exporter pagination caps are recorded as follow-up risk.
+- 2026-11-08: Tenth review follow-up. zhihu/cnblog/qireader exporters isolate
+  per-item failures and mark partial; zhihu list-content parsing matches the
+  projection parser; Weibo items without `idstr` are skipped. Full suite: 296
+  passed, 2 skipped; ruff passes.
 
 ## Notes
 

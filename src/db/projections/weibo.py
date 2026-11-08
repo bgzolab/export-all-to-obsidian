@@ -90,13 +90,18 @@ def _upsert_posts(
 
     rows = 0
     for item in data.get('list') or []:
+        post_id = item.get('idstr')
+        if not post_id:
+            result.skipped += 1
+            print('投影跳过无效条目: weibo.likes.page post_id=<unknown>')
+            continue
         if item.get('isLongText') and not item.get('mblogid'):
             result.aux_missed += 1
-            print(f'长文缺少 mblogid: weibo_post post_id={item["idstr"]}')
+            print(f'长文缺少 mblogid: weibo_post post_id={post_id}')
         rows += upsert(
             connection,
             'weibo_post',
-            {'post_id': item['idstr']},
+            {'post_id': post_id},
             {
                 'numeric_id': item.get('id'),
                 'mid': item.get('mid') or '',

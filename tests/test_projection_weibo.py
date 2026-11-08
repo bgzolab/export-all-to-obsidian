@@ -88,6 +88,7 @@ def test_missing_long_text_is_skipped():
 
     result = rebuild_platform(connection, 'weibo')
 
+    assert result.responses == 1
     assert result.skipped == 1
     row = connection.execute('SELECT * FROM weibo_post').fetchone()
     assert row['long_text'] is None
@@ -104,6 +105,19 @@ def test_long_text_post_without_mblogid_is_reported(capsys):
 
     assert result.aux_missed == 1
     assert '长文缺少 mblogid' in capsys.readouterr().out
+    connection.close()
+
+
+def test_post_without_idstr_is_skipped():
+    connection = connect(':memory:')
+    post = dict(POST)
+    post.pop('idstr')
+    record_json(connection, 'weibo.likes.page', _likes([post]))
+
+    result = rebuild_platform(connection, 'weibo')
+
+    assert result.skipped == 1
+    assert business_rows(connection, TABLES) == {'weibo_post': []}
     connection.close()
 
 
