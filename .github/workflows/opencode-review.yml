@@ -76,12 +76,23 @@ jobs:
           mkdir -p "$RUNNER_TEMP/review"
           for name in configure-opencode-permissions.sh install_opencode.sh \
                       opencode_review_turn.sh review_verdict.sh; do
-            if content=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github/scripts/${name}?ref=${BASE_SHA}" --jq '.content' 2>/dev/null) \
-               && [ -n "${content}" ]; then
+            err="$RUNNER_TEMP/review/${name}.err"
+            if json=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github/scripts/${name}?ref=${BASE_SHA}" 2>"$err"); then
+              content=$(jq -r 'select(.type == "file") | .content // empty' <<<"$json")
+              if [ -z "${content}" ]; then
+                echo "::error::基线里的 ${name} 不是文件或缺少内容" >&2
+                exit 1
+              fi
               printf '%s' "${content}" | base64 -d > "$RUNNER_TEMP/review/${name}"
-            else
+            elif grep -q 'HTTP 404' "$err"; then
+              # 只有「基线里还没有这个脚本」才回退；其它 API 错误必须暴露出来，
+              # 否则一次限流就会静默退回被审查分支的副本
               echo "::warning::${name} 不在基线 ${BASE_SHA} 中，暂时使用工作区副本" >&2
               cp ".github/scripts/${name}" "$RUNNER_TEMP/review/${name}"
+            else
+              cat "$err" >&2
+              echo "::error::无法从基线 ${BASE_SHA} 获取 ${name}" >&2
+              exit 1
             fi
           done
       # deny 规则与只读 agent（default_agent=ci-readonly）由脚本统一写入全局配置

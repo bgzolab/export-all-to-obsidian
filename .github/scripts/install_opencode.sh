@@ -10,6 +10,13 @@
 set -euo pipefail
 
 version="${1:?usage: install_opencode.sh <version>}"
+# 版本会拼进 npm 包名与元数据 URL，先拒绝不合法字符，避免路径/查询注入
+case "$version" in
+  *[!0-9A-Za-z.-]*)
+    echo "::error::非法版本号: ${version}" >&2
+    exit 1
+    ;;
+esac
 
 case "$(uname -m)" in
   x86_64) arch=x64 ;;
