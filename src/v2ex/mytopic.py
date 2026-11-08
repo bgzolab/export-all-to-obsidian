@@ -20,14 +20,15 @@ from v2ex.html import is_signin_page, parse_fav_topic_ids
 V2EX_MAX_FAV_PAGES = 1000
 
 
-def get_fav_html_with_page(page: int) -> str:
+def get_fav_html_with_page(page: int, client: V2exClient | None = None) -> str:
     """
     获取我的主题页面的HTML内容
 
     :param page: 页码
+    :param client: 可复用的 V2EX 客户端
     :return: HTML内容字符串
     """
-    client = V2exClient()
+    client = client or V2exClient()
     response = http.get(
         client.session,
         V2EX_FAV,
@@ -43,18 +44,22 @@ def get_fav_html_with_page(page: int) -> str:
     return response.text
 
 
-def get_fav_list_topic_id_page(page: int) -> list[int]:
+def get_fav_list_topic_id_page(
+    page: int,
+    client: V2exClient | None = None,
+) -> list[int]:
     """
     获取我的主题页面的主题ID列表
 
     :param page: 页码
+    :param client: 可复用的 V2EX 客户端
     :return: 主题ID列表
     """
     if page > V2EX_MAX_FAV_PAGES:
         raise RuntimeError(
             f'favorite page limit {V2EX_MAX_FAV_PAGES} reached',
         )
-    return parse_fav_topic_ids(get_fav_html_with_page(page))
+    return parse_fav_topic_ids(get_fav_html_with_page(page, client))
 
 
 if __name__ == '__main__':

@@ -190,7 +190,10 @@
   has no `mblogid`.
 - 2026-11-08: Fifth review follow-up. Added a V2EX favorite-page cap; clarified
   that `--max-pages` still applies under `--db-only`; documented the V2EX
-  signin-template limitation and raw-layer accumulation. Full suite: 286 passed,
+  signin-template limitation and raw-layer accumulation.
+- 2026-11-08: Sixth review follow-up. Removed GitHub `full_name` UNIQUE (slug can
+  be inherited) and indexed it instead; V2EX favorite pages now reuse one client;
+  documented how a recorded signin page blocks rebuild. Full suite: 287 passed,
   2 skipped; ruff passes.
 
 ## Notes

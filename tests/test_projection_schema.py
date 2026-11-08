@@ -36,6 +36,7 @@ PROJECTION_INDEXES = {
     'idx_bilibili_fav_item_media',
     'idx_cnblog_bookmark_link_url',
     'idx_github_star_owner',
+    'idx_github_star_full_name',
     'idx_github_star_starred_at',
     'idx_qireader_entry_url',
     'idx_qireader_entry_timestamp',
@@ -190,17 +191,17 @@ def test_natural_key_uniqueness_is_enforced():
     connection = connect(':memory:')
     response_id = _seed_response(connection)
     connection.execute(
-        'INSERT INTO github_star '
-        '(repo_id, full_name, response_id, db_created_at, db_updated_at) '
-        "VALUES (1, 'owner/repo', ?, 'now', 'now')",
+        'INSERT INTO weibo_post '
+        '(post_id, numeric_id, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', 1, ?, 'now', 'now')",
         (response_id,),
     )
 
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
-            'INSERT INTO github_star '
-            '(repo_id, full_name, response_id, db_created_at, db_updated_at) '
-            "VALUES (2, 'owner/repo', ?, 'now', 'now')",
+            'INSERT INTO weibo_post '
+            '(post_id, numeric_id, response_id, db_created_at, db_updated_at) '
+            "VALUES ('2', 1, ?, 'now', 'now')",
             (response_id,),
         )
 

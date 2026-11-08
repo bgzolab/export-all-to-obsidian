@@ -475,7 +475,7 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
     topic_calls = []
     reply_calls = []
 
-    def fake_page(page):
+    def fake_page(page, client=None):
         page_calls.append(page)
         return pages[page]
 
@@ -500,6 +500,7 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
         'app.cli.probe_v2ex_credentials',
         lambda: CredentialProbeResult.valid('v2ex'),
     )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
     monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
     monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
     monkeypatch.setattr(
@@ -591,9 +592,10 @@ def test_v2ex_list_failure_marks_run_failed(monkeypatch, tmp_path):
         lambda: CredentialProbeResult.valid('v2ex'),
     )
 
-    def fail(page):
+    def fail(page, client=None):
         raise RuntimeError('list page failed')
 
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
     monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fail)
 
     result = CliRunner().invoke(

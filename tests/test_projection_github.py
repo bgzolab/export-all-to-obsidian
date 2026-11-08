@@ -98,6 +98,35 @@ def test_repository_rename_updates_the_same_row():
     connection.close()
 
 
+def test_slug_inherited_by_another_repository_does_not_fail():
+    connection = connect(':memory:')
+    old_repo = json.loads(json.dumps(STAR))
+    old_repo['repo']['id'] = 123
+    old_repo['repo']['full_name'] = 'octocat/foo'
+
+    inherited = json.loads(json.dumps(STAR))
+    inherited['repo']['id'] = 456
+    inherited['repo']['full_name'] = 'octocat/foo'
+    inherited['repo']['html_url'] = 'https://github.com/octocat/foo-two'
+
+    renamed = json.loads(json.dumps(STAR))
+    renamed['repo']['id'] = 123
+    renamed['repo']['full_name'] = 'octocat/bar'
+
+    record_json(connection, 'github.stars.list', [old_repo])
+    record_json(connection, 'github.stars.list', [inherited, renamed])
+
+    result = rebuild_platform(connection, 'github')
+
+    rows = business_rows(connection, TABLES)['github_star']
+    assert result.rows == 3
+    assert {(row['repo_id'], row['full_name']) for row in rows} == {
+        (123, 'octocat/bar'),
+        (456, 'octocat/foo'),
+    }
+    connection.close()
+
+
 def test_unexpected_readme_status_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'github.stars.list', [STAR])

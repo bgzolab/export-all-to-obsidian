@@ -145,7 +145,7 @@ CREATE TABLE cnblog_post (
 
 CREATE TABLE github_star (
     repo_id INTEGER PRIMARY KEY,
-    full_name TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
     html_url TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     owner_login TEXT NOT NULL DEFAULT '',
@@ -173,6 +173,9 @@ CREATE TABLE github_star (
 
 CREATE INDEX idx_github_star_owner
     ON github_star(owner_login);
+
+CREATE INDEX idx_github_star_full_name
+    ON github_star(full_name);
 
 CREATE INDEX idx_github_star_starred_at
     ON github_star(starred_at);

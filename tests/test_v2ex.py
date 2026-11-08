@@ -81,6 +81,25 @@ def test_v2ex_client_missing_cookie_raises(monkeypatch, tmp_path):
         V2exClient()
 
 
+def test_fav_list_reuses_provided_client(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        url = 'https://www.v2ex.com/my/topics'
+        text = '<a href="/t/1">topic</a>'
+
+    def fail_client():
+        raise AssertionError('V2exClient should not be created')
+
+    monkeypatch.setattr('v2ex.mytopic.V2exClient', fail_client)
+    monkeypatch.setattr(
+        'v2ex.mytopic.http.get',
+        lambda session, url, *, endpoint, **kwargs: FakeResponse(),
+    )
+
+    client = SimpleNamespace(session=object())
+    assert get_fav_list_topic_id_page(1, client) == [1]
+
+
 def test_fav_page_limit_stops_pagination(monkeypatch):
     monkeypatch.setattr('v2ex.mytopic.V2EX_MAX_FAV_PAGES', 2)
 

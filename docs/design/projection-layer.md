@@ -388,14 +388,15 @@ CREATE TABLE cnblog_post (
 
 - 主键 `repo_id` 取 API 的 `repo.id`。当前 dataclass 没有这个字段，投影解析器直接读
   raw JSON 补上；仓库改名时仍能按 id 更新同一行。
-- `full_name` 唯一，用于展示和文件名。
+- `full_name` 用于展示和文件名；不设唯一约束，因为仓库改名后 slug 可以被新仓库继承。
+  加普通索引供 README 辅助响应按 `full_name` 关联。
 - 平台时间 `created_at`、`updated_at`、`pushed_at`、`starred_at` 全部保留。
 - README 是辅助响应，只更新 `readme` 和 `readme_response_id`，并刷新 `db_updated_at`。
 
 ```sql
 CREATE TABLE github_star (
     repo_id INTEGER PRIMARY KEY,
-    full_name TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
     html_url TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     owner_login TEXT NOT NULL DEFAULT '',
@@ -423,6 +424,9 @@ CREATE TABLE github_star (
 
 CREATE INDEX idx_github_star_owner
     ON github_star(owner_login);
+
+CREATE INDEX idx_github_star_full_name
+    ON github_star(full_name);
 
 CREATE INDEX idx_github_star_starred_at
     ON github_star(starred_at);
@@ -773,7 +777,8 @@ WHERE <natural key> = ?;
   缺少业务字段（如回复列表、正文、长文内容）时跳过并计数；辅助数据不应因为一条坏响应
   阻塞整个平台。
 - V2EX 收藏页返回 signin 表单时视为抓取失败，回滚 `v2ex_favorite`，避免把登录页
-  当成“空收藏”清空读模型。
+  当成“空收藏”清空读模型。已写入 raw 的 signin 行会持续阻塞 rebuild，需要按
+  `docs/usages/db.md` 的坏行处置步骤手动废弃。
 - 列表页的 `data` / `entries` 值为 `null` 时按空页处理；键缺失仍视为响应结构错误并回滚。
   这是有意区分：`null` 是合法的空页，缺键通常意味着上游返回了非预期负载。
 - 不静默跳过单条坏响应：跳过的错误响应数量必须出现在命令输出里。
@@ -882,6 +887,10 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
   raw 层仍保留失败记录，重跑成功后可再次重建补齐。
 - V2EX 投影侧只能依据 signin 表单标记识别登录页；raw 未记录重定向后的最终 URL，
   上游换登录模板时需要同步更新 `is_signin_page`。
+- GitHub README 辅助响应只按 `full_name` 关联；仓库改名后 slug 被新仓库继承时，
+  旧 README 可能更新到当前同名仓库。`repo_id` 是主键，实体本身不会串行。
+- `weibo_post.numeric_id` 使用 SQLite INTEGER；如果微博雪花 id 超出 int64，
+  需要迁移为 TEXT 或跳过该列。
 - raw 层只增不删，长期运行会持续累积；按 run 清理或限制回放窗口属于后续任务，
   不影响当前投影正确性。
 - v1 不删除，取消收藏/取消点赞的旧行会保留到删除策略实现。

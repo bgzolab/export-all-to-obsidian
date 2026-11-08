@@ -12,6 +12,7 @@ from export_runtime.exporter_support import (
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 from utils.template import WebPage
+from v2ex.cilent import V2exClient
 from v2ex.mytopic import get_fav_list_topic_id_page
 from v2ex.replies import fetch_all_replies
 from v2ex.topic import get_v2ex_topic_info
@@ -19,9 +20,10 @@ from v2ex.topic import get_v2ex_topic_info
 
 def export(output_dir: str, index_writer: IndexWriter) -> None:
     """导出 V2EX 收藏主题。"""
+    client = V2exClient()
     page = 1
     while True:
-        id_list = get_fav_list_topic_id_page(page)
+        id_list = get_fav_list_topic_id_page(page, client)
         if not id_list:
             break
         page += 1
