@@ -505,7 +505,7 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
     monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
-        lambda topic_id: reply_calls.append(topic_id),
+        lambda topic_id, client=None: reply_calls.append(topic_id),
     )
 
     result = CliRunner().invoke(

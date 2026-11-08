@@ -39,9 +39,9 @@ def get_replies_page(
     return result
 
 
-def fetch_all_replies(topic_id: int) -> int:
+def fetch_all_replies(topic_id: int, client: V2exClient | None = None) -> int:
     """Fetch every reply page so the raw layer has the full thread."""
-    client = V2exClient()
+    client = client or V2exClient()
     page = 1
     total = 0
     while page <= V2EX_MAX_REPLY_PAGES:

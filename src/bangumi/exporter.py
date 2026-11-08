@@ -61,13 +61,13 @@ def export(
                     print(f'写入失败: {filename}')
                     index_writer.flush('bangumi')
                     return
+                print(f'处理完成={result.subject_id}')
             except Exception as error:
                 mark_run_partial()
                 print(
                     f'跳过:{result.subject.name}, '
                     f'subject_id={result.subject_id}, error={error}',
                 )
-            print(f'处理完成={result.subject_id}')
     index_writer.flush('bangumi')
 
 

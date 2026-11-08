@@ -35,7 +35,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     continue
                 topic = result.result
                 if is_db_only() and topic.replies:
-                    fetch_all_replies(topic_id)
+                    fetch_all_replies(topic_id, client)
                 filename = get_clean_filename(f'{topic_id}-{topic.title}')
                 if stop_if_output_exists(
                     output_dir,

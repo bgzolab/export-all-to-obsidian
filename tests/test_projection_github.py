@@ -140,6 +140,24 @@ def test_unexpected_readme_status_is_skipped():
 
     result = rebuild_platform(connection, 'github')
 
+    assert result.responses == 1
+    assert result.skipped == 1
+    assert connection.execute('SELECT readme FROM github_star').fetchone()[0] == ''
+    connection.close()
+
+
+def test_html_readme_is_skipped():
+    connection = connect(':memory:')
+    record_json(connection, 'github.stars.list', [STAR])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '<!DOCTYPE html><html><body>blocked</body></html>',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
+
+    result = rebuild_platform(connection, 'github')
+
     assert result.skipped == 1
     assert connection.execute('SELECT readme FROM github_star').fetchone()[0] == ''
     connection.close()

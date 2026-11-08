@@ -162,8 +162,17 @@ def _decode_readme(body: bytes) -> str:
     try:
         payload = json.loads(body)
     except (TypeError, ValueError):
-        return body.decode('utf-8', errors='replace')
-    if isinstance(payload, dict) and isinstance(payload.get('content'), str):
-        content = payload['content'].replace('\n', '')
-        return base64.b64decode(content).decode('utf-8', errors='ignore')
-    return body.decode('utf-8', errors='replace')
+        text = body.decode('utf-8', errors='replace')
+        if text.lstrip().lower().startswith(('<!doctype html', '<html')):
+            raise SkipResponse('readme payload is HTML')
+        return text
+    if not isinstance(payload, dict):
+        raise SkipResponse('readme payload is not a JSON object')
+    content = payload.get('content')
+    if not isinstance(content, str):
+        raise SkipResponse('readme JSON missing content')
+    try:
+        decoded = base64.b64decode(content.replace('\n', ''))
+    except ValueError as exc:
+        raise SkipResponse(f'readme base64 decode failed: {exc}') from exc
+    return decoded.decode('utf-8', errors='ignore')

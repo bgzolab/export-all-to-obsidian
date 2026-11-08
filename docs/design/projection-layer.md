@@ -776,6 +776,8 @@ WHERE <natural key> = ?;
 - 辅助接口（README、角色、长文、正文、回复）的 200 非 JSON 响应、或 200 JSON 但
   缺少业务字段（如回复列表、正文、长文内容）时跳过并计数；辅助数据不应因为一条坏响应
   阻塞整个平台。
+- GitHub README 接口允许纯文本正文；HTML 形态视为风控/错误页跳过，JSON 信封缺少
+  `content` 时也跳过，不把错误页写进 `readme`。
 - 辅助数据按自然键关联不唯一或未命中时跳过并计入 `aux_missed`，摘要里输出数量。
   GitHub README 只在 `full_name` 唯一命中时更新，避免 slug 歧义写错仓库。
 - V2EX 收藏页返回 signin 表单时视为抓取失败，回滚 `v2ex_favorite`，避免把登录页

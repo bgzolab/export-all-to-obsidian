@@ -209,7 +209,11 @@
   projection parser; Weibo items without `idstr` are skipped.
 - 2026-11-08: Eleventh review follow-up. Weibo/Bilibili/Twitter item-level
   failures now mark the run partial, matching AGENTS.md; added an auxiliary
-  replay-order invariant test. Full suite: 298 passed, 2 skipped; ruff passes.
+  replay-order invariant test.
+- 2026-11-08: Twelfth review follow-up. GitHub README skips HTML error pages and
+  JSON without `content`; V2EX reply fetching reuses the exporter client; Bangumi
+  no longer prints “处理完成” after a skipped subject. Full suite: 303 passed,
+  2 skipped; ruff passes.
 
 ## Notes
 
