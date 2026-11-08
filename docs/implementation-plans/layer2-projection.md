@@ -106,7 +106,7 @@
 
 ### T7. 其余平台
 
-- Status: Planned
+- Status: In progress
 - 每个平台一个任务、一个解析器文件、一个测试文件；不改表结构。
 - Order:
   1. `bilibili`：`bilibili.favlist.page` -> 3 张表。
@@ -160,6 +160,8 @@
   with runtime validation, centralized output suppression, disabled `IndexWriter`,
   Bangumi/GitHub output exceptions, projection after fetch with partial/failed run
   handling, and `eto db rebuild <platform>`.
+- 2026-11-08: T7 bilibili/github/zhihu parsers completed, with idempotency,
+  multi-membership, README auxiliary and rollback tests.
 
 ## Notes
 

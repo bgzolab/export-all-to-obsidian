@@ -5,11 +5,14 @@ from __future__ import annotations
 import sqlite3
 from types import ModuleType
 
-from db.projections import bangumi
+from db.projections import bangumi, bilibili, github, zhihu
 from db.projections._upsert import ProjectionError, RebuildResult
 
 _PLATFORMS: dict[str, ModuleType] = {
     'bangumi': bangumi,
+    'bilibili': bilibili,
+    'github': github,
+    'zhihu': zhihu,
 }
 
 SUPPORTED_PLATFORMS = tuple(_PLATFORMS)
