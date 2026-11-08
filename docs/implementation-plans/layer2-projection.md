@@ -3,7 +3,7 @@
 - Issue: [#16](https://github.com/bgzolab/export-all-to-obsidian/issues/16)
 - Design: [projection-layer.md](../design/projection-layer.md)
 - Branch: `feature/db-stage-2-projection-layer`
-- Status: Planned
+- Status: In progress
 
 ## Goal
 
@@ -14,7 +14,7 @@
 
 ### T1. 投影层迁移
 
-- Status: Planned
+- Status: Completed
 - Files: `src/db/migrations/002_projection_layer.sql`
 - Work:
   - 创建设计文档第 3 节的 17 张表、索引，全部使用 `STRICT`。
@@ -27,7 +27,7 @@
 
 ### T2. Schema 测试更新
 
-- Status: Planned
+- Status: Completed
 - Files: `tests/test_db_schema.py`, `tests/test_projection_schema.py`
 - Work:
   - 把现有 `user_version == 1` 断言更新到 2。
@@ -144,6 +144,14 @@
 - `--db-only` 只入库：不写 Markdown、不写索引、不要求 `-o` / `-t`。
 - `--db-only` 下 raw 层和投影层都有数据；投影失败时 run 为 `partial`，命令非零退出。
 - v1 不做删除；`response_id` 已写入，供后续完整 run 删除扫描回查。
+
+## Execution records
+
+- 2026-11-08: T1/T2 completed. Added `002_projection_layer.sql` with 17 `STRICT`
+  tables and indexes; updated `user_version` assertions to 2; added
+  `tests/test_projection_schema.py` covering common provenance columns, platform
+  time columns, JSON checks, strict types, natural keys, foreign keys and migration
+  from a layer 1 database.
 
 ## Notes
 
