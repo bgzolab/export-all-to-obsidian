@@ -206,8 +206,10 @@
   exporter pagination caps are recorded as follow-up risk.
 - 2026-11-08: Tenth review follow-up. zhihu/cnblog/qireader exporters isolate
   per-item failures and mark partial; zhihu list-content parsing matches the
-  projection parser; Weibo items without `idstr` are skipped. Full suite: 296
-  passed, 2 skipped; ruff passes.
+  projection parser; Weibo items without `idstr` are skipped.
+- 2026-11-08: Eleventh review follow-up. Weibo/Bilibili/Twitter item-level
+  failures now mark the run partial, matching AGENTS.md; added an auxiliary
+  replay-order invariant test. Full suite: 298 passed, 2 skipped; ruff passes.
 
 ## Notes
 

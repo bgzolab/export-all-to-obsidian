@@ -124,6 +124,45 @@ def test_update_aux_keeps_main_provenance():
     connection.close()
 
 
+def test_update_aux_uses_the_last_response_in_replay_order():
+    connection = connect(':memory:')
+    main = record_json(connection, 'test.main', {})
+    first = record_json(connection, 'test.aux.first', {})
+    second = record_json(connection, 'test.aux.second', {})
+
+    upsert(
+        connection,
+        'github_star',
+        {'repo_id': 1},
+        _star_values('owner/repo', 'repo'),
+        main,
+        '2026-01-01T00:00:00+00:00',
+    )
+    update_aux(
+        connection,
+        'github_star',
+        {'repo_id': 1},
+        {'readme': 'first'},
+        'readme_response_id',
+        first,
+        '2026-01-02T00:00:00+00:00',
+    )
+    update_aux(
+        connection,
+        'github_star',
+        {'repo_id': 1},
+        {'readme': 'second'},
+        'readme_response_id',
+        second,
+        '2026-01-03T00:00:00+00:00',
+    )
+
+    row = connection.execute('SELECT * FROM github_star WHERE repo_id = 1').fetchone()
+    assert row['readme'] == 'second'
+    assert row['readme_response_id'] == second
+    connection.close()
+
+
 def test_unsupported_platform_raises():
     connection = connect(':memory:')
     assert 'bangumi' in SUPPORTED_PLATFORMS

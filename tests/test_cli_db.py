@@ -612,6 +612,102 @@ def test_v2ex_list_failure_marks_run_failed(monkeypatch, tmp_path):
     assert 'RuntimeError: list page failed' in run['error']
 
 
+def test_bilibili_item_error_marks_run_partial(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    media = SimpleNamespace(
+        bvid='BV1',
+        title='Video',
+        pubtime=0,
+        fav_time=0,
+        intro='',
+        upper=None,
+    )
+
+    def fake_favlist(fid, page, size):
+        if page == 1:
+            return SimpleNamespace(data=SimpleNamespace(medias=[media]))
+        return SimpleNamespace(data=SimpleNamespace(medias=[]))
+
+    monkeypatch.setattr(
+        'app.cli.probe_bilibili_credentials',
+        lambda fid: CredentialProbeResult.valid('bilibili'),
+    )
+    monkeypatch.setattr('bilibili.exporter.get_bilibili_favlistd', fake_favlist)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'bilibili', '-f', '1', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_weibo_item_error_marks_run_partial(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    item = SimpleNamespace(
+        mblogid='m1',
+        user=None,
+        text_raw='text',
+        isLongText=False,
+    )
+
+    def fake_like(uid, page_index):
+        if page_index == 1:
+            return SimpleNamespace(ok=1, data=SimpleNamespace(list=[item]))
+        return SimpleNamespace(ok=1, data=SimpleNamespace(list=[]))
+
+    monkeypatch.setattr(
+        'app.cli.probe_weibo_credentials',
+        lambda uid: CredentialProbeResult.valid('weibo'),
+    )
+    monkeypatch.setattr('weibo.exporter.get_weibo_like_list', fake_like)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'weibo', '-u', '1', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_twitter_item_error_marks_run_partial(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    tweet = SimpleNamespace(author=None, id_str='1', full_text='text')
+    page = SimpleNamespace(tweets=[tweet], cursor_bottom=None)
+
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr('twitter.exporter.TwitterClient', lambda: object())
+    monkeypatch.setattr(
+        'twitter.exporter.get_twitter_like_list',
+        lambda *args, **kwargs: page,
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, 'twitter', '-o', str(tmp_path / 'output')],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
 def test_v2ex_write_error_marks_partial_and_continues(monkeypatch, tmp_path):
     db_path = str(tmp_path / 'eto.db')
     pages = {1: [1, 2], 2: []}
