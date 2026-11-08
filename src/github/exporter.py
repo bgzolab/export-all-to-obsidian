@@ -3,6 +3,7 @@
 import re
 from datetime import datetime
 
+from app.context import is_db_only
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -76,8 +77,10 @@ def export(
 ) -> None:
     """导出当前认证用户的 GitHub star 仓库。"""
     resolved_prefix = resolve_output_prefix(prefix)
-    with open(template_path, encoding='utf-8') as file:
-        template_content = file.read()
+    template_content = ''
+    if not is_db_only():
+        with open(template_path, encoding='utf-8') as file:
+            template_content = file.read()
 
     page = 1
     per_page = 100

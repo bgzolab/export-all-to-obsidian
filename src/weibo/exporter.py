@@ -111,6 +111,7 @@ def export(
                 )
 
             except Exception as error:
+                mark_run_partial()
                 print(f'处理报文发生错误: {error}，微博可能已经被删除，跳过处理')
 
         page_index += 1

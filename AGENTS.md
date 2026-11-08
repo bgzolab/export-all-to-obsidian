@@ -29,13 +29,19 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
    sync run is active; `export_runtime.exporter_support` handles output paths, incremental
    pruning, file writes and index appends; `index_writer` prints the index or appends it to
    the index file.
+6. `--db-only` suppresses every Markdown/index write, then calls
+   `db.projections.rebuild_platform` after the fetch inside the same `sync_run`.
+   `eto db rebuild <platform>` runs the same projection without network or output.
 
 ## Constraints
 
 - Only lightweight exporter helpers exist; there is no `BaseExporter`-style abstraction.
 - `bangumi.bangumi` is a historical compatibility import layer.
-- The database is an append-only raw layer (`sync_run` / `sync_response`); there are no
-  normalized cross-platform tables yet.
+- The database has an append-only raw layer (`sync_run` / `sync_response`) plus per-platform
+  projection tables. Projections are rebuilt from raw, never edited in place; there is no
+  normalized cross-platform `item` table.
+- Projection parsers live in `src/db/projections/`; add a platform there and register it in
+  `SUPPORTED_PLATFORMS` before using `--db-only` / `db rebuild` for that platform.
 
 ## Tech stack
 
@@ -73,14 +79,18 @@ ruff format src tests                          # apply formatting
 
 ## CLI contract (gotchas)
 
-- `--index-file`、`--prefix`、`--cookies-file` and `--db` are **top-level options and must
-  come before the subcommand**; when `--index-file` is omitted, the index is printed to the
-  terminal. `--cookies-file` points to a Netscape-format `cookies.txt`; when omitted, the
-  environment variable `COOKIES` (the file path) is used. `--db` defaults to
-  `data/eto.db`; the database file is treated as a credential file.
+- `--index-file`、`--prefix`、`--cookies-file`、`--db` and `--db-only` are **top-level
+  options and must come before the subcommand**; when `--index-file` is omitted, the index
+  is printed to the terminal. `--cookies-file` points to a Netscape-format `cookies.txt`;
+  when omitted, the environment variable `COOKIES` (the file path) is used. `--db` defaults
+  to `data/eto.db`; the database file is treated as a credential file.
+  `--index-file` and `--db-only` are mutually exclusive.
 - Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
   `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
-  `bilibili(-f -o [--force])`, `github(-t -o [--force])`, `import-markdown(<path>)`.
+  `bilibili(-f -o [--force])`, `github(-t -o [--force])`, `import-markdown(<path>)`,
+  `db rebuild(<platform>)`.
+- `-o` is required unless `--db-only`; `-t` is required for bangumi/github unless
+  `--db-only`. Missing values raise `UsageError`.
 - `--force` currently only affects bangumi, github, weibo, bilibili, and twitter.
 
 ## Environment variables (required by module exports)
@@ -98,8 +108,27 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   current sync run immediately — not a remote cursor. When that happens, the active
   `sync_run` is marked `partial`. `partial` means "result is incomplete", including
   `--max-pages` truncation and failure paths.
+- `--db-only` disables that pruning; explicit limits such as `--max-pages` still apply. It
+  writes no Markdown and no index, and does not require `-o` / `-t`.
 - API responses and imported Markdown are appended to `sync_response`; the database is never
   used as an incremental cursor yet.
+- Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
+  raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
+  `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip
+  invalid 200 JSON or missing auxiliary fields. Main-entity business-level no-data payloads
+  (`result: null`, errors-only, `ok != 1`) are skipped and counted; a main-entity 200 body
+  that cannot parse or violates constraints rolls back the whole platform. `response_id`
+  points at the producing `sync_response`, not `sync_run`.
+- Main-entity business-level no-data payloads (`v2ex` missing/null `result`, bilibili
+  `code != 0`, twitter errors-only, weibo `ok != 1`) are also skipped and counted; malformed
+  top-level types still roll back.
+- Auxiliary data that misses or ambiguously matches its main row is skipped and counted in
+  `RebuildResult.aux_missed`; the rebuild summary prints the count.
+- Projection failures under `--db-only` mark the run `partial` and exit non-zero; raw data
+  remains available for `eto db rebuild <platform>`.
+- Per-item failures in exporters are isolated: the item is skipped, the run is marked
+  `partial`, and the batch continues. This applies to zhihu/cnblog/qireader as well as the
+  platforms that already had item-level guards.
 - Each entry is one Markdown file with YAML front matter; the top-level `--prefix` controls
   the filename prefix (default `~`).
 - Index file is grouped by module: module is `##`, entries are appended under that section.
@@ -120,8 +149,11 @@ Each platform has `tests/test_<platform>.py`; shared pieces are covered by
 `test_cookies.py`, `test_credential_guard.py`, `test_utils.py`, `test_db_schema.py`,
 `test_db_raw.py`, `test_http_recorder.py`, `test_import_markdown.py`,
 `test_cli_db.py`, `test_raw_platforms.py` and `test_raw_integration.py`.
+Projection coverage lives in `tests/test_projection_schema.py`, `test_projection_base.py`
+and one `test_projection_<platform>.py` per platform.
 
 ## Non-goals
 
-- No normalized cross-platform database model yet; raw storage only.
-- No message queue / async task system, no web service, no plugin framework.
+- No normalized cross-platform database model; projections are per platform.
+- No deletion detection, multi-account support, message queue / async task system, web
+  service or plugin framework yet.

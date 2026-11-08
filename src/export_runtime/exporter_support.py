@@ -4,7 +4,7 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
-from app.context import get_output_prefix, mark_run_partial
+from app.context import get_output_prefix, is_db_only, mark_run_partial
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import output_content_to_file_path
 from utils.md_utils import dump_markdown_with_frontmatter
@@ -51,7 +51,7 @@ def stop_if_output_exists(
     prefix: str | None = None,
 ) -> bool:
     """检测增量剪枝条件并在命中时刷新索引。"""
-    if force:
+    if is_db_only() or force:
         return False
 
     file_path = build_output_path(output_dir, filename, prefix)
@@ -72,6 +72,8 @@ def write_markdown_output(
     prefix: str | None = None,
 ) -> None:
     """生成 front matter 并写入 Markdown 文件。"""
+    if is_db_only():
+        return
     markdown = dump_markdown_with_frontmatter(dict(metadata), content)
     output_content_to_file_path(
         output_dir,
@@ -89,6 +91,8 @@ def write_raw_markdown_output(
     prefix: str | None = None,
 ) -> None:
     """直接写入 Markdown 文本，不额外生成 front matter。"""
+    if is_db_only():
+        return
     output_content_to_file_path(
         output_dir,
         filename,
@@ -105,4 +109,6 @@ def add_index_entry(
     title: str,
 ) -> None:
     """追加一条标准索引项。"""
+    if is_db_only():
+        return
     index_writer.add(f'- [[{link_target}|{title}]]')

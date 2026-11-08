@@ -38,7 +38,7 @@ def test_connect_creates_raw_tables_and_indexes(tmp_path):
         'idx_sync_response_lookup',
         'idx_sync_response_sha256',
     } <= indexes
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 1
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 2
     assert connection.execute('PRAGMA foreign_keys').fetchone()[0] == 1
 
     columns = {row['name'] for row in connection.execute('PRAGMA table_info(sync_run)')}
@@ -52,7 +52,7 @@ def test_connect_is_idempotent(tmp_path):
     migrate(connection)
     migrate(connection)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 1
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 2
     connection.close()
 
 

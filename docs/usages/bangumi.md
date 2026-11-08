@@ -12,9 +12,9 @@ eto [全局参数] bangumi -t TEMPLATE -s SUBJECT_TYPE -o OUTPUT [-c COLLECTION_
 
 | 参数 | 必需 | 说明 |
 | --- | --- | --- |
-| `-t`, `--template` | 是 | 模板文件路径，可使用仓库自带的 `config/template/bangumi.md` |
+| `-t`, `--template` | 非 `--db-only` 时必需 | 模板文件路径，可使用仓库自带的 `config/template/bangumi.md` |
 | `-s`, `--subject_type` | 是 | 主题类型，见下表 |
-| `-o`, `--output` | 是 | 输出目录，不存在时会自动创建 |
+| `-o`, `--output` | 非 `--db-only` 时必需 | 输出目录，不存在时会自动创建 |
 | `-c`, `--collection_type` | 否 | 收藏类型；不传时导出全部 5 种收藏类型 |
 | `--force` | 否 | 覆盖已存在的文件并继续导出 |
 

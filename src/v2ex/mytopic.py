@@ -10,21 +10,25 @@ https://www.v2ex.com/t/1035675
 @Links : https://github.com/bGZo
 """
 
-from bs4 import BeautifulSoup
-
 from export_runtime import http
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
+from v2ex.html import is_signin_page, parse_fav_topic_ids
+
+# shortcut: 收藏页分页上限 1000 页，防止接口重复返回最后一页时无限抓取；
+# 遇到超长收藏再提高。
+V2EX_MAX_FAV_PAGES = 1000
 
 
-def get_fav_html_with_page(page: int) -> str:
+def get_fav_html_with_page(page: int, client: V2exClient | None = None) -> str:
     """
     获取我的主题页面的HTML内容
 
     :param page: 页码
+    :param client: 可复用的 V2EX 客户端
     :return: HTML内容字符串
     """
-    client = V2exClient()
+    client = client or V2exClient()
     response = http.get(
         client.session,
         V2EX_FAV,
@@ -33,29 +37,29 @@ def get_fav_html_with_page(page: int) -> str:
     )
     if response.status_code != 200:
         response.raise_for_status()
+    if '/signin' in getattr(response, 'url', '').lower() or is_signin_page(
+        response.text,
+    ):
+        raise RuntimeError('V2EX login required')
     return response.text
 
 
-def get_fav_list_topic_id_page(page: int) -> list[int]:
+def get_fav_list_topic_id_page(
+    page: int,
+    client: V2exClient | None = None,
+) -> list[int]:
     """
     获取我的主题页面的主题ID列表
 
     :param page: 页码
+    :param client: 可复用的 V2EX 客户端
     :return: 主题ID列表
     """
-    fav_html = get_fav_html_with_page(page)
-    soup = BeautifulSoup(fav_html, 'html.parser')
-    topic_id_list = []
-    for topic_link in soup.select('a[href^="/t/"]'):
-        href = topic_link.get('href')
-        if href:
-            try:
-                topic_id = int(href.split('/t/')[1].split('#')[0])
-                topic_id_list.append(topic_id)
-            except ValueError:
-                continue
-    # 使用 dict.fromkeys 保留插入顺序去重 (Python 3.7+)
-    return list(dict.fromkeys(topic_id_list))
+    if page > V2EX_MAX_FAV_PAGES:
+        raise RuntimeError(
+            f'favorite page limit {V2EX_MAX_FAV_PAGES} reached',
+        )
+    return parse_fav_topic_ids(get_fav_html_with_page(page, client))
 
 
 if __name__ == '__main__':

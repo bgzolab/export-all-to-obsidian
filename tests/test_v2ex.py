@@ -4,10 +4,14 @@
 @Links : https://github.com/bGZo
 """
 
+from types import SimpleNamespace
+
 import pytest
 from urllib3.util.retry import Retry
 
 from v2ex.cilent import V2exClient
+from v2ex.mytopic import get_fav_html_with_page, get_fav_list_topic_id_page
+from v2ex.replies import fetch_all_replies, get_replies_page
 
 
 def _write_cookies_file(tmp_path, line):
@@ -75,3 +79,127 @@ def test_v2ex_client_missing_cookie_raises(monkeypatch, tmp_path):
     monkeypatch.setenv('COOKIES', p)
     with pytest.raises(ValueError, match='No cookies found'):
         V2exClient()
+
+
+def test_fav_list_reuses_provided_client(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        url = 'https://www.v2ex.com/my/topics'
+        text = '<a href="/t/1">topic</a>'
+
+    def fail_client():
+        raise AssertionError('V2exClient should not be created')
+
+    monkeypatch.setattr('v2ex.mytopic.V2exClient', fail_client)
+    monkeypatch.setattr(
+        'v2ex.mytopic.http.get',
+        lambda session, url, *, endpoint, **kwargs: FakeResponse(),
+    )
+
+    client = SimpleNamespace(session=object())
+    assert get_fav_list_topic_id_page(1, client) == [1]
+
+
+def test_fav_page_limit_stops_pagination(monkeypatch):
+    monkeypatch.setattr('v2ex.mytopic.V2EX_MAX_FAV_PAGES', 2)
+
+    with pytest.raises(RuntimeError, match='favorite page limit 2'):
+        get_fav_list_topic_id_page(3)
+
+
+def test_fav_page_detects_signin_redirect(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        url = 'https://www.v2ex.com/signin?next=/my/topics'
+        text = '<html></html>'
+
+    monkeypatch.setattr(
+        'v2ex.mytopic.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr(
+        'v2ex.mytopic.http.get',
+        lambda session, url, *, endpoint, **kwargs: FakeResponse(),
+    )
+
+    with pytest.raises(RuntimeError, match='login required'):
+        get_fav_html_with_page(1)
+
+
+def test_fetch_all_replies_reads_pages_until_empty(monkeypatch):
+    pages = {1: [{'id': 1}], 2: [{'id': 2}], 3: []}
+    calls = []
+    clients = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        calls.append((endpoint, kwargs['params']['p']))
+        return FakeResponse({'result': pages[kwargs['params']['p']]})
+
+    def fake_client():
+        clients.append(1)
+        return SimpleNamespace(session=object())
+
+    monkeypatch.setattr('v2ex.replies.V2exClient', fake_client)
+    monkeypatch.setattr('v2ex.replies.http.get', fake_get)
+
+    assert fetch_all_replies(1) == 2
+    assert len(clients) == 1
+    assert calls == [
+        ('v2ex.topic.replies.page', 1),
+        ('v2ex.topic.replies.page', 2),
+        ('v2ex.topic.replies.page', 3),
+    ]
+
+
+def test_fetch_all_replies_stops_at_page_limit(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {'result': [{'id': 1}]}
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        calls.append(kwargs['params']['p'])
+        return FakeResponse()
+
+    monkeypatch.setattr('v2ex.replies.V2EX_MAX_REPLY_PAGES', 2)
+    monkeypatch.setattr(
+        'v2ex.replies.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr('v2ex.replies.http.get', fake_get)
+
+    with pytest.raises(RuntimeError, match='reply page limit 2'):
+        fetch_all_replies(1)
+    assert calls == [1, 2]
+
+
+def test_replies_page_rejects_unexpected_result(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {'result': {'unexpected': True}}
+
+    monkeypatch.setattr(
+        'v2ex.replies.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr(
+        'v2ex.replies.http.get',
+        lambda session, url, *, endpoint, **kwargs: FakeResponse(),
+    )
+
+    with pytest.raises(TypeError, match='unexpected replies result'):
+        get_replies_page(1, 1)

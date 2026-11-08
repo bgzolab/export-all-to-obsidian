@@ -7,6 +7,8 @@ This tool exports your social media data to Obsidian with markdown files.
 - Export data from many sites into local Markdown files.
 - Keep one simple CLI for all modules.
 - Provide an optional index file in Markdown.
+- Keep every API response in SQLite and rebuild per-platform projection tables from it
+  (`--db-only` / `eto db rebuild <platform>`).
 
 Now this tool had supported following modules:
 
@@ -45,7 +47,7 @@ source ./export-env.sh
 
 Full command reference lives in [docs/usages](./docs/usages/README.md). It covers:
 
-- global options (`--index-file`, `--prefix`, `--cookies-file`, `--db`)
+- global options (`--index-file`, `--prefix`, `--cookies-file`, `--db`, `--db-only`)
 - required environment variables and cookie domains
 - one page per subcommand with parameters, output layout and examples
 - shared behavior for credential checks, incremental exports, index files and the raw database
@@ -54,6 +56,18 @@ A typical call looks like:
 
 ```shell
 eto --index-file output/index/export-index.md zhihu -c your-collection-id -o output/zhihu
+```
+
+Store only the raw responses and projection tables, without writing Markdown:
+
+```shell
+eto --db-only zhihu -c your-collection-id
+```
+
+Rebuild a platform's projection from existing raw responses:
+
+```shell
+eto db rebuild zhihu
 ```
 
 Run `eto --help` or `eto <command> --help` for the built-in help.

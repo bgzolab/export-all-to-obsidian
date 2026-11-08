@@ -160,6 +160,7 @@ def export(
                 )
 
             except Exception as error:
+                mark_run_partial()
                 print(f'处理报文发生错误: {error}，跳过处理')
 
         if page.cursor_bottom is None or not page.cursor_bottom.value:

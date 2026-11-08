@@ -20,18 +20,25 @@ def initialize_context(
     output_prefix: str,
     cookies_file: str | None = None,
     db_path: str | None = None,
+    db_only: bool = False,
 ) -> None:
     """初始化根上下文。"""
+    if db_only and index_file:
+        raise click.UsageError('--index-file cannot be used with --db-only')
     if index_file and os.path.isdir(index_file):
         # 与 --cookies-file 指向目录的约定一致：坏路径统一 exit 1（ClickException），
         # 而非 click 参数校验的 exit 2（dir_okay=False 已移除）
         raise click.ClickException(f'Index file is a directory: {index_file}')
     ctx.ensure_object(dict)
-    ctx.obj['index_writer'] = IndexWriter(file_path=index_file)
+    ctx.obj['index_writer'] = IndexWriter(
+        file_path=index_file,
+        enabled=not db_only,
+    )
     ctx.obj['output_prefix'] = output_prefix
     ctx.obj['cookies_file'] = cookies_file
     ctx.obj['command'] = shlex.join(sys.argv)
     ctx.obj['run_partial'] = False
+    ctx.obj['db_only'] = db_only
     database = _open_database(db_path)
     ctx.obj['database'] = database
     ctx.call_on_close(database.close)
@@ -86,6 +93,15 @@ def get_run_id() -> int | None:
     if context is None:
         return None
     return context.find_root().obj.get('run_id')
+
+
+def is_db_only() -> bool:
+    """Return whether the current command only writes to the database."""
+    context = click.get_current_context(silent=True)
+    if context is None:
+        return False
+    root = context.find_root()
+    return bool(root.obj and root.obj.get('db_only'))
 
 
 def get_command() -> str | None:
@@ -153,5 +169,26 @@ def run_action(
     action: Callable[[], None],
 ) -> None:
     """Run an export action inside a sync_run."""
+    projection_error: Exception | None = None
     with sync_run(platform, operation, scope):
         action()
+        if is_db_only():
+            try:
+                _rebuild_projection(platform)
+            except Exception as exc:
+                mark_run_partial()
+                projection_error = exc
+    if projection_error is not None:
+        raise click.ClickException(
+            f'投影失败: {projection_error}；请按 docs/usages/db.md 定位/处置坏响应',
+        )
+
+
+def _rebuild_projection(platform: str) -> None:
+    from db.projections import SUPPORTED_PLATFORMS, rebuild_platform
+
+    if platform not in SUPPORTED_PLATFORMS:
+        print(f'projection not implemented: {platform}')
+        return
+    result = rebuild_platform(get_database(), platform)
+    click.echo(f'投影完成: {result.summary()}')

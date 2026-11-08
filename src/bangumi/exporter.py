@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import is_db_only, mark_run_partial
 from bangumi.client import BangumiClient
 from bangumi.collection import get_all_collections_by_pages
 from bangumi.enum import CollectionType, SubjectType
@@ -51,6 +51,9 @@ def export(
                     template_path=template_path,
                     force=force,
                 )
+                if is_db_only():
+                    print(f'处理完成={result.subject_id}')
+                    continue
                 if success and filename and title:
                     index_writer.add(f'- [[{filename}|{title}]]')
                 elif not force:
@@ -58,13 +61,13 @@ def export(
                     print(f'写入失败: {filename}')
                     index_writer.flush('bangumi')
                     return
+                print(f'处理完成={result.subject_id}')
             except Exception as error:
                 mark_run_partial()
                 print(
                     f'跳过:{result.subject.name}, '
                     f'subject_id={result.subject_id}, error={error}',
                 )
-            print(f'处理完成={result.subject_id}')
     index_writer.flush('bangumi')
 
 
@@ -100,6 +103,12 @@ def write_subject_markdown(
     subject = get_subject_info(subject_id)
     if not subject:
         print(f'未获取到条目详情: {subject_id}')
+        return True, '', ''
+
+    if is_db_only():
+        # db-only 不写 Markdown，但仍要抓角色列表，projection 的 characters_json
+        # 依赖这条 raw 响应。
+        get_output_character_string(subject_id)
         return True, '', ''
 
     subject_type = subject.type_id

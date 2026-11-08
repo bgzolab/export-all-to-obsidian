@@ -82,10 +82,6 @@ Gopkg.lock
 /output
 tests/import-from-github-url/import-report.json
 tests/import-from-github-url/import-index.md
-
-# AI export folder
-ai_export/
-docs/implementation-plans/*.md
 debug/
 bruno/
 cookies.txt

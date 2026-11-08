@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.context import mark_run_partial
 from bilibili.favlist import get_bilibili_favlistd
 from export_runtime.exporter_support import (
     add_index_entry,
@@ -98,6 +99,7 @@ def export(
                 )
 
             except Exception as error:
+                mark_run_partial()
                 print(f'处理报文发生错误: {error}，跳过处理')
         page += 1
 

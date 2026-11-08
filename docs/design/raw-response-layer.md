@@ -84,7 +84,8 @@ Markdown：
 
 - 按 `endpoint` 选择解析器。
 - 按 `fetched_at, id` 顺序回放，必须幂等。
-- 投影表以后再加；手工修改要事件化或单独存 override，否则会被重放覆盖。
+- Layer 2 已提供 `db.projections` 回放器；手工修改要事件化或单独存 override，
+  否则会被重放覆盖。
 
 ## 6. 数据库
 
@@ -97,3 +98,7 @@ Markdown：
 ## 7. 暂缓
 
 跨平台规范表、删除检测、内容寻址去重、统计、搜索、Telegram bot、多账号。
+
+## 8. 后续
+
+Layer 2 平台投影层见 [projection-layer.md](projection-layer.md)。`sync_response.id` 是投影表的溯源锚点。
