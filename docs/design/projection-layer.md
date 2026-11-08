@@ -155,6 +155,26 @@ db_updated_at TEXT NOT NULL
   `characters_response_id` 单独记录，不覆盖主响应溯源列。
 - 平台时间：收藏记录的 `updated_at`、条目的 `date` 原样保留。
 
+#### 为什么 collection 和 subject 分开
+
+当前单账号、只导出收藏时，两张表是 1:1；但这是导出流程带来的，不是实体同一性。
+collection 是“我-条目”的关系，subject 是条目本身。分开存的原因：
+
+1. **详情抓取失败时，收藏事实仍然保留。** `bangumi_collection.subject_json` 已经包含
+   slim subject，足够基本导出；`bangumi_subject` 抓不到只是少字段，不会丢掉“我收藏了它”。
+   合并成一张表就必须让一半字段可空，或者整行不写。
+2. **改收藏状态只 upsert collection。** 把“在看”改成“看过”时，列表响应只带收藏字段；
+   合并表如果直接 upsert，容易把 subject 字段覆盖成默认值。
+3. **上游改条目信息只 upsert subject。** 标题、简介的变化和我的评分、评论是两条独立更新线。
+4. **取消收藏只删 collection。** subject 元数据可以保留；合并后要么删整行丢 subject，
+   要么留一行半空数据。
+5. **1:1 是有条件的。** 以后多账号、或者单独查某个条目时，subject 不需要有对应的
+   collection。分开后两个方向都可以独立存在。
+
+代价是一个 `ON subject_id` 的 join，SQLite 上很便宜。合并省一张表，但要多两个溯源列
+（collection / subject 各一个），并让所有 subject 字段可空；取消收藏后还要在
+“删整行”和“留半空行”之间选，边界更多，不划算。
+
 ```sql
 CREATE TABLE bangumi_collection (
     subject_id INTEGER PRIMARY KEY,
