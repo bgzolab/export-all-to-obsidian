@@ -70,19 +70,13 @@ jobs:
           fi
           VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-      - name: Cache opencode
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.opencode/bin
-          key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
       - name: Install opencode
-        if: steps.cache.outputs.cache-hit != 'true'
         # 安装必须有时限：下载挂起会吃掉整个 job 的 20 分钟
         timeout-minutes: 8
         env:
           PINNED_VERSION: ${{ steps.version.outputs.version }}
-        # 版本固定；脚本内部按该版本的 npm sha512 校验安装包，并重试临时 5xx
+        # 版本固定；脚本内部按该版本的 npm sha512 校验安装包，并重试临时 5xx。
+        # 不缓存 ~/.opencode/bin：缓存命中会绕过校验。
         run: bash .github/scripts/install_opencode.sh "${PINNED_VERSION}"
       - name: Add opencode to PATH
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"

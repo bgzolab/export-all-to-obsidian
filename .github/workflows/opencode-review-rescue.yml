@@ -135,19 +135,13 @@ jobs:
           persist-credentials: false
       - name: Configure opencode CI permissions (read-only agent, ci-finalize)
         run: bash "$RUNNER_TEMP/review/configure-opencode-permissions.sh"
-      - name: Cache opencode
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.opencode/bin
-          key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.snapshot.outputs.version }}
       - name: Install opencode (the version recorded in the snapshot)
-        if: steps.cache.outputs.cache-hit != 'true'
         # 安装必须有时限，避免挂起吃掉收尾预算
         timeout-minutes: 8
         env:
           PINNED_VERSION: ${{ steps.snapshot.outputs.version }}
-        # 用工作区之外的副本：这里可能已签出被审查的 head 提交，未必带这个脚本
+        # 用工作区之外的副本：这里可能已签出被审查的 head 提交，未必带这个脚本。
+        # 不缓存 ~/.opencode/bin：缓存命中会绕过 sha512 校验。
         run: bash "$RUNNER_TEMP/review/install_opencode.sh" "${PINNED_VERSION}"
       - name: Add opencode to PATH
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
