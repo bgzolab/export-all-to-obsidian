@@ -40,7 +40,7 @@
 
 ### T3. 重建基础设施
 
-- Status: Planned
+- Status: Completed
 - Files: `src/db/projections/__init__.py`, `src/db/projections/_upsert.py`
 - Work:
   - `rebuild_platform(connection, platform)` 分发器。
@@ -54,7 +54,7 @@
 
 ### T4. Bangumi pilot
 
-- Status: Planned
+- Status: Completed
 - Files: `src/db/projections/bangumi.py`, `tests/test_projection_bangumi.py`
 - Work:
   - 解析 `bangumi.collections.page` -> `bangumi_collection`。
@@ -152,6 +152,10 @@
   `tests/test_projection_schema.py` covering common provenance columns, platform
   time columns, JSON checks, strict types, natural keys, foreign keys and migration
   from a layer 1 database.
+- 2026-11-08: T3/T4 completed. Added `db.projections` dispatcher, shared
+  `_upsert` helpers and the Bangumi parser. Rebuilds run in one transaction,
+  skip stale responses, keep the main `response_id` on auxiliary updates and roll
+  back on invalid or missing raw bodies.
 
 ## Notes
 
