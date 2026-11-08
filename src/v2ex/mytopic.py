@@ -15,6 +15,10 @@ from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
 from v2ex.html import is_signin_page, parse_fav_topic_ids
 
+# shortcut: 收藏页分页上限 1000 页，防止接口重复返回最后一页时无限抓取；
+# 遇到超长收藏再提高。
+V2EX_MAX_FAV_PAGES = 1000
+
 
 def get_fav_html_with_page(page: int) -> str:
     """
@@ -46,6 +50,10 @@ def get_fav_list_topic_id_page(page: int) -> list[int]:
     :param page: 页码
     :return: 主题ID列表
     """
+    if page > V2EX_MAX_FAV_PAGES:
+        raise RuntimeError(
+            f'favorite page limit {V2EX_MAX_FAV_PAGES} reached',
+        )
     return parse_fav_topic_ids(get_fav_html_with_page(page))
 
 

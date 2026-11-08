@@ -187,7 +187,11 @@
   roll back.
 - 2026-11-08: Fourth review follow-up. Auxiliary endpoints now also skip 200 JSON
   with missing business fields via `SkipResponse`; Weibo warns when a long post
-  has no `mblogid`. Full suite: 282 passed, 2 skipped; ruff passes.
+  has no `mblogid`.
+- 2026-11-08: Fifth review follow-up. Added a V2EX favorite-page cap; clarified
+  that `--max-pages` still applies under `--db-only`; documented the V2EX
+  signin-template limitation and raw-layer accumulation. Full suite: 286 passed,
+  2 skipped; ruff passes.
 
 ## Notes
 

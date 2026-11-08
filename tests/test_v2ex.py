@@ -10,7 +10,7 @@ import pytest
 from urllib3.util.retry import Retry
 
 from v2ex.cilent import V2exClient
-from v2ex.mytopic import get_fav_html_with_page
+from v2ex.mytopic import get_fav_html_with_page, get_fav_list_topic_id_page
 from v2ex.replies import fetch_all_replies, get_replies_page
 
 
@@ -79,6 +79,13 @@ def test_v2ex_client_missing_cookie_raises(monkeypatch, tmp_path):
     monkeypatch.setenv('COOKIES', p)
     with pytest.raises(ValueError, match='No cookies found'):
         V2exClient()
+
+
+def test_fav_page_limit_stops_pagination(monkeypatch):
+    monkeypatch.setattr('v2ex.mytopic.V2EX_MAX_FAV_PAGES', 2)
+
+    with pytest.raises(RuntimeError, match='favorite page limit 2'):
+        get_fav_list_topic_id_page(3)
 
 
 def test_fav_page_detects_signin_redirect(monkeypatch):

@@ -108,8 +108,8 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   current sync run immediately — not a remote cursor. When that happens, the active
   `sync_run` is marked `partial`. `partial` means "result is incomplete", including
   `--max-pages` truncation and failure paths.
-- `--db-only` disables that pruning so pagination is fetched completely. It writes no
-  Markdown and no index, and does not require `-o` / `-t`.
+- `--db-only` disables that pruning; explicit limits such as `--max-pages` still apply. It
+  writes no Markdown and no index, and does not require `-o` / `-t`.
 - API responses and imported Markdown are appended to `sync_response`; the database is never
   used as an incremental cursor yet.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
