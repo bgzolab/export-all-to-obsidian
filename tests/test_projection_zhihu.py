@@ -138,6 +138,16 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
+def test_non_object_page_rolls_back():
+    connection = connect(':memory:')
+    record_json(connection, 'zhihu.collection.page', [], request=REQUEST)
+
+    with pytest.raises(ProjectionError, match='invalid collection payload'):
+        rebuild_platform(connection, 'zhihu')
+
+    connection.close()
+
+
 def test_null_page_is_empty():
     connection = connect(':memory:')
     record_json(

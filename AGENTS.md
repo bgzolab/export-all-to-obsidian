@@ -119,6 +119,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   (`result: null`, errors-only, `ok != 1`) are skipped and counted; a main-entity 200 body
   that cannot parse or violates constraints rolls back the whole platform. `response_id`
   points at the producing `sync_response`, not `sync_run`.
+- Main-entity business-level no-data payloads (`v2ex` missing/null `result`, bilibili
+  `code != 0`, twitter errors-only, weibo `ok != 1`) are also skipped and counted; malformed
+  top-level types still roll back.
 - Auxiliary data that misses or ambiguously matches its main row is skipped and counted in
   `RebuildResult.aux_missed`; the rebuild summary prints the count.
 - Projection failures under `--db-only` mark the run `partial` and exit non-zero; raw data

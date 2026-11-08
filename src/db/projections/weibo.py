@@ -81,6 +81,8 @@ def _upsert_posts(
     now: str,
     result: RebuildResult,
 ) -> int:
+    if not isinstance(payload, dict):
+        raise TypeError('invalid likes payload')
     if payload.get('ok') != 1:
         raise SkipResponse(f'ok={payload.get("ok")}')
     if 'data' not in payload:

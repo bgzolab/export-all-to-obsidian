@@ -267,6 +267,16 @@ def test_characters_without_subject_are_reported(capsys):
     connection.close()
 
 
+def test_non_object_collections_payload_rolls_back():
+    connection = connect(':memory:')
+    record_json(connection, 'bangumi.collections.page', [])
+
+    with pytest.raises(ProjectionError, match='invalid collections payload'):
+        rebuild_platform(connection, 'bangumi')
+
+    connection.close()
+
+
 def test_null_collection_page_is_empty():
     connection = connect(':memory:')
     record_json(connection, 'bangumi.collections.page', {'data': None})

@@ -217,8 +217,11 @@
   no-data payloads (V2EX `result: null`, Twitter errors-only/empty data, Weibo
   `ok != 1`) are skipped and counted instead of poisoning rebuilds; missing keys
   and type violations still roll back. Qireader article downgrade marks partial;
-  docs note db-only still requires credentials. Full suite: 304 passed, 2 skipped;
-  ruff passes.
+  docs note db-only still requires credentials.
+- 2026-11-08: Fourteenth review follow-up (BLOCK fix). Also skip V2EX missing
+  `result`, Bilibili `code != 0` and non-object V2EX replies; add top-level shape
+  checks for bangumi/zhihu/weibo/github; projection failure output points to the
+  bad-response procedure in db.md. Full suite: 306 passed, 2 skipped; ruff passes.
 
 ## Notes
 

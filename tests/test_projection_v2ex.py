@@ -254,7 +254,7 @@ def test_null_topic_result_is_skipped():
     connection.close()
 
 
-def test_missing_topic_result_key_rolls_back():
+def test_missing_topic_result_key_is_skipped():
     connection = connect(':memory:')
     _seed(connection)
     rebuild_platform(connection, 'v2ex')
@@ -267,8 +267,24 @@ def test_missing_topic_result_key_rolls_back():
         request={'url': 'https://www.v2ex.com/api/v2/topics/3'},
     )
 
-    with pytest.raises(ProjectionError, match='missing result'):
-        rebuild_platform(connection, 'v2ex')
+    result = rebuild_platform(connection, 'v2ex')
 
+    assert result.skipped == 1
     assert business_rows(connection, TABLES) == before
+    connection.close()
+
+
+def test_array_replies_payload_is_skipped():
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'v2ex.topic.replies.page',
+        [],
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1/replies'},
+    )
+
+    result = rebuild_platform(connection, 'v2ex')
+
+    assert result.skipped == 1
+    assert business_rows(connection, ('v2ex_reply',))['v2ex_reply'] == []
     connection.close()

@@ -179,7 +179,9 @@ def run_action(
                 mark_run_partial()
                 projection_error = exc
     if projection_error is not None:
-        raise click.ClickException(f'投影失败: {projection_error}')
+        raise click.ClickException(
+            f'投影失败: {projection_error}；请按 docs/usages/db.md 定位/处置坏响应',
+        )
 
 
 def _rebuild_projection(platform: str) -> None:

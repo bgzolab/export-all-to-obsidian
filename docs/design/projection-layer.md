@@ -773,8 +773,9 @@ WHERE <natural key> = ?;
   它们表示“这次抓取失败”，不是投影数据损坏。
 - 主实体接口的 200 响应 body 无法解析、字段无法满足非空约束、JSON 校验失败，
   整个平台重建回滚。
-- 主实体接口的业务级无数据负载（V2EX `result: null`、Twitter errors-only / 空 data、
-  Weibo `ok != 1`）按“无数据”处理：跳过并计数，不阻塞后续重建；缺键或类型错误仍回滚。
+- 主实体接口的业务级无数据负载（V2EX `result` 缺失/null、Bilibili `code != 0`、
+  Twitter errors-only / 空 data、Weibo `ok != 1`）按“无数据”处理：跳过并计数，
+  不阻塞后续重建；非 dict/list 的顶层类型错误仍回滚。
 - 辅助接口（README、角色、长文、正文、回复）的 200 非 JSON 响应、或 200 JSON 但
   缺少业务字段（如回复列表、正文、长文内容）时跳过并计数；辅助数据不应因为一条坏响应
   阻塞整个平台。

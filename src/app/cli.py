@@ -320,7 +320,9 @@ def db_rebuild(platform: str) -> None:
     try:
         result = rebuild_platform(get_database(), platform)
     except Exception as exc:
-        raise click.ClickException(f'投影失败: {exc}') from exc
+        raise click.ClickException(
+            f'投影失败: {exc}；请按 docs/usages/db.md 定位/处置坏响应',
+        ) from exc
     click.echo(f'重建完成: {result.summary()}')
 
 

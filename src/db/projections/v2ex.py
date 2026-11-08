@@ -124,14 +124,12 @@ def _upsert_topic(
     now: str,
 ) -> int:
     if not isinstance(payload, dict):
-        raise TypeError('invalid topic payload')
-    if 'result' not in payload:
-        raise ValueError('missing result')
-    topic = payload['result']
+        raise SkipResponse('invalid topic payload')
+    topic = payload.get('result')
     if topic is None:
-        raise SkipResponse('topic result is null')
+        raise SkipResponse('topic result is missing or null')
     if not isinstance(topic, dict):
-        raise TypeError('invalid topic result')
+        raise SkipResponse('invalid topic result')
     return upsert(
         connection,
         'v2ex_topic',
@@ -163,6 +161,8 @@ def _upsert_replies(
     result: RebuildResult,
 ) -> int:
     topic_id = _replies_topic_id(response)
+    if not isinstance(payload, dict):
+        raise SkipResponse('invalid replies payload')
     replies = payload.get('result')
     if not isinstance(replies, list):
         raise SkipResponse('missing result list')

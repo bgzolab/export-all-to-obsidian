@@ -8,10 +8,12 @@ from typing import Any
 from db import raw
 from db.projections._upsert import (
     RebuildResult,
+    SkipResponse,
     apply_handler,
     iter_json_responses,
     json_or_null,
     reset_tables,
+    skip_handler_response,
     upsert,
 )
 
@@ -31,15 +33,18 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         ENDPOINT,
         result=result,
     ):
-        result.rows += apply_handler(
-            ENDPOINT,
-            response,
-            _upsert_page,
-            connection,
-            payload,
-            response['id'],
-            now,
-        )
+        try:
+            result.rows += apply_handler(
+                ENDPOINT,
+                response,
+                _upsert_page,
+                connection,
+                payload,
+                response['id'],
+                now,
+            )
+        except SkipResponse as exc:
+            skip_handler_response(result, ENDPOINT, response, str(exc))
 
     return result
 
@@ -51,7 +56,7 @@ def _upsert_page(
     now: str,
 ) -> int:
     if payload.get('code') != 0:
-        raise ValueError(
+        raise SkipResponse(
             f'code={payload.get("code")} message={payload.get("message")}',
         )
     if 'data' not in payload:

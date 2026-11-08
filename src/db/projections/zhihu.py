@@ -55,6 +55,8 @@ def _upsert_page(
     response: dict[str, Any],
     now: str,
 ) -> int:
+    if not isinstance(payload, dict):
+        raise TypeError('invalid collection payload')
     collection_id = _collection_id(response)
     rows = 0
     for item in payload['data'] or []:

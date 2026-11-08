@@ -95,6 +95,8 @@ def _upsert_collections(
     response_id: int,
     now: str,
 ) -> int:
+    if not isinstance(payload, dict):
+        raise TypeError('invalid collections payload')
     rows = 0
     for item in payload['data'] or []:
         values = {
@@ -127,6 +129,8 @@ def _upsert_subject(
     response_id: int,
     now: str,
 ) -> int:
+    if not isinstance(payload, dict):
+        raise TypeError('invalid subject payload')
     values = {
         'date': payload.get('date'),
         'platform': payload.get('platform'),

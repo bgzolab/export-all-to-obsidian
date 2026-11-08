@@ -80,8 +80,12 @@ def _upsert_stars(
     response_id: int,
     now: str,
 ) -> int:
+    if payload is None:
+        return 0
+    if not isinstance(payload, list):
+        raise TypeError('invalid stars payload')
     rows = 0
-    for item in payload or []:
+    for item in payload:
         repo = item.get('repo') or item
         owner = repo.get('owner') or {}
         license_data = repo.get('license') or {}

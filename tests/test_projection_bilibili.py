@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from db.connection import connect
-from db.projections import ProjectionError, rebuild_platform
+from db.projections import rebuild_platform
 from tests.projection_helpers import business_rows, record_json
 
 TABLES = ('bilibili_fav_item', 'bilibili_media', 'bilibili_fav')
@@ -150,7 +148,7 @@ def test_null_data_is_empty():
     connection.close()
 
 
-def test_business_error_rolls_back():
+def test_business_error_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'bilibili.favlist.page', _page())
     rebuild_platform(connection, 'bilibili')
@@ -162,8 +160,8 @@ def test_business_error_rolls_back():
         {'code': -101, 'message': 'not logged in', 'ttl': 1, 'data': None},
     )
 
-    with pytest.raises(ProjectionError, match='code=-101'):
-        rebuild_platform(connection, 'bilibili')
+    result = rebuild_platform(connection, 'bilibili')
 
+    assert result.skipped == 1
     assert business_rows(connection, TABLES) == before
     connection.close()
