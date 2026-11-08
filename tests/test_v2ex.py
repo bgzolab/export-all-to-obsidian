@@ -10,6 +10,7 @@ import pytest
 from urllib3.util.retry import Retry
 
 from v2ex.cilent import V2exClient
+from v2ex.mytopic import get_fav_html_with_page
 from v2ex.replies import fetch_all_replies, get_replies_page
 
 
@@ -78,6 +79,25 @@ def test_v2ex_client_missing_cookie_raises(monkeypatch, tmp_path):
     monkeypatch.setenv('COOKIES', p)
     with pytest.raises(ValueError, match='No cookies found'):
         V2exClient()
+
+
+def test_fav_page_detects_signin_redirect(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        url = 'https://www.v2ex.com/signin?next=/my/topics'
+        text = '<html></html>'
+
+    monkeypatch.setattr(
+        'v2ex.mytopic.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr(
+        'v2ex.mytopic.http.get',
+        lambda session, url, *, endpoint, **kwargs: FakeResponse(),
+    )
+
+    with pytest.raises(RuntimeError, match='login required'):
+        get_fav_html_with_page(1)
 
 
 def test_fetch_all_replies_reads_pages_until_empty(monkeypatch):

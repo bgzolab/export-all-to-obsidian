@@ -129,7 +129,7 @@ def _update_readme(
         readme = _decode_readme(body)
     else:
         return 0
-    return update_aux(
+    rows = update_aux(
         connection,
         'github_star',
         {'full_name': full_name},
@@ -138,6 +138,9 @@ def _update_readme(
         response['id'],
         now,
     )
+    if rows == 0:
+        print(f'辅助数据未命中主行: github_star full_name={full_name}')
+    return rows
 
 
 def _decode_readme(body: bytes) -> str:

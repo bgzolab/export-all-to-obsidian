@@ -13,7 +13,7 @@ https://www.v2ex.com/t/1035675
 from export_runtime import http
 from v2ex.api_endpoints import V2EX_FAV
 from v2ex.cilent import V2exClient
-from v2ex.html import parse_fav_topic_ids
+from v2ex.html import is_signin_page, parse_fav_topic_ids
 
 
 def get_fav_html_with_page(page: int) -> str:
@@ -32,6 +32,10 @@ def get_fav_html_with_page(page: int) -> str:
     )
     if response.status_code != 200:
         response.raise_for_status()
+    if '/signin' in getattr(response, 'url', '').lower() or is_signin_page(
+        response.text,
+    ):
+        raise RuntimeError('V2EX login required')
     return response.text
 
 

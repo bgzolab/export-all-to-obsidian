@@ -68,6 +68,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         connection,
         CHARACTERS_ENDPOINT,
         result=result,
+        skip_invalid_json=True,
     ):
         result.rows += apply_handler(
             CHARACTERS_ENDPOINT,
@@ -162,7 +163,7 @@ def _update_characters(
     if match is None:
         raise ValueError('cannot determine subject id from request URL')
     subject_id = int(match.group(1))
-    return update_aux(
+    rows = update_aux(
         connection,
         'bangumi_subject',
         {'subject_id': subject_id},
@@ -171,3 +172,6 @@ def _update_characters(
         response['id'],
         now,
     )
+    if rows == 0:
+        print(f'辅助数据未命中主行: bangumi_subject subject_id={subject_id}')
+    return rows

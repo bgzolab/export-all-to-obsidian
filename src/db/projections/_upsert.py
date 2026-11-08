@@ -54,27 +54,37 @@ def iter_json_responses(
     *,
     result: RebuildResult | None = None,
     status_ok_only: bool = True,
+    skip_invalid_json: bool = False,
 ) -> Iterator[tuple[dict[str, Any], Any]]:
     """Yield non-error responses with a parsed JSON body.
 
     Transport errors and non-200 responses are skipped and counted. A 200
-    response that is not valid JSON is still fatal: the raw data itself is bad.
+    response that is not valid JSON is fatal for main entities, but auxiliary
+    endpoints may set ``skip_invalid_json`` to count it and continue.
     """
     for response in raw.iter_responses(connection, endpoint=endpoint):
         if _should_skip(response, status_ok_only):
             if result is not None:
                 result.skipped += 1
             continue
-        if result is not None:
-            result.responses += 1
         try:
             payload = json.loads(response['body'])
         except (TypeError, ValueError) as exc:
+            if skip_invalid_json:
+                if result is not None:
+                    result.skipped += 1
+                print(
+                    f'投影跳过无效响应: {endpoint} '
+                    f'(id={response["id"]}): invalid JSON: {exc}',
+                )
+                continue
             raise ProjectionError(
                 endpoint,
                 response['id'],
                 f'invalid JSON: {exc}',
             ) from exc
+        if result is not None:
+            result.responses += 1
         yield response, payload
 
 

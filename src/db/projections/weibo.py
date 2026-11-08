@@ -49,6 +49,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         connection,
         LONGTEXT_ENDPOINT,
         result=result,
+        skip_invalid_json=True,
     ):
         result.rows += apply_handler(
             LONGTEXT_ENDPOINT,
@@ -121,7 +122,7 @@ def _update_long_text(
     mblogid = params.get('id') if isinstance(params, dict) else None
     if not mblogid:
         raise ValueError('cannot determine mblogid from request params')
-    return update_aux(
+    rows = update_aux(
         connection,
         'weibo_post',
         {'mblogid': mblogid},
@@ -130,3 +131,6 @@ def _update_long_text(
         response['id'],
         now,
     )
+    if rows == 0:
+        print(f'辅助数据未命中主行: weibo_post mblogid={mblogid}')
+    return rows

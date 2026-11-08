@@ -230,6 +230,22 @@ def test_missing_body_is_skipped_without_losing_rows():
     connection.close()
 
 
+def test_characters_without_subject_are_reported(capsys):
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'bangumi.subject.characters',
+        CHARACTERS,
+        request={'url': 'https://api.bgm.tv/v0/subjects/1/characters'},
+    )
+
+    result = rebuild_platform(connection, 'bangumi')
+
+    assert result.rows == 0
+    assert '辅助数据未命中主行' in capsys.readouterr().out
+    connection.close()
+
+
 def test_null_collection_page_is_empty():
     connection = connect(':memory:')
     record_json(connection, 'bangumi.collections.page', {'data': None})

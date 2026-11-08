@@ -98,6 +98,22 @@ def test_repository_rename_updates_the_same_row():
     connection.close()
 
 
+def test_readme_without_star_is_reported(capsys):
+    connection = connect(':memory:')
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
+
+    result = rebuild_platform(connection, 'github')
+
+    assert result.rows == 0
+    assert '辅助数据未命中主行' in capsys.readouterr().out
+    connection.close()
+
+
 def test_rebuild_is_idempotent():
     connection = connect(':memory:')
     record_json(connection, 'github.stars.list', [STAR])

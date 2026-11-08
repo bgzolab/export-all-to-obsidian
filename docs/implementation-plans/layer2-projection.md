@@ -180,7 +180,11 @@
 - 2026-11-08: Second review follow-up. CNBlog only backfills `source_url` on a
   unique `/<post_id>.html` bookmark match; V2EX reply page-limit path has a test;
   the design doc now states that `null` list values are empty pages while missing
-  keys are structural errors. Full suite: 276 passed, 2 skipped; ruff passes.
+  keys are structural errors.
+- 2026-11-08: Third review follow-up. V2EX signin pages are detected during fetch
+  and projection so favorites are not cleared; auxiliary `update_aux` misses are
+  reported; auxiliary endpoints skip invalid 200 JSON while main entities still
+  roll back. Full suite: 276 passed, 2 skipped; ruff passes.
 
 ## Notes
 

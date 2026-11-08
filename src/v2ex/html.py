@@ -3,6 +3,12 @@
 from bs4 import BeautifulSoup
 
 
+def is_signin_page(html: str) -> bool:
+    """Return True when V2EX redirected to its sign-in form."""
+    soup = BeautifulSoup(html, 'html.parser')
+    return soup.select_one('form[action*="/signin"]') is not None
+
+
 def parse_fav_topic_ids(fav_html: str) -> list[int]:
     """从收藏页 HTML 中解析主题 ID，保留顺序并去重。"""
     soup = BeautifulSoup(fav_html, 'html.parser')

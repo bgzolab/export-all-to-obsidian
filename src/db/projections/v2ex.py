@@ -18,7 +18,7 @@ from db.projections._upsert import (
     reset_tables,
     upsert,
 )
-from v2ex.html import parse_fav_topic_ids
+from v2ex.html import is_signin_page, parse_fav_topic_ids
 
 FAV_ENDPOINT = 'v2ex.fav.page'
 TOPIC_ENDPOINT = 'v2ex.topic.detail'
@@ -70,6 +70,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         connection,
         REPLIES_ENDPOINT,
         result=result,
+        skip_invalid_json=True,
     ):
         result.rows += apply_handler(
             REPLIES_ENDPOINT,
@@ -92,6 +93,8 @@ def _upsert_favorites(
 ) -> int:
     rows = 0
     html = body.decode('utf-8', errors='replace')
+    if is_signin_page(html):
+        raise ValueError('signin page instead of favorites')
     for topic_id in parse_fav_topic_ids(html):
         rows += upsert(
             connection,

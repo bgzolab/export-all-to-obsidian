@@ -144,6 +144,43 @@ def test_replies_are_independent_of_topic_detail():
     connection.close()
 
 
+def test_signin_page_rolls_back_favorites():
+    connection = connect(':memory:')
+    _seed(connection)
+    rebuild_platform(connection, 'v2ex')
+    before = business_rows(connection, TABLES)
+
+    record_text(
+        connection,
+        'v2ex.fav.page',
+        '<html><form action="/signin" method="post"></form></html>',
+        request={'url': 'https://www.v2ex.com/my/topics'},
+    )
+
+    with pytest.raises(ProjectionError, match='signin'):
+        rebuild_platform(connection, 'v2ex')
+
+    assert business_rows(connection, TABLES) == before
+    connection.close()
+
+
+def test_invalid_reply_json_is_skipped():
+    connection = connect(':memory:')
+    _seed(connection)
+    record_text(
+        connection,
+        'v2ex.topic.replies.page',
+        '{',
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1/replies'},
+    )
+
+    result = rebuild_platform(connection, 'v2ex')
+
+    assert result.skipped == 1
+    assert len(business_rows(connection, ('v2ex_reply',))['v2ex_reply']) == 2
+    connection.close()
+
+
 def test_rebuild_is_idempotent():
     connection = connect(':memory:')
     _seed(connection)

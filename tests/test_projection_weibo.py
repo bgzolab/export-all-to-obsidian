@@ -94,6 +94,25 @@ def test_missing_long_text_is_ignored():
     connection.close()
 
 
+def test_long_text_without_post_is_reported(capsys):
+    connection = connect(':memory:')
+    record_json(
+        connection,
+        'weibo.longtext',
+        {'data': {'longTextContent': 'full text'}},
+        request={
+            'url': 'https://weibo.com/ajax/statuses/longtext',
+            'params': {'id': 'AbCdEf'},
+        },
+    )
+
+    result = rebuild_platform(connection, 'weibo')
+
+    assert result.rows == 0
+    assert '辅助数据未命中主行' in capsys.readouterr().out
+    connection.close()
+
+
 def test_rebuild_is_idempotent():
     connection = connect(':memory:')
     record_json(connection, 'weibo.likes.page', _likes())

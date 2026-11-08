@@ -48,6 +48,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
         connection,
         ARTICLE_ENDPOINT,
         result=result,
+        skip_invalid_json=True,
     ):
         result.rows += apply_handler(
             ARTICLE_ENDPOINT,
