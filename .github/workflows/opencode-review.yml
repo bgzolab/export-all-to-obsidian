@@ -73,27 +73,42 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/review"
+          mkdir -p "$RUNNER_TEMP/review/fetch"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/.github/scripts"
           for name in configure-opencode-permissions.sh install_opencode.sh \
                       opencode_review_turn.sh review_verdict.sh; do
-            err="$RUNNER_TEMP/review/${name}.err"
-            if json=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github/scripts/${name}?ref=${BASE_SHA}" 2>"$err"); then
-              content=$(jq -r 'select(.type == "file") | .content // empty' <<<"$json")
-              if [ -z "${content}" ]; then
-                echo "::error::基线里的 ${name} 不是文件或缺少内容" >&2
-                exit 1
-              fi
-              printf '%s' "${content}" | base64 -d > "$RUNNER_TEMP/review/${name}"
-            elif grep -q 'HTTP 404' "$err"; then
-              # 只有「基线里还没有这个脚本」才回退；其它 API 错误必须暴露出来，
-              # 否则一次限流就会静默退回被审查分支的副本
-              echo "::warning::${name} 不在基线 ${BASE_SHA} 中，暂时使用工作区副本" >&2
-              cp ".github/scripts/${name}" "$RUNNER_TEMP/review/${name}"
-            else
-              cat "$err" >&2
+            body="$RUNNER_TEMP/review/fetch/${name}.json"
+            if ! code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 30 \
+                 -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                 "${api}/${name}?ref=${BASE_SHA}"); then
               echo "::error::无法从基线 ${BASE_SHA} 获取 ${name}" >&2
               exit 1
             fi
+            case "$code" in
+              200) ;;
+              404)
+                # 只有「基线里还没有这个脚本」才回退；其它 API 错误必须暴露出来，
+                # 否则一次限流就会静默退回被审查分支的副本
+                echo "::warning::${name} 不在基线 ${BASE_SHA} 中，暂时使用工作区副本" >&2
+                if [ ! -f ".github/scripts/${name}" ]; then
+                  echo "::error::基线与当前分支都没有 ${name}" >&2
+                  exit 1
+                fi
+                cp ".github/scripts/${name}" "$RUNNER_TEMP/review/${name}"
+                continue
+                ;;
+              *)
+                echo "::error::无法从基线 ${BASE_SHA} 获取 ${name}（HTTP ${code}）" >&2
+                cat "$body" >&2
+                exit 1
+                ;;
+            esac
+            content=$(jq -r 'select(.type == "file") | .content // empty' "$body")
+            if [ -z "${content}" ]; then
+              echo "::error::基线里的 ${name} 不是文件或缺少内容" >&2
+              exit 1
+            fi
+            printf '%s' "${content}" | base64 -d > "$RUNNER_TEMP/review/${name}"
           done
       # deny 规则与只读 agent（default_agent=ci-readonly）由脚本统一写入全局配置
       # （~/.config/opencode/opencode.json），不要写进仓库目录：opencode 结束时会对
@@ -101,17 +116,16 @@ jobs:
       # 与 opencode-comment 共用同一脚本，避免安全策略漂移。
       - name: Configure opencode CI permissions (read-only agent, deny rm / git commit / git push)
         run: bash "$RUNNER_TEMP/review/configure-opencode-permissions.sh"
-      # 说明：下面内联了 anomalyco/opencode/github 的 composite 步骤
-      # （v1.18.33 / 51ef4be1d3c122f18fefb510dca8d778571f4f18）。原 action 的
-      # 「Get opencode version」步骤用未认证 curl 请求 GitHub API，共享 runner 上
-      # 容易触发限流（60 次/小时）并让整步直接失败，而 action 没有对应 input 可用。
-      # 内联后：版本查询走 gh api（认证额度 5000 次/小时）且失败不中断 job。
-      - name: Get opencode version (authenticated, non-fatal)
+      # 版本取自 npm 的 opencode-ai（v1 线）；GitHub 的 latest release 可能是
+      # OpenCode 2，装不上 v1 的平台包。同一个元数据源也保证版本与随后安装的平台
+      # 包一致，不会出现「release 已发、npm 包还没发」的窗口。
+      - name: Get opencode version (npm v1 channel, non-fatal)
         id: version
         run: |
           VERSION=""
           for attempt in 1 2 3; do
-            if VERSION=$(gh api repos/anomalyco/opencode/releases/latest --jq '.tag_name' 2>/dev/null) && [ -n "${VERSION}" ]; then
+            if VERSION=$(curl -fsSL --max-time 20 https://registry.npmjs.org/opencode-ai/latest 2>/dev/null | jq -r '.version // empty') \
+               && [ -n "${VERSION}" ]; then
               break
             fi
 
@@ -121,7 +135,7 @@ jobs:
               sleep 2
             fi
           done
-          # 三连失败时回退到已知良好的固定版本：保证任何路径下安装版本可复现，
+          # 三连失败时回退到已知良好的固定版本：保证任何路径下安装版本可复现
           # 第三方安装端点只影响下载、不影响版本选择
           if [ -z "${VERSION}" ]; then
             VERSION="${OPENCODE_FALLBACK_VERSION}"

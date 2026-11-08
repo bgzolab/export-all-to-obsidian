@@ -32,14 +32,21 @@ if [ "$arch" = x64 ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then
 fi
 
 pkg="opencode-linux-${arch}"
-meta="$(curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 60 \
-  "https://registry.npmjs.org/${pkg}/${version}")"
-tarball="$(jq -r '.dist.tarball // empty' <<<"$meta")"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+if ! curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 60 \
+     -o "$tmp/meta.json" "https://registry.npmjs.org/${pkg}/${version}"; then
+  echo "::error::${pkg}@${version} 的 npm 元数据获取失败（版本未发布或 registry 不可用）" >&2
+  exit 1
+fi
+tarball="$(jq -r '.dist.tarball // empty' "$tmp/meta.json")"
 if [ -z "$tarball" ]; then
   echo "::error::${pkg}@${version} 元数据里没有 dist.tarball" >&2
   exit 1
 fi
-integrity="$(jq -r '.dist.integrity // empty' <<<"$meta" | awk '{print $1}')"
+integrity="$(jq -r '.dist.integrity // empty' "$tmp/meta.json" | awk '{print $1}')"
 case "$integrity" in
   sha512-*) ;;
   *)
@@ -47,9 +54,6 @@ case "$integrity" in
     exit 1
     ;;
 esac
-
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
 
 # -f：4xx/5xx 直接失败，绝不把错误页喂给 tar；--retry-all-errors 覆盖 5xx 与连接重置
 curl -fL --retry 3 --retry-delay 3 --retry-all-errors --max-time 300 \

@@ -44,17 +44,15 @@ jobs:
       # 需要改代码时由 agent 在回复里给出 diff。
       - name: Configure opencode CI permissions (read-only agent, deny rm / git commit / git push)
         run: bash .github/scripts/configure-opencode-permissions.sh
-      # 说明：下面内联了 anomalyco/opencode/github 的 composite 步骤
-      # （v1.18.33 / 51ef4be1d3c122f18fefb510dca8d778571f4f18）。原 action 的
-      # 「Get opencode version」步骤用未认证 curl 请求 GitHub API，共享 runner 上
-      # 容易触发限流（60 次/小时）并让整步直接失败；内联后版本查询走 gh api（认证
-      # 额度 5000 次/小时）且失败不中断，安装固定版本并限时。
-      - name: Get opencode version (authenticated, non-fatal)
+      # 版本取自 npm 的 opencode-ai（v1 线）；GitHub 的 latest release 可能是
+      # OpenCode 2，装不上 v1 的平台包。
+      - name: Get opencode version (npm v1 channel, non-fatal)
         id: version
         run: |
           VERSION=""
           for attempt in 1 2 3; do
-            if VERSION=$(gh api repos/anomalyco/opencode/releases/latest --jq '.tag_name' 2>/dev/null) && [ -n "${VERSION}" ]; then
+            if VERSION=$(curl -fsSL --max-time 20 https://registry.npmjs.org/opencode-ai/latest 2>/dev/null | jq -r '.version // empty') \
+               && [ -n "${VERSION}" ]; then
               break
             fi
 
