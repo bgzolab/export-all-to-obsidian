@@ -162,6 +162,9 @@
   handling, and `eto db rebuild <platform>`.
 - 2026-11-08: T7 bilibili/github/zhihu parsers completed, with idempotency,
   multi-membership, README auxiliary and rollback tests.
+- 2026-11-08: T7 v2ex/weibo parsers completed. V2EX now fetches all reply pages
+  under `--db-only` and stores them independently from topic details; Weibo long
+  text is applied by `mblogid` without overwriting the main response provenance.
 
 ## Notes
 

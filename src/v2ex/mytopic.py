@@ -36,14 +36,8 @@ def get_fav_html_with_page(page: int) -> str:
     return response.text
 
 
-def get_fav_list_topic_id_page(page: int) -> list[int]:
-    """
-    获取我的主题页面的主题ID列表
-
-    :param page: 页码
-    :return: 主题ID列表
-    """
-    fav_html = get_fav_html_with_page(page)
+def parse_fav_topic_ids(fav_html: str) -> list[int]:
+    """从收藏页 HTML 中解析主题 ID，保留顺序并去重。"""
     soup = BeautifulSoup(fav_html, 'html.parser')
     topic_id_list = []
     for topic_link in soup.select('a[href^="/t/"]'):
@@ -56,6 +50,16 @@ def get_fav_list_topic_id_page(page: int) -> list[int]:
                 continue
     # 使用 dict.fromkeys 保留插入顺序去重 (Python 3.7+)
     return list(dict.fromkeys(topic_id_list))
+
+
+def get_fav_list_topic_id_page(page: int) -> list[int]:
+    """
+    获取我的主题页面的主题ID列表
+
+    :param page: 页码
+    :return: 主题ID列表
+    """
+    return parse_fav_topic_ids(get_fav_html_with_page(page))
 
 
 if __name__ == '__main__':

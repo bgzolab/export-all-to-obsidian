@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import is_db_only, mark_run_partial
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -13,6 +13,7 @@ from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 from utils.template import WebPage
 from v2ex.mytopic import get_fav_list_topic_id_page
+from v2ex.replies import fetch_all_replies
 from v2ex.topic import get_v2ex_topic_info
 
 
@@ -27,6 +28,8 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
         for topic_id in id_list:
             try:
                 result = get_v2ex_topic_info(topic_id)
+                if is_db_only() and result and result.result and result.result.replies:
+                    fetch_all_replies(topic_id)
             except Exception as exc:
                 # 重试耗尽后仍失败则跳过该条目，避免单条故障中断整批同步
                 mark_run_partial()

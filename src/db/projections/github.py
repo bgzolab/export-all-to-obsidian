@@ -116,11 +116,18 @@ def _update_readme(
     if match is None:
         raise ValueError('cannot determine repository from request URL')
     full_name = f'{match.group(1)}/{match.group(2)}'
+    status_code = response.get('status_code')
+    if status_code == 404:
+        readme = ''
+    elif status_code == 200:
+        readme = _decode_readme(body)
+    else:
+        return 0
     return update_aux(
         connection,
         'github_star',
         {'full_name': full_name},
-        {'readme': _decode_readme(body)},
+        {'readme': readme},
         'readme_response_id',
         response['id'],
         now,

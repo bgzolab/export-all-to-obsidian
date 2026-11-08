@@ -4,10 +4,13 @@
 @Links : https://github.com/bGZo
 """
 
+from types import SimpleNamespace
+
 import pytest
 from urllib3.util.retry import Retry
 
 from v2ex.cilent import V2exClient
+from v2ex.replies import fetch_all_replies
 
 
 def _write_cookies_file(tmp_path, line):
@@ -75,3 +78,34 @@ def test_v2ex_client_missing_cookie_raises(monkeypatch, tmp_path):
     monkeypatch.setenv('COOKIES', p)
     with pytest.raises(ValueError, match='No cookies found'):
         V2exClient()
+
+
+def test_fetch_all_replies_reads_pages_until_empty(monkeypatch):
+    pages = {1: [{'id': 1}], 2: [{'id': 2}], 3: []}
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        calls.append((endpoint, kwargs['params']['p']))
+        return FakeResponse({'result': pages[kwargs['params']['p']]})
+
+    monkeypatch.setattr(
+        'v2ex.replies.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr('v2ex.replies.http.get', fake_get)
+
+    assert fetch_all_replies(1) == 2
+    assert calls == [
+        ('v2ex.topic.replies.page', 1),
+        ('v2ex.topic.replies.page', 2),
+        ('v2ex.topic.replies.page', 3),
+    ]

@@ -14,12 +14,14 @@ def record_json(
     endpoint: str,
     payload: Any,
     request: Any = None,
+    status_code: int = 200,
 ) -> int:
     return _record(
         connection,
         endpoint,
         body=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
         request=request,
+        status_code=status_code,
     )
 
 
@@ -28,8 +30,15 @@ def record_text(
     endpoint: str,
     text: str,
     request: Any = None,
+    status_code: int = 200,
 ) -> int:
-    return _record(connection, endpoint, body=text.encode('utf-8'), request=request)
+    return _record(
+        connection,
+        endpoint,
+        body=text.encode('utf-8'),
+        request=request,
+        status_code=status_code,
+    )
 
 
 def record_missing(
@@ -55,6 +64,7 @@ def _record(
     *,
     body: bytes,
     request: Any,
+    status_code: int,
 ) -> int:
     run_id = start_run(connection, 'test', endpoint)
     response_id = record_response(
@@ -62,7 +72,7 @@ def _record(
         run_id,
         endpoint=endpoint,
         request=request or {},
-        status_code=200,
+        status_code=status_code,
         body=body,
     )
     finish_run(connection, run_id, 'success')
