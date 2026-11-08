@@ -106,7 +106,7 @@
 
 ### T7. 其余平台
 
-- Status: In progress
+- Status: Completed
 - 每个平台一个任务、一个解析器文件、一个测试文件；不改表结构。
 - Order:
   1. `bilibili`：`bilibili.favlist.page` -> 3 张表。
@@ -165,6 +165,9 @@
 - 2026-11-08: T7 v2ex/weibo parsers completed. V2EX now fetches all reply pages
   under `--db-only` and stores them independently from topic details; Weibo long
   text is applied by `mblogid` without overwriting the main response provenance.
+- 2026-11-08: T7 qireader/cnblog/twitter parsers completed. All nine platforms
+  are registered in `SUPPORTED_PLATFORMS`; non-200 auxiliary bodies are skipped
+  instead of being stored as content.
 
 ## Notes
 

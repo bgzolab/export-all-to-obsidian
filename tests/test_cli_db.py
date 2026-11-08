@@ -314,7 +314,7 @@ def test_db_only_does_not_require_output(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert seen == {'output': '', 'enabled': False}
-    assert 'projection not implemented: cnblog' in result.output
+    assert '投影完成: 0 个响应，0 行' in result.output
 
 
 def test_without_db_only_output_is_required(tmp_path):
