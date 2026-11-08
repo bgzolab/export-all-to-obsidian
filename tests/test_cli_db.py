@@ -5,7 +5,31 @@ import sqlite3
 from click.testing import CliRunner
 
 from app.credential_guard import CredentialProbeResult
+from db.connection import connect
 from export_to_obsidian import eto
+from tests.projection_helpers import record_json
+
+BANGUMI_COLLECTION = {
+    'subject_id': 1,
+    'id': 1001,
+    'updated_at': '2026-01-02T03:04:05+08:00',
+    'tags': [],
+    'vol_status': 0,
+    'ep_status': 0,
+    'subject_type': 2,
+    'rate': 0,
+    'type': 3,
+    'private': False,
+    'subject': {'id': 1, 'name': 'Subject'},
+}
+
+BANGUMI_SUBJECT = {
+    'id': 1,
+    'name': 'Subject',
+    'name_cn': '条目',
+    'date': '2020-01-01',
+    'type': 2,
+}
 
 
 def _invoke_cnblog(monkeypatch, db_path: str | None):
@@ -259,6 +283,235 @@ def test_cli_survives_finish_run_failure(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert '结束 sync_run 失败' in result.output
+
+
+def _seed_bangumi_raw(db_path) -> None:
+    connection = connect(db_path)
+    record_json(
+        connection,
+        'bangumi.collections.page',
+        {'data': [BANGUMI_COLLECTION]},
+    )
+    record_json(connection, 'bangumi.subject.detail', BANGUMI_SUBJECT)
+    connection.close()
+
+
+def test_db_only_does_not_require_output(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    seen = {}
+
+    def fake_export(output, index_writer):
+        seen['output'] = output
+        seen['enabled'] = index_writer.enabled
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr('app.cli.export_cnblog', fake_export)
+
+    result = CliRunner().invoke(eto, ['--db', db_path, '--db-only', 'cnblog'])
+
+    assert result.exit_code == 0, result.output
+    assert seen == {'output': '', 'enabled': False}
+    assert 'projection not implemented: cnblog' in result.output
+
+
+def test_without_db_only_output_is_required(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), 'cnblog'],
+    )
+
+    assert result.exit_code == 2
+    assert '--output/-o is required' in result.output
+
+
+def test_without_db_only_template_is_required(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            str(tmp_path / 'eto.db'),
+            'bangumi',
+            '-s',
+            '2',
+            '-o',
+            str(tmp_path / 'output'),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert '--template/-t is required' in result.output
+
+
+def test_db_only_rejects_index_file(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db-only',
+            '--index-file',
+            str(tmp_path / 'index.md'),
+            '--db',
+            str(tmp_path / 'eto.db'),
+            'cnblog',
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert '--index-file cannot be used with --db-only' in result.output
+
+
+def test_db_only_suppresses_markdown_and_index(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    output_dir = tmp_path / 'output'
+
+    def fake_export(output, index_writer):
+        from export_runtime.exporter_support import (
+            add_index_entry,
+            stop_if_output_exists,
+            write_markdown_output,
+        )
+
+        assert output == ''
+        assert not stop_if_output_exists(
+            str(output_dir),
+            'demo',
+            index_writer=index_writer,
+            section_name='cnblog',
+        )
+        write_markdown_output(str(output_dir), 'demo', {'title': 'demo'}, 'body')
+        add_index_entry(index_writer, link_target='demo', title='demo')
+        index_writer.flush('cnblog')
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr('app.cli.export_cnblog', fake_export)
+
+    result = CliRunner().invoke(eto, ['--db', db_path, '--db-only', 'cnblog'])
+
+    assert result.exit_code == 0, result.output
+    assert not output_dir.exists()
+    assert '导出index' not in result.output
+
+
+def test_db_only_projects_after_fetch(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+
+    def fake_export(subject_type, collection_type, output, template, writer, force):
+        assert output == ''
+        assert template == ''
+        connection = connect(db_path)
+        record_json(
+            connection,
+            'bangumi.collections.page',
+            {'data': [BANGUMI_COLLECTION]},
+        )
+        record_json(connection, 'bangumi.subject.detail', BANGUMI_SUBJECT)
+        connection.close()
+
+    monkeypatch.setattr(
+        'app.cli.probe_bangumi_credentials',
+        lambda: CredentialProbeResult.valid('bangumi'),
+    )
+    monkeypatch.setattr('app.cli.export_bangumi', fake_export)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'bangumi', '-s', '2', '-c', '3'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '投影完成: 2 个响应，2 行' in result.output
+    connection = connect(db_path)
+    assert (
+        connection.execute('SELECT count(*) FROM bangumi_collection').fetchone()[0] == 1
+    )
+    assert connection.execute('SELECT count(*) FROM bangumi_subject').fetchone()[0] == 1
+    run = connection.execute(
+        "SELECT status FROM sync_run WHERE platform = 'bangumi' "
+        'ORDER BY id DESC LIMIT 1'
+    ).fetchone()
+    assert run['status'] == 'success'
+    connection.close()
+
+
+def test_db_only_projection_failure_marks_run_partial(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+
+    def fake_export(subject_type, collection_type, output, template, writer, force):
+        connection = connect(db_path)
+        record_json(connection, 'bangumi.collections.page', {'data': 'bad'})
+        connection.close()
+
+    monkeypatch.setattr(
+        'app.cli.probe_bangumi_credentials',
+        lambda: CredentialProbeResult.valid('bangumi'),
+    )
+    monkeypatch.setattr('app.cli.export_bangumi', fake_export)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'bangumi', '-s', '2', '-c', '3'],
+    )
+
+    assert result.exit_code != 0
+    assert '投影失败' in result.output
+    connection = connect(db_path)
+    run = connection.execute(
+        "SELECT status FROM sync_run WHERE platform = 'bangumi' "
+        'ORDER BY id DESC LIMIT 1'
+    ).fetchone()
+    assert run['status'] == 'partial'
+    connection.close()
+
+
+def test_db_rebuild_bangumi(tmp_path):
+    db_path = tmp_path / 'eto.db'
+    _seed_bangumi_raw(db_path)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), 'db', 'rebuild', 'bangumi'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '重建完成: 2 个响应，2 行' in result.output
+    connection = connect(db_path)
+    assert (
+        connection.execute(
+            'SELECT name_cn FROM bangumi_subject WHERE subject_id = 1'
+        ).fetchone()[0]
+        == '条目'
+    )
+    connection.close()
+
+
+def test_db_rebuild_rejects_unknown_platform(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), 'db', 'rebuild', 'unknown'],
+    )
+
+    assert result.exit_code == 2
+    assert 'Invalid value' in result.output
+
+
+def test_db_rebuild_reports_projection_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        'app.cli.rebuild_platform',
+        lambda connection, platform: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), 'db', 'rebuild', 'bangumi'],
+    )
+
+    assert result.exit_code == 1
+    assert '投影失败: boom' in result.output
 
 
 def test_v2ex_list_failure_marks_run_failed(monkeypatch, tmp_path):

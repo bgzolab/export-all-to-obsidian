@@ -70,7 +70,7 @@
 
 ### T5. `--db-only` 模式
 
-- Status: Planned
+- Status: Completed
 - Files: `src/app/cli.py`, `src/app/context.py`,
   `src/export_runtime/exporter_support.py`, `src/export_runtime/index_writer.py`,
   `tests/test_cli_db.py`
@@ -96,7 +96,7 @@
 
 ### T6. 重建 CLI
 
-- Status: Planned
+- Status: Completed
 - Files: `src/app/cli.py`, `tests/test_cli_db.py`
 - Work:
   - 增加 `eto --db data/eto.db db rebuild <platform>`。
@@ -156,6 +156,10 @@
   `_upsert` helpers and the Bangumi parser. Rebuilds run in one transaction,
   skip stale responses, keep the main `response_id` on auxiliary updates and roll
   back on invalid or missing raw bodies.
+- 2026-11-08: T5/T6 completed. Added top-level `--db-only`, optional `-o` / `-t`
+  with runtime validation, centralized output suppression, disabled `IndexWriter`,
+  Bangumi/GitHub output exceptions, projection after fetch with partial/failed run
+  handling, and `eto db rebuild <platform>`.
 
 ## Notes
 

@@ -11,6 +11,7 @@ class IndexWriter:
     file_path: str | None = None
     title: str = '输出index'
     _entries: list[str] | None = None
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         """初始化索引条目列表。"""
@@ -19,6 +20,8 @@ class IndexWriter:
 
     def add(self, entry: str) -> None:
         """追加一条索引内容。"""
+        if not self.enabled:
+            return
         if entry:
             self._entries.append(entry)
 
@@ -28,6 +31,9 @@ class IndexWriter:
 
     def flush(self, section_name: str, title: str | None = None) -> None:
         """将索引输出到控制台或指定 Markdown 文件。"""
+        if not self.enabled:
+            self._entries.clear()
+            return
         output_title = title or self.title
         content = self.render()
         if self.file_path:

@@ -8,6 +8,7 @@ from app.context import (
     get_index_writer,
     get_output_prefix,
     initialize_context,
+    is_db_only,
     run_action,
 )
 from app.credential_guard import (
@@ -26,6 +27,7 @@ from bangumi.exporter import sync_all_collections
 from bilibili.exporter import export as export_bilibili
 from cnblog.exporter import export as export_cnblog
 from db.import_markdown import import_markdown
+from db.projections import SUPPORTED_PLATFORMS, rebuild_platform
 from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
 from twitter.exporter import TWITTER_MAX_PAGES
@@ -60,6 +62,11 @@ from zhihu.exporter import export as export_zhihu
     default=None,
     help='SQLite 数据库路径；默认 data/eto.db',
 )
+@click.option(
+    '--db-only',
+    is_flag=True,
+    help='只写入数据库，不生成 Markdown 和索引',
+)
 @click.pass_context
 def eto(
     ctx: click.Context,
@@ -67,15 +74,40 @@ def eto(
     prefix: str,
     cookies_file: str | None,
     db_path: str | None,
+    db_only: bool,
 ) -> None:
     """导出命令组。"""
-    initialize_context(ctx, index_file, prefix, cookies_file, db_path)
+    initialize_context(
+        ctx,
+        index_file,
+        prefix,
+        cookies_file,
+        db_path,
+        db_only,
+    )
+
+
+def _output_dir(output: str | None) -> str:
+    if is_db_only():
+        return output or ''
+    if not output:
+        raise click.UsageError('--output/-o is required')
+    return output
+
+
+def _template_path(template: str | None) -> str:
+    if is_db_only():
+        return template or ''
+    if not template:
+        raise click.UsageError('--template/-t is required')
+    return template
 
 
 @eto.command()
-@click.option('--output', '-o', required=True, help='输出目录')
-def cnblog(output: str) -> None:
+@click.option('--output', '-o', required=False, help='输出目录')
+def cnblog(output: str | None) -> None:
     """导出博客园收藏。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'cnblog',
         probe_cnblog_credentials,
@@ -89,19 +121,21 @@ def cnblog(output: str) -> None:
 
 
 @eto.command()
-@click.option('--template', '-t', required=True, type=str, help='模板文件')
+@click.option('--template', '-t', required=False, type=str, help='模板文件')
 @click.option('--subject_type', '-s', required=True, type=int, help='主题类型')
-@click.option('--output', '-o', required=True, help='输出目录')
+@click.option('--output', '-o', required=False, help='输出目录')
 @click.option('--collection_type', '-c', required=False, type=int, help='收藏类型')
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
 def bangumi(
     subject_type: int,
     collection_type: int | None,
-    output: str,
-    template: str,
+    output: str | None,
+    template: str | None,
     force: bool,
 ) -> None:
     """导出 Bangumi 收藏。"""
+    output = _output_dir(output)
+    template = _template_path(template)
 
     def export_action() -> None:
         index_writer = get_index_writer()
@@ -137,9 +171,10 @@ def bangumi(
 
 @eto.command()
 @click.option('--tag', '-t', required=True, type=str, help='收藏夹ID')
-@click.option('--output', '-o', required=True, help='输出目录')
-def qireader(tag: str, output: str) -> None:
+@click.option('--output', '-o', required=False, help='输出目录')
+def qireader(tag: str, output: str | None) -> None:
     """导出稍后读列表。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'qireader',
         lambda: probe_qireader_credentials(tag),
@@ -153,9 +188,10 @@ def qireader(tag: str, output: str) -> None:
 
 
 @eto.command()
-@click.option('--output', '-o', required=True, help='输出目录')
-def v2ex(output: str) -> None:
+@click.option('--output', '-o', required=False, help='输出目录')
+def v2ex(output: str | None) -> None:
     """导出 V2EX 收藏主题。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'v2ex',
         probe_v2ex_credentials,
@@ -169,7 +205,7 @@ def v2ex(output: str) -> None:
 
 
 @eto.command()
-@click.option('--output', '-o', required=True, help='输出目录')
+@click.option('--output', '-o', required=False, help='输出目录')
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
 @click.option(
     '--max-pages',
@@ -179,8 +215,9 @@ def v2ex(output: str) -> None:
     help=f'Twitter 点赞最大分页数（默认 {TWITTER_MAX_PAGES}，即约 '
     f'{TWITTER_MAX_PAGES * 20} 条）',
 )
-def twitter(output: str, force: bool, max_pages: int | None) -> None:
+def twitter(output: str | None, force: bool, max_pages: int | None) -> None:
     """导出 Twitter 点赞。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'twitter',
         probe_twitter_credentials,
@@ -195,9 +232,10 @@ def twitter(output: str, force: bool, max_pages: int | None) -> None:
 
 @eto.command()
 @click.option('--collection', '-c', required=True, help='收藏夹')
-@click.option('--output', '-o', required=True, help='输出目录')
-def zhihu(collection: str, output: str) -> None:
+@click.option('--output', '-o', required=False, help='输出目录')
+def zhihu(collection: str, output: str | None) -> None:
     """导出知乎收藏夹。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'zhihu',
         lambda: probe_zhihu_credentials(collection),
@@ -212,10 +250,11 @@ def zhihu(collection: str, output: str) -> None:
 
 @eto.command()
 @click.option('--uid', '-u', required=True, help='用户ID')
-@click.option('--output', '-o', required=True, help='输出目录')
+@click.option('--output', '-o', required=False, help='输出目录')
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
-def weibo(uid: int, output: str, force: bool) -> None:
+def weibo(uid: int, output: str | None, force: bool) -> None:
     """导出微博点赞。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'weibo',
         lambda: probe_weibo_credentials(uid),
@@ -230,10 +269,11 @@ def weibo(uid: int, output: str, force: bool) -> None:
 
 @eto.command()
 @click.option('--fid', '-f', required=True, help='收藏夹ID')
-@click.option('--output', '-o', required=True, help='输出目录')
+@click.option('--output', '-o', required=False, help='输出目录')
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
-def bilibili(fid: int, output: str, force: bool) -> None:
+def bilibili(fid: int, output: str | None, force: bool) -> None:
     """导出 Bilibili 收藏夹。"""
+    output = _output_dir(output)
     run_with_credential_guard(
         'bilibili',
         lambda: probe_bilibili_credentials(fid),
@@ -247,11 +287,13 @@ def bilibili(fid: int, output: str, force: bool) -> None:
 
 
 @eto.command()
-@click.option('--template', '-t', required=True, type=str, help='模板文件')
-@click.option('--output', '-o', required=True, help='输出目录')
+@click.option('--template', '-t', required=False, type=str, help='模板文件')
+@click.option('--output', '-o', required=False, help='输出目录')
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
-def github(template: str, output: str, force: bool) -> None:
+def github(template: str | None, output: str | None, force: bool) -> None:
     """导出 GitHub stars。"""
+    output = _output_dir(output)
+    template = _template_path(template)
     run_action(
         'github',
         'stars',
@@ -264,6 +306,22 @@ def github(template: str, output: str, force: bool) -> None:
             get_output_prefix(),
         ),
     )
+
+
+@eto.group()
+def db() -> None:
+    """数据库维护命令。"""
+
+
+@db.command('rebuild')
+@click.argument('platform', type=click.Choice(SUPPORTED_PLATFORMS))
+def db_rebuild(platform: str) -> None:
+    """从 raw 响应重建平台投影表。"""
+    try:
+        result = rebuild_platform(get_database(), platform)
+    except Exception as exc:
+        raise click.ClickException(f'投影失败: {exc}') from exc
+    click.echo(f'重建完成: {result.responses} 个响应，{result.rows} 行')
 
 
 @eto.command(name='import-markdown')
