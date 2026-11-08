@@ -121,6 +121,21 @@ def _upsert_stars(
     return rows
 
 
+def known_repo_ids(
+    connection: sqlite3.Connection,
+    repo_ids: list[int],
+) -> set[int]:
+    """Return the subset of repo ids already present in the projection."""
+    if not repo_ids:
+        return set()
+    placeholders = ','.join('?' for _ in repo_ids)
+    rows = connection.execute(
+        f'SELECT repo_id FROM github_star WHERE repo_id IN ({placeholders})',
+        repo_ids,
+    )
+    return {row['repo_id'] for row in rows}
+
+
 def readme_exists(connection: sqlite3.Connection, repo_id: int) -> bool:
     """Return whether the repository README is already projected."""
     return (

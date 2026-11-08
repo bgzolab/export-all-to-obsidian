@@ -75,7 +75,7 @@ that existing rows do not move behind newer rows:
 | Platform | Order | Risk |
 | --- | --- | --- |
 | twitter | cursor, reverse chronological | low |
-| qireader | `olderThan` timestamp cursor | low |
+| qireader | `olderThan` timestamp cursor | low (Stage 2 deferred until tag scope is modeled) |
 | github | default `created` desc | low |
 | bilibili | `order=mtime` desc | low |
 | weibo | time desc (verify) | medium |

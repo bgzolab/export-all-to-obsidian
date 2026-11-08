@@ -9,7 +9,8 @@ Twitter 点赞导出流程。
 import re
 from datetime import datetime, timedelta, timezone
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import twitter as twitter_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -162,6 +163,17 @@ def export(
             except Exception as error:
                 mark_run_partial()
                 print(f'处理报文发生错误: {error}，跳过处理')
+
+        tweet_ids = [tweet.id_str for tweet in page.tweets]
+        if is_db_only() and not force and tweet_ids:
+            known = twitter_projection.known_tweet_ids(
+                get_database(),
+                tweet_ids,
+            )
+            if all(tweet_id in known for tweet_id in tweet_ids):
+                mark_run_partial()
+                print('分页已到达已知数据，停止')
+                break
 
         if page.cursor_bottom is None or not page.cursor_bottom.value:
             break

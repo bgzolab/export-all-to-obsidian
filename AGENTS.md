@@ -115,8 +115,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - API responses and imported Markdown are appended to `sync_response`. `--db-only` uses the
   projection tables as a detail/aux pruning hint (list pages are still fetched); `--force`
   disables that pruning. Detail/aux pruning keeps the run `success` because the list is
-  complete; future page-level pruning must mark such runs `partial` and exclude them from
-  deletion detection.
+  complete. github/bilibili/twitter also stop pagination when a whole page is already known;
+  those runs are `partial` and must not drive deletion detection. Other platforms only have
+  detail/aux pruning until their ordering is verified.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip

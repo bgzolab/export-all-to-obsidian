@@ -22,6 +22,23 @@ ENDPOINT = 'bilibili.favlist.page'
 DELETE_ORDER = ('bilibili_fav_item', 'bilibili_media', 'bilibili_fav')
 
 
+def known_media_ids(
+    connection: sqlite3.Connection,
+    fav_id: int,
+    media_ids: list[int],
+) -> set[int]:
+    """Return media ids already linked to the favourite folder."""
+    if not media_ids:
+        return set()
+    placeholders = ','.join('?' for _ in media_ids)
+    rows = connection.execute(
+        'SELECT media_id FROM bilibili_fav_item '
+        f'WHERE fav_id = ? AND media_id IN ({placeholders})',
+        [fav_id, *media_ids],
+    )
+    return {row['media_id'] for row in rows}
+
+
 def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     """Rebuild favourite folders, videos and their membership rows."""
     now = raw.utc_now()

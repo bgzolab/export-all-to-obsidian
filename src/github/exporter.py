@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 
-from app.context import get_database, is_db_only
+from app.context import get_database, is_db_only, mark_run_partial
 from db.projections import github as github_projection
 from export_runtime.exporter_support import (
     add_index_entry,
@@ -134,6 +134,17 @@ def export(
                 title=item.full_name,
             )
             print(f'Done: {item.full_name}')
+
+        repo_ids = [item.repo_id for item in items]
+        if is_db_only() and not force and repo_ids:
+            known = github_projection.known_repo_ids(
+                get_database(),
+                repo_ids,
+            )
+            if all(repo_id in known for repo_id in repo_ids):
+                mark_run_partial()
+                print('分页已到达已知数据，停止')
+                break
 
         page += 1
 

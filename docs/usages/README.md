@@ -119,6 +119,7 @@ eto --db ./data/eto.db zhihu -c your-collection-id -o output/zhihu
 - 不因目标文件已存在而提前结束；`--max-pages` 等显式抓取范围参数仍然生效。
 - 默认启用增量剪枝：列表页照常抓取，但已存在的详情/辅助请求（如 README、长文、
   正文、角色、主题详情）会跳过；传 `--force` 可关闭剪枝并完整抓取。
+- github/bilibili/twitter 在整页条目都已知时停止后续分页，本次 run 标记为 `partial`。
 - 抓取结束后在同一 `sync_run` 内重建该平台的投影表。
 - 传输错误和非 200 响应在重建时跳过并计数；200 响应解析失败或违反约束仍会整体回滚。
 - 投影失败时本次 run 标记为 `partial`，命令非零退出；raw 已保存，可稍后执行

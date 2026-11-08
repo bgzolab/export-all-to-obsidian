@@ -38,14 +38,14 @@
 
 ## Stage 2. 整页已知停止分页
 
-- Status: Planned（后续 PR）
+- Status: Completed（github/bilibili/twitter；qireader 暂缓）
 - Files: 各平台 exporter、`src/app/context.py`、`tests/test_cli_db.py`
 - Work:
   - 每页处理后查询该页全部自然键是否已知（按 scope）。
   - 整页已知才停止后续分页；页内有一条新数据就继续。
   - 剪枝时 `mark_run_partial()`；`--force` 不做页级停止。
-  - 先给顺序风险低的平台接入：twitter、qireader、github、bilibili。
-  - 其余平台确认顺序后再接入；未确认的平台只保留 Stage 1。
+  - 已接入顺序风险低的平台：github、bilibili、twitter。
+  - qireader 因 tag scope 未建模，暂缓 Stage 2；其余平台确认顺序后再接入。
 - Verify:
   - 第二页整页已知时停止；页内混合新旧数据时继续。
   - 剪枝 run 为 `partial`；`--force` run 为 `success`。
@@ -65,7 +65,10 @@
 - 2026-11-08: Stage 1 completed. Added projection lookup helpers for bangumi,
   github, weibo, qireader, cnblog and v2ex; `--db-only` skips known detail/aux
   requests; `--force` disables pruning and is now available on every export
-  command. Stage 2 remains planned.
+  command.
+- 2026-11-08: Stage 2 completed for github/bilibili/twitter. A fully known page
+  stops pagination and marks the run `partial`; `--force` disables the stop.
+  qireader is deferred until tag membership is modeled.
 
 ## Notes
 
