@@ -29,7 +29,9 @@ def get_replies_page(
     if response.status_code != 200:
         response.raise_for_status()
     payload = response.json()
-    result = payload.get('result') if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        raise TypeError('unexpected replies payload')
+    result = payload.get('result')
     if result is None:
         return []
     if not isinstance(result, list):

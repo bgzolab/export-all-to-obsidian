@@ -136,8 +136,7 @@ db_updated_at TEXT NOT NULL
 
 ## 3. 平台表
 
-迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引。解析器按平台逐步实现，
-未实现的平台表保持为空。
+迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引；解析器已覆盖全部九个平台。
 
 ### 3.1 Bangumi（pilot）
 
