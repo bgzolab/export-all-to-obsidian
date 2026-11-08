@@ -5,7 +5,7 @@
 ## 用法
 
 ```shell
-eto [全局参数] qireader -t TAG -o OUTPUT
+eto [全局参数] qireader -t TAG -o OUTPUT [--force]
 ```
 
 ## 参数
@@ -14,6 +14,7 @@ eto [全局参数] qireader -t TAG -o OUTPUT
 | --- | --- | --- |
 | `-t`, `--tag` | 是 | 稍后读收藏夹 ID，形如 `tag-xxxxxxxx` |
 | `-o`, `--output` | 非 `--db-only` 时必需 | 输出目录，不存在时会自动创建 |
+| `--force` | 否 | 覆盖已有文件；`--db-only` 下关闭增量剪枝 |
 
 ## 凭证
 

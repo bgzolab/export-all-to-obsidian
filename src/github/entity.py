@@ -28,6 +28,7 @@ class GitHubStarredResponseItem:
     pushed_at: str
     starred_at: str
     readme: str = ''
+    repo_id: int = 0
 
     @staticmethod
     def from_api(data: dict[str, Any]) -> 'GitHubStarredResponseItem':
@@ -58,4 +59,5 @@ class GitHubStarredResponseItem:
             pushed_at=repo.get('pushed_at', ''),
             starred_at=data.get('starred_at', ''),
             readme=data.get('readme') or '',
+            repo_id=repo.get('id', 0),
         )

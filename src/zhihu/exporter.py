@@ -16,7 +16,12 @@ from utils.template import WebPage
 from zhihu.collection import get_collection_page
 
 
-def export(collection: str, output_dir: str, index_writer: IndexWriter) -> None:
+def export(
+    collection: str,
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+) -> None:
     """导出知乎收藏夹。"""
     offset = 0
     limit = 20
@@ -42,6 +47,7 @@ def export(collection: str, output_dir: str, index_writer: IndexWriter) -> None:
                     filename,
                     index_writer=index_writer,
                     section_name='zhihu',
+                    force=force,
                 ):
                     return
 

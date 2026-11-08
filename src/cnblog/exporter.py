@@ -1,8 +1,9 @@
 """博客园导出流程。"""
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
 from cnblog.blog_post import get_cnblog_post_body_by_url
 from cnblog.bookmark import get_bookmark_list
+from db.projections import cnblog as cnblog_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -15,7 +16,11 @@ from utils.md_utils import html_to_markdown_with_bs
 from utils.template import WebPage
 
 
-def export(output_dir: str, index_writer: IndexWriter) -> None:
+def export(
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+) -> None:
     """导出博客园收藏。"""
     page_index = 1
     page_size = 100
@@ -32,6 +37,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     index_writer=index_writer,
                     section_name='cnblog',
                     flush_title=None,
+                    force=force,
                     message='已存在，提前结束: {filename}.md',
                 ):
                     return
@@ -46,9 +52,19 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                         type='archive-web',
                     )
 
-                    body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
-                    if not body:
-                        mark_run_partial()
+                    skip_body = (
+                        is_db_only()
+                        and not force
+                        and cnblog_projection.post_exists(
+                            get_database(),
+                            bookmark.LinkUrl,
+                        )
+                    )
+                    body = ''
+                    if not skip_body:
+                        body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
+                        if not body:
+                            mark_run_partial()
 
                     write_markdown_output(
                         output_dir,

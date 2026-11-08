@@ -91,7 +91,9 @@ ruff format src tests                          # apply formatting
   `db rebuild(<platform>)`.
 - `-o` is required unless `--db-only`; `-t` is required for bangumi/github unless
   `--db-only`. Missing values raise `UsageError`.
-- `--force` currently only affects bangumi, github, weibo, bilibili, and twitter.
+- `--force` is available on every export subcommand. Outside `--db-only` it overwrites
+  existing Markdown; under `--db-only` it disables incremental pruning and fetches the full
+  scope again.
 
 ## Environment variables (required by module exports)
 
@@ -110,8 +112,11 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   `--max-pages` truncation and failure paths.
 - `--db-only` disables that pruning; explicit limits such as `--max-pages` still apply. It
   writes no Markdown and no index, and does not require `-o` / `-t`.
-- API responses and imported Markdown are appended to `sync_response`; the database is never
-  used as an incremental cursor yet.
+- API responses and imported Markdown are appended to `sync_response`. `--db-only` uses the
+  projection tables as a detail/aux pruning hint (list pages are still fetched); `--force`
+  disables that pruning. Detail/aux pruning keeps the run `success` because the list is
+  complete; future page-level pruning must mark such runs `partial` and exclude them from
+  deletion detection.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip

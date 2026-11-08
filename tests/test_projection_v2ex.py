@@ -6,6 +6,11 @@ import pytest
 
 from db.connection import connect
 from db.projections import ProjectionError, rebuild_platform
+from db.projections.v2ex import (
+    replies_exist,
+    topic_exists,
+    topic_reply_count,
+)
 from tests.projection_helpers import business_rows, record_json, record_text
 
 TABLES = ('v2ex_reply', 'v2ex_favorite', 'v2ex_topic')
@@ -231,6 +236,20 @@ def test_rebuild_is_idempotent():
     second = business_rows(connection, TABLES)
 
     assert first == second
+    connection.close()
+
+
+def test_projection_helpers_report_known_rows():
+    connection = connect(':memory:')
+    _seed(connection)
+    rebuild_platform(connection, 'v2ex')
+
+    assert topic_exists(connection, 1) is True
+    assert topic_exists(connection, 99) is False
+    assert topic_reply_count(connection, 1) == 2
+    assert topic_reply_count(connection, 99) is None
+    assert replies_exist(connection, 1) is True
+    assert replies_exist(connection, 99) is False
     connection.close()
 
 

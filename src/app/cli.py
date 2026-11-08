@@ -105,7 +105,8 @@ def _template_path(template: str | None) -> str:
 
 @eto.command()
 @click.option('--output', '-o', required=False, help='输出目录')
-def cnblog(output: str | None) -> None:
+@click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
+def cnblog(output: str | None, force: bool) -> None:
     """导出博客园收藏。"""
     output = _output_dir(output)
     run_with_credential_guard(
@@ -115,7 +116,7 @@ def cnblog(output: str | None) -> None:
             'cnblog',
             'bookmarks',
             None,
-            lambda: export_cnblog(output, get_index_writer()),
+            lambda: export_cnblog(output, get_index_writer(), force),
         ),
     )
 
@@ -172,7 +173,8 @@ def bangumi(
 @eto.command()
 @click.option('--tag', '-t', required=True, type=str, help='收藏夹ID')
 @click.option('--output', '-o', required=False, help='输出目录')
-def qireader(tag: str, output: str | None) -> None:
+@click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
+def qireader(tag: str, output: str | None, force: bool) -> None:
     """导出稍后读列表。"""
     output = _output_dir(output)
     run_with_credential_guard(
@@ -182,14 +184,15 @@ def qireader(tag: str, output: str | None) -> None:
             'qireader',
             'readlater',
             tag,
-            lambda: export_qireader(tag, output, get_index_writer()),
+            lambda: export_qireader(tag, output, get_index_writer(), force),
         ),
     )
 
 
 @eto.command()
 @click.option('--output', '-o', required=False, help='输出目录')
-def v2ex(output: str | None) -> None:
+@click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
+def v2ex(output: str | None, force: bool) -> None:
     """导出 V2EX 收藏主题。"""
     output = _output_dir(output)
     run_with_credential_guard(
@@ -199,7 +202,7 @@ def v2ex(output: str | None) -> None:
             'v2ex',
             'favorites',
             None,
-            lambda: export_v2ex(output, get_index_writer()),
+            lambda: export_v2ex(output, get_index_writer(), force),
         ),
     )
 
@@ -233,7 +236,8 @@ def twitter(output: str | None, force: bool, max_pages: int | None) -> None:
 @eto.command()
 @click.option('--collection', '-c', required=True, help='收藏夹')
 @click.option('--output', '-o', required=False, help='输出目录')
-def zhihu(collection: str, output: str | None) -> None:
+@click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
+def zhihu(collection: str, output: str | None, force: bool) -> None:
     """导出知乎收藏夹。"""
     output = _output_dir(output)
     run_with_credential_guard(
@@ -243,7 +247,7 @@ def zhihu(collection: str, output: str | None) -> None:
             'zhihu',
             'collection',
             collection,
-            lambda: export_zhihu(collection, output, get_index_writer()),
+            lambda: export_zhihu(collection, output, get_index_writer(), force),
         ),
     )
 

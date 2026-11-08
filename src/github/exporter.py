@@ -3,7 +3,8 @@
 import re
 from datetime import datetime
 
-from app.context import is_db_only
+from app.context import get_database, is_db_only
+from db.projections import github as github_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -101,6 +102,18 @@ def export(
                 prefix=resolved_prefix,
             ):
                 return
+
+            if (
+                is_db_only()
+                and not force
+                and item.repo_id
+                and github_projection.readme_exists(
+                    get_database(),
+                    item.repo_id,
+                )
+            ):
+                print(f'Skip README: {item.full_name}')
+                continue
 
             readme = get_repository_readme(item.owner_login, item.repo_name)
             context = build_template_context(

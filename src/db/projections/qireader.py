@@ -103,6 +103,17 @@ def _upsert_entries(
     return rows
 
 
+def article_exists(connection: sqlite3.Connection, url: str) -> bool:
+    """Return whether the article body is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM qireader_article WHERE url = ?',
+            (url,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _upsert_article(
     connection: sqlite3.Connection,
     payload: dict[str, Any],

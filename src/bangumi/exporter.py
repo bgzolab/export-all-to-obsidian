@@ -3,11 +3,12 @@
 import os
 from datetime import datetime
 
-from app.context import is_db_only, mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
 from bangumi.client import BangumiClient
 from bangumi.collection import get_all_collections_by_pages
 from bangumi.enum import CollectionType, SubjectType
 from bangumi.subject import get_subject_character, get_subject_info
+from db.projections import bangumi as bangumi_projection
 from export_runtime.exporter_support import (
     build_link_target,
     build_output_path,
@@ -100,6 +101,13 @@ def write_subject_markdown(
     force: bool = False,
 ) -> tuple[bool, str, str]:
     """根据 subject id 渲染并写入 Bangumi Markdown。"""
+    if is_db_only() and not force:
+        connection = get_database()
+        if bangumi_projection.subject_exists(connection, subject_id):
+            if not bangumi_projection.characters_exist(connection, subject_id):
+                get_output_character_string(subject_id)
+            return True, '', ''
+
     subject = get_subject_info(subject_id)
     if not subject:
         print(f'未获取到条目详情: {subject_id}')
@@ -108,6 +116,11 @@ def write_subject_markdown(
     if is_db_only():
         # db-only 不写 Markdown，但仍要抓角色列表，projection 的 characters_json
         # 依赖这条 raw 响应。
+        if not force and bangumi_projection.characters_exist(
+            get_database(),
+            subject_id,
+        ):
+            return True, '', ''
         get_output_character_string(subject_id)
         return True, '', ''
 

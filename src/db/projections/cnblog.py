@@ -102,6 +102,19 @@ def _upsert_bookmarks(
     return rows
 
 
+def post_exists(connection: sqlite3.Connection, source_url: str) -> bool:
+    """Return whether the post body is already projected."""
+    if not source_url:
+        return False
+    return (
+        connection.execute(
+            'SELECT 1 FROM cnblog_post WHERE source_url = ?',
+            (source_url,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _upsert_post(
     connection: sqlite3.Connection,
     body: bytes,

@@ -5,7 +5,7 @@
 ## 用法
 
 ```shell
-eto [全局参数] v2ex -o OUTPUT
+eto [全局参数] v2ex -o OUTPUT [--force]
 ```
 
 ## 参数
@@ -13,6 +13,7 @@ eto [全局参数] v2ex -o OUTPUT
 | 参数 | 必需 | 说明 |
 | --- | --- | --- |
 | `-o`, `--output` | 非 `--db-only` 时必需 | 输出目录，不存在时会自动创建 |
+| `--force` | 否 | 覆盖已有文件；`--db-only` 下关闭增量剪枝 |
 
 ## 凭证
 

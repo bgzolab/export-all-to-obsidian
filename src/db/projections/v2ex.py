@@ -117,6 +117,40 @@ def _upsert_favorites(
     return rows
 
 
+def topic_exists(connection: sqlite3.Connection, topic_id: int) -> bool:
+    """Return whether the topic detail row is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM v2ex_topic WHERE topic_id = ?',
+            (topic_id,),
+        ).fetchone()
+        is not None
+    )
+
+
+def topic_reply_count(
+    connection: sqlite3.Connection,
+    topic_id: int,
+) -> int | None:
+    """Return the projected reply count, or None when the topic is unknown."""
+    row = connection.execute(
+        'SELECT replies FROM v2ex_topic WHERE topic_id = ?',
+        (topic_id,),
+    ).fetchone()
+    return int(row['replies']) if row is not None else None
+
+
+def replies_exist(connection: sqlite3.Connection, topic_id: int) -> bool:
+    """Return whether any reply row exists for the topic."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM v2ex_reply WHERE topic_id = ? LIMIT 1',
+            (topic_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _upsert_topic(
     connection: sqlite3.Connection,
     payload: dict[str, Any],

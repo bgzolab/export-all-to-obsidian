@@ -132,6 +132,20 @@ def _upsert_posts(
     return rows
 
 
+def long_text_exists(connection: sqlite3.Connection, mblogid: str | None) -> bool:
+    """Return whether the long text is already projected."""
+    if not mblogid:
+        return False
+    return (
+        connection.execute(
+            'SELECT 1 FROM weibo_post '
+            'WHERE mblogid = ? AND long_text_response_id IS NOT NULL',
+            (mblogid,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _update_long_text(
     connection: sqlite3.Connection,
     payload: dict[str, Any],

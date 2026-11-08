@@ -162,6 +162,29 @@ def _upsert_subject(
     )
 
 
+def subject_exists(connection: sqlite3.Connection, subject_id: int) -> bool:
+    """Return whether the subject detail row is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM bangumi_subject WHERE subject_id = ?',
+            (subject_id,),
+        ).fetchone()
+        is not None
+    )
+
+
+def characters_exist(connection: sqlite3.Connection, subject_id: int) -> bool:
+    """Return whether the character list has already been projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM bangumi_subject '
+            'WHERE subject_id = ? AND characters_response_id IS NOT NULL',
+            (subject_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _update_characters(
     connection: sqlite3.Connection,
     payload: Any,

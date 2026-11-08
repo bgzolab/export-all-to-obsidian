@@ -4,6 +4,7 @@ import json
 
 from db.connection import connect
 from db.projections import rebuild_platform
+from db.projections.cnblog import post_exists
 from tests.projection_helpers import business_rows, record_json, record_text
 
 TABLES = ('cnblog_post', 'cnblog_bookmark')
@@ -73,6 +74,23 @@ def test_single_bookmark_object_is_supported():
     rebuild_platform(connection, 'cnblog')
 
     assert len(business_rows(connection, ('cnblog_bookmark',))['cnblog_bookmark']) == 1
+    connection.close()
+
+
+def test_post_exists_helper():
+    connection = connect(':memory:')
+    record_json(connection, 'cnblog.bookmarks.page', BOOKMARKS)
+    record_text(
+        connection,
+        'cnblog.post.body',
+        '<p>post body</p>',
+        request={'url': 'https://api.cnblogs.com/api/blogposts/123/body'},
+    )
+    rebuild_platform(connection, 'cnblog')
+
+    assert post_exists(connection, BOOKMARKS[0]['LinkUrl']) is True
+    assert post_exists(connection, 'https://example.com/missing') is False
+    assert post_exists(connection, '') is False
     connection.close()
 
 

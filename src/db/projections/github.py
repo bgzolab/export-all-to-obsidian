@@ -121,6 +121,18 @@ def _upsert_stars(
     return rows
 
 
+def readme_exists(connection: sqlite3.Connection, repo_id: int) -> bool:
+    """Return whether the repository README is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM github_star '
+            'WHERE repo_id = ? AND readme_response_id IS NOT NULL',
+            (repo_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _update_readme(
     connection: sqlite3.Connection,
     body: bytes,

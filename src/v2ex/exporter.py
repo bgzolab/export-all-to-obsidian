@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from app.context import is_db_only, mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import v2ex as v2ex_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -18,7 +19,11 @@ from v2ex.replies import fetch_all_replies
 from v2ex.topic import get_v2ex_topic_info
 
 
-def export(output_dir: str, index_writer: IndexWriter) -> None:
+def export(
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+) -> None:
     """导出 V2EX 收藏主题。"""
     client = V2exClient()
     page = 1
@@ -29,12 +34,35 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
         page += 1
         for topic_id in id_list:
             try:
+                if is_db_only() and not force:
+                    connection = get_database()
+                    reply_count = v2ex_projection.topic_reply_count(
+                        connection,
+                        topic_id,
+                    )
+                    if reply_count is not None:
+                        if reply_count > 0 and not v2ex_projection.replies_exist(
+                            connection,
+                            topic_id,
+                        ):
+                            fetch_all_replies(topic_id, client)
+                        continue
                 result = get_v2ex_topic_info(topic_id)
                 if not (result and result.result):
                     mark_run_partial()
                     continue
                 topic = result.result
-                if is_db_only() and topic.replies:
+                if (
+                    is_db_only()
+                    and topic.replies
+                    and (
+                        force
+                        or not v2ex_projection.replies_exist(
+                            get_database(),
+                            topic_id,
+                        )
+                    )
+                ):
                     fetch_all_replies(topic_id, client)
                 filename = get_clean_filename(f'{topic_id}-{topic.title}')
                 if stop_if_output_exists(
@@ -42,6 +70,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     filename,
                     index_writer=index_writer,
                     section_name='v2ex',
+                    force=force,
                 ):
                     return
                 created_time = datetime.fromtimestamp(topic.created).strftime(

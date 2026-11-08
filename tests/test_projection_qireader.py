@@ -6,6 +6,7 @@ import pytest
 
 from db.connection import connect
 from db.projections import ProjectionError, rebuild_platform
+from db.projections.qireader import article_exists
 from tests.projection_helpers import business_rows, record_json
 
 TABLES = ('qireader_article', 'qireader_entry')
@@ -107,6 +108,25 @@ def test_rebuild_is_idempotent():
     second = business_rows(connection, TABLES)
 
     assert first == second
+    connection.close()
+
+
+def test_article_exists_helper():
+    connection = connect(':memory:')
+    record_json(connection, 'qireader.readlater.page', PAGE)
+    record_json(
+        connection,
+        'qireader.article',
+        {'content': '<p>article</p>'},
+        request={
+            'url': 'https://nettools3.oxyry.com/text',
+            'params': {'url': 'https://example.com/a'},
+        },
+    )
+    rebuild_platform(connection, 'qireader')
+
+    assert article_exists(connection, 'https://example.com/a') is True
+    assert article_exists(connection, 'https://example.com/missing') is False
     connection.close()
 
 

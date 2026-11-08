@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import weibo as weibo_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -77,11 +78,20 @@ def export(
 
                 article = item.text_raw
                 if item.isLongText:
-                    longtext = get_weibo_longtext_by_id(post_id)
-                    if longtext is not None:
-                        article = longtext
-                    else:
-                        mark_run_partial()
+                    skip_long_text = (
+                        is_db_only()
+                        and not force
+                        and weibo_projection.long_text_exists(
+                            get_database(),
+                            item.mblogid,
+                        )
+                    )
+                    if not skip_long_text:
+                        longtext = get_weibo_longtext_by_id(post_id)
+                        if longtext is not None:
+                            article = longtext
+                        else:
+                            mark_run_partial()
 
                 dt_obj = datetime.strptime(
                     item.created_at,

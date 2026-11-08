@@ -7,8 +7,9 @@ from click.testing import CliRunner
 
 from app.credential_guard import CredentialProbeResult
 from db.connection import connect
+from db.projections import rebuild_platform
 from export_to_obsidian import eto
-from tests.projection_helpers import record_json, record_missing
+from tests.projection_helpers import record_json, record_missing, record_text
 
 BANGUMI_COLLECTION = {
     'subject_id': 1,
@@ -32,13 +33,60 @@ BANGUMI_SUBJECT = {
     'type': 2,
 }
 
+GITHUB_STAR = {
+    'starred_at': '2026-05-23T00:00:00Z',
+    'repo': {
+        'id': 123,
+        'full_name': 'octocat/Hello-World',
+        'name': 'Hello-World',
+        'owner': {'login': 'octocat'},
+        'html_url': 'https://github.com/octocat/Hello-World',
+        'description': '',
+        'language': '',
+        'topics': [],
+        'stargazers_count': 0,
+        'forks_count': 0,
+        'open_issues_count': 0,
+        'fork': False,
+        'archived': False,
+        'private': False,
+        'homepage': '',
+        'license': None,
+        'created_at': '',
+        'updated_at': '',
+        'pushed_at': '',
+    },
+}
+
+V2EX_TOPIC = {
+    'success': True,
+    'message': '',
+    'result': {
+        'id': 1,
+        'title': 'Topic',
+        'content': 'topic body',
+        'syntax': 0,
+        'url': 'https://www.v2ex.com/t/1',
+        'replies': 0,
+        'last_reply_by': '',
+        'created': 1,
+        'last_modified': 2,
+        'last_touched': 3,
+        'member': None,
+        'node': None,
+        'supplements': [],
+    },
+}
+
 
 def _invoke_cnblog(monkeypatch, db_path: str | None):
     monkeypatch.setattr(
         'app.cli.probe_cnblog_credentials',
         lambda: CredentialProbeResult.valid('cnblog'),
     )
-    monkeypatch.setattr('app.cli.export_cnblog', lambda output, index_writer: None)
+    monkeypatch.setattr(
+        'app.cli.export_cnblog', lambda output, index_writer, force=False: None
+    )
     args = (['--db', db_path] if db_path else []) + [
         'cnblog',
         '-o',
@@ -103,7 +151,7 @@ def test_cli_db_help_lists_option():
 def test_cli_marks_run_partial(monkeypatch, tmp_path):
     db_path = str(tmp_path / 'eto.db')
 
-    def fake_export(output, index_writer):
+    def fake_export(output, index_writer, force=False):
         from app.context import mark_run_partial
 
         mark_run_partial()
@@ -130,7 +178,7 @@ def test_cli_marks_run_partial(monkeypatch, tmp_path):
 def test_cli_marks_run_failed_on_exception(monkeypatch, tmp_path):
     db_path = str(tmp_path / 'eto.db')
 
-    def fake_export(output, index_writer):
+    def fake_export(output, index_writer, force=False):
         raise RuntimeError('boom')
 
     monkeypatch.setattr(
@@ -270,7 +318,9 @@ def test_cli_survives_finish_run_failure(monkeypatch, tmp_path):
         'app.cli.probe_cnblog_credentials',
         lambda: CredentialProbeResult.valid('cnblog'),
     )
-    monkeypatch.setattr('app.cli.export_cnblog', lambda output, index_writer: None)
+    monkeypatch.setattr(
+        'app.cli.export_cnblog', lambda output, index_writer, force=False: None
+    )
 
     def fail_finish(*args, **kwargs):
         raise sqlite3.OperationalError('database is locked')
@@ -301,7 +351,7 @@ def test_db_only_does_not_require_output(monkeypatch, tmp_path):
     db_path = str(tmp_path / 'eto.db')
     seen = {}
 
-    def fake_export(output, index_writer):
+    def fake_export(output, index_writer, force=False):
         seen['output'] = output
         seen['enabled'] = index_writer.enabled
 
@@ -367,7 +417,7 @@ def test_db_only_suppresses_markdown_and_index(monkeypatch, tmp_path):
     db_path = str(tmp_path / 'eto.db')
     output_dir = tmp_path / 'output'
 
-    def fake_export(output, index_writer):
+    def fake_export(output, index_writer, force=False):
         from export_runtime.exporter_support import (
             add_index_entry,
             stop_if_output_exists,
@@ -518,6 +568,124 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
     assert topic_calls == [1, 2]
     assert reply_calls == [1]
     assert (output_dir / '~1-Topic-1.md').read_text(encoding='utf-8') == 'exists'
+
+
+def test_db_only_github_skips_known_readme(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(connection, 'github.stars.list', [GITHUB_STAR])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
+    rebuild_platform(connection, 'github')
+    connection.close()
+
+    from github.entity import GitHubStarredResponseItem
+
+    item = GitHubStarredResponseItem.from_api(GITHUB_STAR)
+    readme_calls = []
+
+    def fake_stars(page, per_page=100):
+        return [item] if page == 1 else []
+
+    def fake_readme(owner, repo):
+        readme_calls.append((owner, repo))
+        return '# README'
+
+    monkeypatch.setattr('github.exporter.get_starred_repositories', fake_stars)
+    monkeypatch.setattr('github.exporter.get_repository_readme', fake_readme)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'github'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert readme_calls == []
+
+
+def test_db_only_github_force_fetches_known_readme(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(connection, 'github.stars.list', [GITHUB_STAR])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
+    rebuild_platform(connection, 'github')
+    connection.close()
+
+    from github.entity import GitHubStarredResponseItem
+
+    item = GitHubStarredResponseItem.from_api(GITHUB_STAR)
+    readme_calls = []
+
+    def fake_stars(page, per_page=100):
+        return [item] if page == 1 else []
+
+    def fake_readme(owner, repo):
+        readme_calls.append((owner, repo))
+        return '# README'
+
+    monkeypatch.setattr('github.exporter.get_starred_repositories', fake_stars)
+    monkeypatch.setattr('github.exporter.get_repository_readme', fake_readme)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'github', '--force'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert readme_calls == [('octocat', 'Hello-World')]
+
+
+def test_db_only_v2ex_skips_known_topic(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(
+        connection,
+        'v2ex.topic.detail',
+        V2EX_TOPIC,
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1'},
+    )
+    rebuild_platform(connection, 'v2ex')
+    connection.close()
+
+    topic_calls = []
+    replies_calls = []
+
+    def fake_page(page, client=None):
+        return [1] if page == 1 else []
+
+    def fake_topic(topic_id):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(result=SimpleNamespace(replies=0))
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+    monkeypatch.setattr(
+        'v2ex.exporter.fetch_all_replies',
+        lambda topic_id, client=None: replies_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert topic_calls == []
+    assert replies_calls == []
 
 
 def test_db_rebuild_bangumi(tmp_path):

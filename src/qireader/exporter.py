@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import qireader as qireader_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
@@ -17,7 +18,12 @@ from utils.md_utils import html_to_markdown_with_html2text
 from utils.template import WebPage
 
 
-def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
+def export(
+    tag: str,
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+) -> None:
     """导出稍后读内容。"""
     older_than = None
 
@@ -34,6 +40,7 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                     filename,
                     index_writer=index_writer,
                     section_name='qireader',
+                    force=force,
                 ):
                     return
 
@@ -52,16 +59,25 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                 )
 
                 content = ''
-                try:
-                    content = html_to_markdown_with_html2text(
-                        get_html_text_from_url(entry.url),
+                skip_article = (
+                    is_db_only()
+                    and not force
+                    and qireader_projection.article_exists(
+                        get_database(),
+                        entry.url,
                     )
-                except Exception:
-                    mark_run_partial()
-                    print(
-                        f'处理{filename}时发生异常，源地址可以已经删除，'
-                        '直接跳过，请考虑手动处理！',
-                    )
+                )
+                if not skip_article:
+                    try:
+                        content = html_to_markdown_with_html2text(
+                            get_html_text_from_url(entry.url),
+                        )
+                    except Exception:
+                        mark_run_partial()
+                        print(
+                            f'处理{filename}时发生异常，源地址可以已经删除，'
+                            '直接跳过，请考虑手动处理！',
+                        )
 
                 write_markdown_output(
                     output_dir,
