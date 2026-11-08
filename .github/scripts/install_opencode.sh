@@ -41,12 +41,18 @@ if ! curl -fsSL --retry 2 --retry-delay 2 --retry-max-time 50 --retry-all-errors
   echo "::error::${pkg}@${version} 的 npm 元数据获取失败（版本未发布或 registry 不可用）" >&2
   exit 1
 fi
-tarball="$(jq -r '.dist.tarball // empty' "$tmp/meta.json")"
+tarball="$(jq -r '.dist.tarball // empty' "$tmp/meta.json")" || {
+  echo "::error::${pkg}@${version} 元数据解析失败" >&2
+  exit 1
+}
 if [ -z "$tarball" ]; then
   echo "::error::${pkg}@${version} 元数据里没有 dist.tarball" >&2
   exit 1
 fi
-integrity="$(jq -r '.dist.integrity // empty' "$tmp/meta.json" | awk '{print $1}')"
+integrity="$(jq -r '.dist.integrity // empty' "$tmp/meta.json" | awk '{print $1}')" || {
+  echo "::error::${pkg}@${version} 元数据解析失败" >&2
+  exit 1
+}
 case "$integrity" in
   sha512-*) ;;
   *)

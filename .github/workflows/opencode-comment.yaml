@@ -38,12 +38,43 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+      # issue_comment 默认签出默认分支，工作区脚本可信；pull_request_review_comment
+      # 默认签出 PR 的合并提交，工作区脚本会来自被评论的 PR，必须改取基线提交
+      # （与 opencode-review 的 base-fetch 同理）。
+      - name: Stage the helper scripts outside the workspace
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/review"
+          for name in configure-opencode-permissions.sh install_opencode.sh; do
+            if [ "${EVENT_NAME}" != pull_request_review_comment ]; then
+              cp ".github/scripts/${name}" "$RUNNER_TEMP/review/${name}"
+              continue
+            fi
+            body="$RUNNER_TEMP/review/${name}.json"
+            code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 30 \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/.github/scripts/${name}?ref=${PR_BASE_SHA}") || code="000"
+            if [ "$code" != 200 ]; then
+              echo "::error::无法从基线 ${PR_BASE_SHA} 获取 ${name}（HTTP ${code}）" >&2
+              cat "$body" >&2 || true
+              exit 1
+            fi
+            content=$(jq -r 'select(.type == "file") | .content // empty' "$body")
+            if [ -z "${content}" ]; then
+              echo "::error::基线里的 ${name} 不是文件或缺少内容" >&2
+              exit 1
+            fi
+            printf '%s' "${content}" | base64 -d > "$RUNNER_TEMP/review/${name}"
+          done
       # deny 规则与只读 agent（default_agent=ci-readonly）和 review workflow 共用同一
       # 脚本。只读原因：handler 在 chat 之后会对任何变脏的工作区执行 commit/push，而
       # 只读 token 推不上去，push 失败会用 git 报错顶掉真正的回答；因此这一侧必须只读，
       # 需要改代码时由 agent 在回复里给出 diff。
       - name: Configure opencode CI permissions (read-only agent, deny rm / git commit / git push)
-        run: bash .github/scripts/configure-opencode-permissions.sh
+        run: bash "$RUNNER_TEMP/review/configure-opencode-permissions.sh"
       # 版本取自 npm 的 opencode-ai（v1 线）；GitHub 的 latest release 可能是
       # OpenCode 2，装不上 v1 的平台包。
       - name: Get opencode version (npm v1 channel, non-fatal)
@@ -75,7 +106,7 @@ jobs:
           PINNED_VERSION: ${{ steps.version.outputs.version }}
         # 版本固定；脚本内部按该版本的 npm sha512 校验安装包，并重试临时 5xx。
         # 不缓存 ~/.opencode/bin：缓存命中会绕过校验。
-        run: bash .github/scripts/install_opencode.sh "${PINNED_VERSION}"
+        run: bash "$RUNNER_TEMP/review/install_opencode.sh" "${PINNED_VERSION}"
       - name: Add opencode to PATH
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Run opencode
