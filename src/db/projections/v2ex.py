@@ -18,7 +18,7 @@ from db.projections._upsert import (
     reset_tables,
     upsert,
 )
-from v2ex.mytopic import parse_fav_topic_ids
+from v2ex.html import parse_fav_topic_ids
 
 FAV_ENDPOINT = 'v2ex.fav.page'
 TOPIC_ENDPOINT = 'v2ex.topic.detail'

@@ -84,7 +84,8 @@ Markdown：
 
 - 按 `endpoint` 选择解析器。
 - 按 `fetched_at, id` 顺序回放，必须幂等。
-- 投影表以后再加；手工修改要事件化或单独存 override，否则会被重放覆盖。
+- Layer 2 已提供 `db.projections` 回放器；手工修改要事件化或单独存 override，
+  否则会被重放覆盖。
 
 ## 6. 数据库
 

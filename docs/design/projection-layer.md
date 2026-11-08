@@ -1,8 +1,9 @@
 # Projection Layer Design
 
 - Issue: [#16](https://github.com/bgzolab/export-all-to-obsidian/issues/16)
-- Status: Proposed
+- Status: Implemented
 - Date: 2026-11-07
+- Implemented: 2026-11-08
 - Related: [raw-response-layer.md](raw-response-layer.md), [#18](https://github.com/bgzolab/export-all-to-obsidian/issues/18)
 
 ## 1. 目标

@@ -13,7 +13,7 @@ eto [全局参数] zhihu -c COLLECTION -o OUTPUT
 | 参数 | 必需 | 说明 |
 | --- | --- | --- |
 | `-c`, `--collection` | 是 | 知乎收藏夹 ID |
-| `-o`, `--output` | 是 | 输出目录，不存在时会自动创建 |
+| `-o`, `--output` | 非 `--db-only` 时必需 | 输出目录，不存在时会自动创建 |
 
 ## 凭证
 

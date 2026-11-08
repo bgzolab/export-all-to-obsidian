@@ -3,7 +3,7 @@
 - Issue: [#16](https://github.com/bgzolab/export-all-to-obsidian/issues/16)
 - Design: [projection-layer.md](../design/projection-layer.md)
 - Branch: `feature/db-stage-2-projection-layer`
-- Status: In progress
+- Status: Completed
 
 ## Goal
 
@@ -126,7 +126,7 @@
 
 ### T8. 文档收尾
 
-- Status: Planned
+- Status: Completed
 - Files: `AGENTS.md`, `README.md`, `docs/usages/`（如新增命令）
 - Work:
   - 记录投影层的数据流、命令和“raw 只在重建时读取”的边界。
@@ -168,6 +168,9 @@
 - 2026-11-08: T7 qireader/cnblog/twitter parsers completed. All nine platforms
   are registered in `SUPPORTED_PLATFORMS`; non-200 auxiliary bodies are skipped
   instead of being stored as content.
+- 2026-11-08: T8 completed. Updated design status, `AGENTS.md`, `README.md`,
+  `docs/usages/README.md` and per-command pages; added `docs/usages/db.md`.
+  Full suite: 269 passed; `ruff check` and `ruff format --check` pass.
 
 ## Notes
 
