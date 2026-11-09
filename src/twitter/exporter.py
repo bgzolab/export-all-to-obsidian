@@ -15,6 +15,7 @@ from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -170,9 +171,7 @@ def export(
                 get_database(),
                 tweet_ids,
             )
-            if all(tweet_id in known for tweet_id in tweet_ids):
-                mark_run_partial()
-                print('分页已到达已知数据，停止')
+            if stop_if_page_known(tweet_ids, known):
                 break
 
         if page.cursor_bottom is None or not page.cursor_bottom.value:

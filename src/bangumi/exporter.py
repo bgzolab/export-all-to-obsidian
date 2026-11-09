@@ -114,13 +114,8 @@ def write_subject_markdown(
         return True, '', ''
 
     if is_db_only():
-        # db-only 不写 Markdown，但仍要抓角色列表，projection 的 characters_json
-        # 依赖这条 raw 响应。
-        if not force and bangumi_projection.characters_exist(
-            get_database(),
-            subject_id,
-        ):
-            return True, '', ''
+        # 走到这里只可能是 subject 不存在，或 force=True；characters 的
+        # provenance 不可能已存在，直接抓取并写 raw。
         get_output_character_string(subject_id)
         return True, '', ''
 

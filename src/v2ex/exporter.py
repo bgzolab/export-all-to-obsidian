@@ -46,7 +46,12 @@ def export(
                             topic_id,
                             reply_count,
                         ):
-                            fetch_all_replies(topic_id, client)
+                            total = fetch_all_replies(topic_id, client)
+                            if total < reply_count:
+                                print(
+                                    f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
+                                    f'少于 expected={reply_count}，可能含已删除回复',
+                                )
                         continue
                 result = get_v2ex_topic_info(topic_id)
                 if not (result and result.result):
@@ -65,7 +70,12 @@ def export(
                         )
                     )
                 ):
-                    fetch_all_replies(topic_id, client)
+                    total = fetch_all_replies(topic_id, client)
+                    if total < topic.replies:
+                        print(
+                            f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
+                            f'少于 expected={topic.replies}，可能含已删除回复',
+                        )
                 filename = get_clean_filename(f'{topic_id}-{topic.title}')
                 if stop_if_output_exists(
                     output_dir,

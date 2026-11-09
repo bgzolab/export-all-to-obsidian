@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from types import SimpleNamespace
 
@@ -779,8 +780,10 @@ def test_db_only_github_force_fetches_known_readme(monkeypatch, tmp_path):
 
     item = GitHubStarredResponseItem.from_api(GITHUB_STAR)
     readme_calls = []
+    pages = []
 
     def fake_stars(page, per_page=100):
+        pages.append(page)
         return [item] if page == 1 else []
 
     def fake_readme(owner, repo):
@@ -797,6 +800,12 @@ def test_db_only_github_force_fetches_known_readme(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert readme_calls == [('octocat', 'Hello-World')]
+    assert pages == [1, 2]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
 
 
 def test_db_only_v2ex_skips_known_topic(monkeypatch, tmp_path):
@@ -894,6 +903,241 @@ def test_db_only_v2ex_refetches_incomplete_replies(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert topic_calls == []
     assert replies_calls == [1]
+
+
+def test_db_only_github_mixed_page_continues(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(connection, 'github.stars.list', [GITHUB_STAR])
+    rebuild_platform(connection, 'github')
+    connection.close()
+
+    from github.entity import GitHubStarredResponseItem
+
+    known = GitHubStarredResponseItem.from_api(GITHUB_STAR)
+    new_star = json.loads(json.dumps(GITHUB_STAR))
+    new_star['repo']['id'] = 456
+    new_star['repo']['full_name'] = 'octocat/Second'
+    new_star['repo']['name'] = 'Second'
+    new_item = GitHubStarredResponseItem.from_api(new_star)
+    pages = []
+
+    def fake_stars(page, per_page=100):
+        pages.append(page)
+        return [known, new_item] if page == 1 else []
+
+    monkeypatch.setattr('github.exporter.get_starred_repositories', fake_stars)
+    monkeypatch.setattr(
+        'github.exporter.get_repository_readme',
+        lambda owner, repo: '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'github'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1, 2]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
+def test_db_only_v2ex_skips_complete_replies(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    topic = {
+        **V2EX_TOPIC,
+        'result': {**V2EX_TOPIC['result'], 'replies': 1},
+    }
+    record_json(
+        connection,
+        'v2ex.topic.detail',
+        topic,
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1'},
+    )
+    record_json(
+        connection,
+        'v2ex.topic.replies.page',
+        {'success': True, 'message': '', 'result': [{'id': 11, 'content': 'one'}]},
+        request={
+            'url': 'https://www.v2ex.com/api/v2/topics/1/replies',
+            'params': {'p': 1},
+        },
+    )
+    rebuild_platform(connection, 'v2ex')
+    connection.close()
+
+    topic_calls = []
+    replies_calls = []
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_fav_list_topic_id_page',
+        lambda page, client=None: [1] if page == 1 else [],
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter.get_v2ex_topic_info',
+        lambda topic_id: topic_calls.append(topic_id),
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter.fetch_all_replies',
+        lambda topic_id, client=None: replies_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert topic_calls == []
+    assert replies_calls == []
+
+
+def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO cnblog_post '
+        '(post_id, source_url, body, response_id, db_created_at, db_updated_at) '
+        "VALUES (123, 'https://www.cnblogs.com/user/p/123.html', '', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    bookmark = SimpleNamespace(
+        WzLinkId=1,
+        Title='Post',
+        LinkUrl='https://www.cnblogs.com/user/p/123.html',
+        Summary='',
+        Tags=[],
+        DateAdded='2026-01-01',
+        FromCNBlogs=True,
+    )
+    body_calls = []
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_bookmark_list',
+        lambda page_index, page_size: [bookmark] if page_index == 1 else [],
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_cnblog_post_body_by_url',
+        lambda url: body_calls.append(url) or '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'cnblog'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert body_calls == []
+
+
+def test_db_only_weibo_skips_known_long_text(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO weibo_post '
+        '(post_id, mblogid, long_text_response_id, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES ('1', 'm1', ?, ?, 'now', 'now')",
+        (response_id, response_id),
+    )
+    connection.commit()
+    connection.close()
+
+    item = SimpleNamespace(
+        mblogid='m1',
+        user=SimpleNamespace(id=42, screen_name='user'),
+        text_raw='text',
+        isLongText=True,
+        created_at='Wed Jan 01 00:00:00 +0800 2026',
+        pic_num=0,
+        pic_ids=[],
+    )
+    page = SimpleNamespace(ok=1, data=SimpleNamespace(list=[item]))
+    longtext_calls = []
+
+    def fake_like(uid, page_index):
+        if page_index == 1:
+            return page
+        return SimpleNamespace(ok=1, data=SimpleNamespace(list=[]))
+
+    monkeypatch.setattr(
+        'app.cli.probe_weibo_credentials',
+        lambda uid: CredentialProbeResult.valid('weibo'),
+    )
+    monkeypatch.setattr('weibo.exporter.get_weibo_like_list', fake_like)
+    monkeypatch.setattr(
+        'weibo.exporter.get_weibo_longtext_by_id',
+        lambda post_id: longtext_calls.append(post_id) or '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'weibo', '-u', '1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert longtext_calls == []
+
+
+def test_db_only_qireader_skips_known_article(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO qireader_article '
+        '(url, content, response_id, db_created_at, db_updated_at) '
+        "VALUES ('https://example.com/a', 'cached', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    entry = SimpleNamespace(
+        title='Article',
+        url='https://example.com/a',
+        timestamp='1763974116059279295',
+    )
+    article_calls = []
+
+    monkeypatch.setattr(
+        'app.cli.probe_qireader_credentials',
+        lambda tag: CredentialProbeResult.valid('qireader'),
+    )
+    monkeypatch.setattr(
+        'qireader.exporter.get_list_from_read_latter',
+        lambda tag, older_than: [entry] if older_than is None else [],
+    )
+    monkeypatch.setattr(
+        'qireader.exporter.get_html_text_from_url',
+        lambda url: article_calls.append(url) or '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'qireader', '-t', 'tag-1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert article_calls == []
 
 
 def test_db_rebuild_bangumi(tmp_path):

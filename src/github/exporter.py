@@ -3,13 +3,14 @@
 import re
 from datetime import datetime
 
-from app.context import get_database, is_db_only, mark_run_partial
+from app.context import get_database, is_db_only
 from db.projections import github as github_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     resolve_output_prefix,
     stop_if_output_exists,
+    stop_if_page_known,
     write_raw_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -141,9 +142,7 @@ def export(
                 get_database(),
                 repo_ids,
             )
-            if all(repo_id in known for repo_id in repo_ids):
-                mark_run_partial()
-                print('分页已到达已知数据，停止')
+            if stop_if_page_known(repo_ids, known):
                 break
 
         page += 1

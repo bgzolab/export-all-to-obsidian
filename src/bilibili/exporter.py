@@ -9,6 +9,7 @@ from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -115,9 +116,7 @@ def export(
                 info.id,
                 media_ids,
             )
-            if all(media_id in known for media_id in media_ids):
-                mark_run_partial()
-                print('分页已到达已知数据，停止')
+            if stop_if_page_known(media_ids, known):
                 break
 
         page += 1
