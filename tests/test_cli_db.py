@@ -1345,6 +1345,57 @@ def test_db_only_weibo_skips_known_long_text(monkeypatch, tmp_path):
     assert longtext_calls == []
 
 
+def test_db_only_weibo_skips_long_text_without_mblogid(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO weibo_post '
+        '(post_id, mblogid, is_long_text, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', NULL, 1, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    item = SimpleNamespace(
+        idstr='1',
+        mblogid=None,
+        user=SimpleNamespace(id=42, screen_name='user'),
+        text_raw='text',
+        isLongText=True,
+        created_at='Wed Jan 01 00:00:00 +0800 2026',
+        pic_num=0,
+        pic_ids=[],
+    )
+    page = SimpleNamespace(ok=1, data=SimpleNamespace(list=[item]))
+    longtext_calls = []
+
+    def fake_like(uid, page_index):
+        if page_index == 1:
+            return page
+        return SimpleNamespace(ok=1, data=SimpleNamespace(list=[]))
+
+    monkeypatch.setattr(
+        'app.cli.probe_weibo_credentials',
+        lambda uid: CredentialProbeResult.valid('weibo'),
+    )
+    monkeypatch.setattr('weibo.exporter.get_weibo_like_list', fake_like)
+    monkeypatch.setattr(
+        'weibo.exporter.get_weibo_longtext_by_id',
+        lambda post_id: longtext_calls.append(post_id) or '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'weibo', '-u', '1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert longtext_calls == []
+    assert '长文缺少 mblogid' in result.output
+
+
 def test_db_only_qireader_skips_known_article(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)

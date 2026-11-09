@@ -78,7 +78,9 @@ def export(
                 title = author_name + ':' + context_digest
 
                 article = item.text_raw
-                if item.isLongText:
+                if item.isLongText and not item.mblogid:
+                    print(f'长文缺少 mblogid，跳过: post_id={item.idstr}')
+                elif item.isLongText:
                     skip_long_text = (
                         is_db_only()
                         and not force
@@ -143,6 +145,9 @@ def export(
     if is_db_only():
         pending = weibo_projection.long_text_pending_count(get_database())
         if pending:
-            print(f'长文缺口: {pending} 条微博仍无 long_text provenance')
+            print(
+                f'长文缺口: {pending} 条微博仍无 long_text provenance；'
+                '已取消收藏/删除的条目无法自愈，页面剪枝会保持禁用',
+            )
 
     index_writer.flush('weibo')

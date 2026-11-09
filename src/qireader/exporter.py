@@ -115,6 +115,9 @@ def export(
     if is_db_only():
         pending = qireader_projection.article_pending_count(get_database())
         if pending:
-            print(f'正文缺口: {pending} 条稍后读仍缺 article provenance')
+            print(
+                f'正文缺口: {pending} 条稍后读仍缺 article provenance；'
+                '已删除或不在列表中的条目无法自愈，页面剪枝会保持禁用',
+            )
 
     index_writer.flush('qireader', '导出index')

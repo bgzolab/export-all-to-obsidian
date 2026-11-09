@@ -105,6 +105,9 @@ def export(
     if is_db_only():
         pending = cnblog_projection.post_pending_count(get_database())
         if pending:
-            print(f'正文缺口: {pending} 条收藏仍缺 post body provenance')
+            print(
+                f'正文缺口: {pending} 条收藏仍缺 post body provenance；'
+                '已取消收藏/删除的条目无法自愈，页面剪枝会保持禁用',
+            )
 
     index_writer.flush('cnblog')
