@@ -2,46 +2,40 @@
 
 - Issue: [#16](https://github.com/bgzolab/export-all-to-obsidian/issues/16)
 - Follow-up: [#20](https://github.com/bgzolab/export-all-to-obsidian/issues/20)
-- Status: Proposed
-- Date: 2026-11-08
+- PR: [#21](https://github.com/bgzolab/export-all-to-obsidian/pull/21)
+- Status: 已实现
+- Date: 2026-11-09
 - Related: [projection-layer.md](projection-layer.md)
 
-## 1. Goal
+## 1. 目标
 
-Reduce API calls for `--db-only` by reusing data already in the projection tables.
-The list pages stay the source of truth for scope and ordering; only work that is
-already present is skipped.
+在 `--db-only` 下复用投影表已有数据，减少 API 调用。列表页仍然是范围和顺序的
+事实来源，只跳过已经完成的工作。
 
-Two stages, delivered independently:
+分两阶段交付：
 
-1. **Item-level skip**: still fetch every list page, but skip detail/aux requests
-   whose projection row and auxiliary provenance already exist.
-2. **Page-level stop**: after processing a list page, stop pagination when every
-   item on that page is already known.
+1. **条目级详情剪枝**：仍抓取全部列表页，但跳过主行和辅助 provenance 都已存在的
+   详情/辅助请求。
+2. **整页已知停止分页**：处理完一页后，如果该页所有条目都已知，停止后续分页。
 
-Normal export keeps its current Markdown-file pruning. This design only changes
-`--db-only`; otherwise a missing Markdown file could be skipped because the DB row
-already exists.
+普通导出保持现有的 Markdown 文件剪枝，不受本设计影响。否则数据库里已有行、但
+Markdown 文件缺失时，会被错误跳过。
 
-## 2. Defaults and `--force`
+## 2. 默认行为与 `--force`
 
-- Default: prune in `--db-only`.
-- `--force`: disable pruning, fetch and upsert the full scope again.
-- V2EX replies are capped at 200 per topic; the expected count is
-  `min(topic.replies, 200)`. Replies after that are intentionally not fetched.
-- Stage 1 skips only detail/aux requests; list pages are complete, so the run may stay
-  `success`. It still is not a full refresh of mutable details.
-- Stage 2 stops pagination early; those runs must be `partial` and must never drive future
-  deletion detection.
-- A `--force` full run may be `success` and can drive deletion detection later.
-- `--force` keeps its existing Markdown-overwrite meaning outside `--db-only`.
+- `--db-only` 默认剪枝。
+- `--force` 关闭剪枝，重新抓取并 upsert 完整范围；所有导出子命令都提供该选项。
+- Stage 1 只跳过详情/辅助请求，列表页仍完整，因此 run 可以保持 `success`。它不是
+  可变详情的完整刷新。
+- Stage 2 会提前停止分页，这些 run 必须标记为 `partial`，且不得用于将来的删除检测。
+- 完整的 `--force` run 可以是 `success`，将来可以用于删除检测。
+- 普通导出下，`--force` 仍然表示覆盖已有 Markdown。
+- V2EX 每个主题最多抓 200 条回复，expected = `min(topic.replies, 200)`；超过部分
+  有意不抓。
 
-`--force` must be available on every export subcommand for this reason. Platforms
-that do not have detail/aux requests still need it for Stage 2.
+## 3. “已知”的定义
 
-## 3. What “known” means
-
-Known is per entity and per scope, never globally:
+“已知”按实体和 scope 判断，不能只看主键全局存在：
 
 | Platform | Entity key | Scope |
 | --- | --- | --- |
@@ -55,30 +49,30 @@ Known is per entity and per scope, never globally:
 | weibo | `post_id` | single account (uid scope) |
 | zhihu | `content_id` | `collection_id` membership |
 
-Stage 1 uses the same keys for detail/aux checks:
+Stage 1 使用同一组 key 判断详情/辅助数据：
 
-- bangumi: skip `subject.detail` if `bangumi_subject` exists; skip
-  `subject.characters` if `characters_response_id IS NOT NULL`.
-- github: skip `repo.readme` if `readme_response_id IS NOT NULL`.
-  Page-level stop additionally requires `readme_pending_count == 0`; otherwise
-  pagination continues so missing READMEs can be repaired per item.
-- weibo/bangumi/cnblog/qireader page-level stop also requires their detail/aux
-  pending count to be zero (long text, subject/characters, post body, article).
-  If a gap exists, pagination continues so the per-item pass can repair it.
-- qireader: skip `article` if `qireader_article.url` exists.
-- cnblog: skip `post.body` if `cnblog_post.source_url` exists.
-- v2ex: skip `topic.detail` if `v2ex_topic` exists; skip reply pages only when the
-  projected reply count reaches `v2ex_topic.replies` (an interrupted reply fetch
-  leaves a partial thread and must be retried).
-- weibo: skip `longtext` if `long_text_response_id IS NOT NULL` for the `mblogid`.
+- bangumi：`bangumi_subject` 存在则跳过 `subject.detail`；`characters_response_id`
+  非空则跳过 `subject.characters`。
+- github：`readme_response_id` 非空则跳过 `repo.readme`；star 实体保存 `repo_id`
+  用于 scope 匹配。页级停止还要求 `readme_pending_count == 0`，否则继续翻页，让
+  逐条处理修复缺失 README。
+- weibo：`long_text_response_id` 非空则跳过 `longtext`。页级停止还要求
+  `long_text_pending_count == 0`；缺少 `mblogid` 的条目无法修复，直接跳过长文
+  请求，也不计入 pending。
+- qireader：`qireader_article.url` 存在则跳过 `article`。页级停止还要求
+  `article_pending_count == 0`；空 `url` 的条目跳过正文抓取，也不计入 pending。
+- cnblog：`cnblog_post.source_url` 存在则跳过 `post.body`。页级停止还要求
+  `post_pending_count == 0`，且 pending 只统计 `link_url <> ''` 的书签；空
+  `link_url` 的条目跳过正文抓取。
+- v2ex：`v2ex_topic` 存在则跳过 `topic.detail`；回复分页只在投影回复数达到
+  `min(topic.replies, 200)` 时跳过。中断的回复抓取只留下页面前缀，计数必然不足，
+  下一轮会重抓。
 
-Bilibili, Twitter and Zhihu have no detail/aux calls in Stage 1; they participate
-in Stage 2 only.
+Bilibili、Twitter、Zhihu 在 Stage 1 没有详情/辅助请求，只参与 Stage 2。
 
-## 4. Ordering assumptions
+## 4. 顺序假设与页级停止
 
-Stage 2 assumes each list is ordered newest-first by a stable platform time, and
-that existing rows do not move behind newer rows:
+Stage 2 假设每个列表按平台时间稳定地新数据在前，且已有行不会移动到新行之后：
 
 | Platform | Order | Risk |
 | --- | --- | --- |
@@ -91,56 +85,71 @@ that existing rows do not move behind newer rows:
 | cnblog | DateAdded desc (verify) | medium |
 | bangumi | likely updated_at desc (verify) | medium |
 
-v2ex does not use page-level stop yet: it remains Stage 1 only because stopping
-a favorites page would need a global replies-pending gate to avoid locking in
-unfinished reply walks.
+Stage 2 已接入 github、bilibili、twitter、weibo、zhihu、cnblog、bangumi、qireader。
+v2ex 暂缓页级停止：停止收藏页分页需要全局 replies pending gate，否则可能把未完成的
+回复抓取永久锁在更深页。
 
-Because of the medium-risk rows, Stage 2 uses “the whole page is known” rather
-than “the first known item”. A page with one new item still continues to the next
-page. This tolerates interleaved new/old items and page shifts better than
-stopping on the first match.
+因为存在 medium-risk 平台，Stage 2 使用“整页已知”而不是“遇到第一个已知条目”：
 
-If a platform’s order is later found unstable, its page-level stop is disabled
-and only Stage 1 remains.
+- 一页里只要有一条新数据，就继续下一页。
+- 这样能容忍新旧交错和分页位移。
+- 如果某平台顺序后来被确认不稳定，禁用其 Stage 2，只保留 Stage 1。
 
-## 5. Interaction with projections and raw
+github/weibo/bangumi/cnblog/qireader 的页级停止还要求各自的详情/辅助 pending
+count 为 0；存在缺口时继续翻页，由逐条处理补抓，避免页级停止把缺口锁死。
 
-- List pages are always fetched and recorded in raw; only detail/aux requests are
-  skipped in Stage 1.
-- The projection is rebuilt after the fetch inside the same `--db-only` run. The
-  next run sees the previous run’s projection.
-- A failed projection leaves the previous rows in place; if a row is missing, the
-  next run fetches it again. This is safe (at worst duplicate raw rows).
-- `--force` full runs append duplicate raw responses for existing entities. The
-  raw layer stays append-only; projection upserts keep one row per natural key.
-- No raw deletion or dedupe is introduced.
-- V2EX replies are capped at 200 per topic. If the platform count includes
-  deleted/invisible replies, the projected count is compared against
-  `min(topic.replies, 200)`, so the cap is still reachable. A topic whose
-  visible replies stay below that expected count is refetched each run; the
-  200 cap bounds the cost, and an empty-page provenance marker is deferred.
-- All platforms except v2ex use the optimistic page-level stop: the list is
-  assumed stable and ordered newest-first; no per-platform ordering verification
-  is done.
-- Qireader page-level stop uses the global `qireader_entry.entry_id`; tag
-  membership is not modeled, so the same entry in another tag is considered
-  known. This is accepted for the current single-account, optimistic design.
-- Persistent detail gaps (for example, an item deleted upstream while its detail
-  is missing) keep page-level stop disabled for that platform. The run falls
-  back to Stage 1; this is safe but slower. Clearing such rows needs deletion
-  detection or manual cleanup, both out of scope.
+## 5. 与投影层、raw 层的交互
 
-## 6. Deletion and multi-account
+- 列表页始终抓取并写入 raw；Stage 1 只跳过详情/辅助请求。
+- 投影在 `--db-only` run 的抓取结束后、同一个 `sync_run` 内重建。下一轮 run 看到
+  的是上一轮重建后的投影。
+- 投影重建失败时保留旧行；缺行会在下一轮重新抓取。最坏情况只是 raw 追加重复响应，
+  不影响正确性。
+- `--force` 完整抓取会为已有实体追加重复 raw 响应；raw 保持 append-only，投影
+  upsert 保证每个自然键只有一行。
+- 不引入 raw 删除或去重。
+- pending gate 惰性求值：只有整页已知、准备停止分页时才查询 pending count。
+- V2EX 回复上限为 200。若平台计数包含已删除/不可见回复，投影计数可能低于
+  expected；此时该主题每轮都会重抓，200 上限限制最坏成本，空页 provenance 完成
+  标记暂缓。
+- 所有页级停止平台都采用乐观顺序假设，不做逐平台顺序验证。
+- Qireader 使用全局 `qireader_entry.entry_id`；tag membership 未建模，同一 entry
+  出现在另一个 tag 时也视为已知。当前单账号场景接受该取舍。
 
-- Stage 2 pruned runs are `partial`; only a complete `success` run may drive deletion.
-- Stage 1 keeps list completeness, so its runs can stay `success`; they are not a full
-  detail refresh, which is what `--force` is for.
-- `--force` is the supported way to produce a complete full refresh.
-- Single-account assumption is unchanged.
+## 6. 删除与多账号
 
-## 7. Non-goals
+- Stage 2 剪枝 run 为 `partial`，只有完整的 `success` run 才能驱动删除检测。
+- Stage 1 保持列表完整，所以 run 可以是 `success`；它不是完整详情刷新，完整刷新
+  使用 `--force`。
+- `--force` 是产生完整全量刷新的受支持方式。
+- 单账号假设不变。
 
-- No HTTP ETag/Last-Modified cache yet.
-- No raw response dedupe.
-- No deletion detection in this stage.
-- No page-level stop for normal Markdown export; file-existence pruning remains.
+## 7. 已知限制与后续工作
+
+- 不可修复的 pending 行（例如条目已取消收藏/删除，但详情仍缺失）会永久禁用该平台的
+  页级停止。run 会回退到 Stage 1，安全但更慢；清理这类行需要删除检测或手工处理，
+  均不在当前范围。
+- V2EX 不可见回复导致的重复抓取由 200 条上限约束；空页 provenance marker 暂缓。
+- v2ex 页级停止暂缓，需要全局 replies pending gate。
+- Qireader tag membership 未建模，使用全局 entry id。
+- 不做多账号。
+
+## 8. 验证
+
+- `PYTHONPATH=src pytest tests -q`、`ruff check src tests`、
+  `ruff format --check src tests` 通过。
+- 回归覆盖：
+  - 第二次 `--db-only` 不再请求已存在的详情/辅助端点，列表端点仍然请求。
+  - `--force` 重新请求详情/辅助端点，且不触发页级停止。
+  - 整页已知时停止分页并标记 `partial`；页内混合新旧数据时继续。
+  - github/weibo/bangumi/cnblog/qireader 存在详情/辅助缺口时继续翻页并补抓，
+    run 保持 `success`。
+  - V2EX 回复中断后重抓；达到 200 条上限后跳过；低于 capped expected 时重抓。
+  - weibo/qireader/cnblog 缺少身份字段的条目不再发起注定无效的请求。
+
+## 9. 非目标
+
+- 不做 HTTP ETag / Last-Modified 缓存。
+- 不做 raw 响应去重。
+- 本阶段不做删除检测。
+- 普通 Markdown 导出不做页级停止，仍使用文件存在性剪枝。
