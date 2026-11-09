@@ -49,7 +49,7 @@ Known is per entity and per scope, never globally:
 | bilibili | `media_id` | `fav_id` membership |
 | cnblog | `wz_link_id` | single account |
 | github | `repo_id` | single account |
-| qireader | `entry_id` | tag (`tag_ids_json` contains the tag) |
+| qireader | `entry_id` | single account (global `entry_id`; tag membership not modeled) |
 | twitter | `tweet_id` | single account |
 | v2ex | `topic_id` | single account |
 | weibo | `post_id` | single account (uid scope) |
@@ -90,7 +90,10 @@ that existing rows do not move behind newer rows:
 | zhihu | collection time desc (verify) | medium |
 | cnblog | DateAdded desc (verify) | medium |
 | bangumi | likely updated_at desc (verify) | medium |
-| v2ex | likely last-reply order (verify) | medium |
+
+v2ex does not use page-level stop yet: it remains Stage 1 only because stopping
+a favorites page would need a global replies-pending gate to avoid locking in
+unfinished reply walks.
 
 Because of the medium-risk rows, Stage 2 uses “the whole page is known” rather
 than “the first known item”. A page with one new item still continues to the next
@@ -116,8 +119,9 @@ and only Stage 1 remains.
   `min(topic.replies, 200)`, so the cap is still reachable. A topic whose
   visible replies stay below that expected count is refetched each run; the
   200 cap bounds the cost, and an empty-page provenance marker is deferred.
-- All platforms use the optimistic page-level stop: the list is assumed stable
-  and ordered newest-first; no per-platform ordering verification is done.
+- All platforms except v2ex use the optimistic page-level stop: the list is
+  assumed stable and ordered newest-first; no per-platform ordering verification
+  is done.
 - Qireader page-level stop uses the global `qireader_entry.entry_id`; tag
   membership is not modeled, so the same entry in another tag is considered
   known. This is accepted for the current single-account, optimistic design.
