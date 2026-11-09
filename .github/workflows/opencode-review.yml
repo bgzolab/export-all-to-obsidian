@@ -61,32 +61,76 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+      # 安全相关脚本一律取 PR 基线提交（base sha）里的版本，而不是被审查的 head：
+      # 否则一条 PR 就能改掉安装校验、deny 规则甚至门禁脚本，让本工作流自我放行。
+      # 副本放在工作区之外：opencode github run 会切到 head 分支，结束时还会对变脏的
+      # 工作区执行 git add/commit/push。
+      # 基线里还没有该脚本时（首次引入本脚本的 PR）退回工作区副本并告警。
+      # 注意：workflow 文件本身仍来自 PR head（GitHub pull_request 的固有行为），
+      # 这里只保证脚本与门禁逻辑来自已合并的基线。
+      - name: Fetch the trusted helper scripts from the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/review/fetch"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/.github/scripts"
+          for name in configure-opencode-permissions.sh install_opencode.sh \
+                      opencode_review_turn.sh review_verdict.sh; do
+            body="$RUNNER_TEMP/review/fetch/${name}.json"
+            # 瞬态失败（网络错误 / 5xx / 429）等 5 秒重试一次；404 立即按缺失处理
+            code=""
+            for wait in 0 5; do
+              [ "$wait" -gt 0 ] && sleep "$wait"
+              code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 30 \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                "${api}/${name}?ref=${BASE_SHA}") || code="000"
+              case "$code" in
+                200 | 404) break ;;
+              esac
+            done
+            case "$code" in
+              200) ;;
+              404)
+                # 只有「基线里还没有这个脚本」才回退；其它 API 错误必须暴露出来，
+                # 否则一次限流就会静默退回被审查分支的副本
+                echo "::warning::${name} 不在基线 ${BASE_SHA} 中，暂时使用工作区副本" >&2
+                if [ ! -f ".github/scripts/${name}" ]; then
+                  echo "::error::基线与当前分支都没有 ${name}" >&2
+                  exit 1
+                fi
+                cp ".github/scripts/${name}" "$RUNNER_TEMP/review/${name}"
+                continue
+                ;;
+              *)
+                echo "::error::无法从基线 ${BASE_SHA} 获取 ${name}（HTTP ${code}）" >&2
+                cat "$body" >&2 || true
+                exit 1
+                ;;
+            esac
+            content=$(jq -r 'select(.type == "file") | .content // empty' "$body")
+            if [ -z "${content}" ]; then
+              echo "::error::基线里的 ${name} 不是文件或缺少内容" >&2
+              exit 1
+            fi
+            printf '%s' "${content}" | base64 -d > "$RUNNER_TEMP/review/${name}"
+          done
       # deny 规则与只读 agent（default_agent=ci-readonly）由脚本统一写入全局配置
       # （~/.config/opencode/opencode.json），不要写进仓库目录：opencode 结束时会对
       # 「变脏的工作区」执行 git add/commit/push，写进仓库会把自己提交上去。
       # 与 opencode-comment 共用同一脚本，避免安全策略漂移。
       - name: Configure opencode CI permissions (read-only agent, deny rm / git commit / git push)
-        run: bash .github/scripts/configure-opencode-permissions.sh
-      # opencode github run 会把工作区切到 PR 的 head 分支（日志中的
-      # "Checking out local branch..."）。如果 head 分支不含这些脚本（例如从旧基线
-      # 拉出的分支），后面的门禁 / 续跑步骤会因 "No such file or directory" 误判失败。
-      # 因此在运行 opencode 之前先把脚本复制到工作区之外，后续一律使用副本。
-      - name: Stash the review helper scripts outside the workspace
-        run: |
-          mkdir -p "$RUNNER_TEMP/review"
-          cp .github/scripts/review_verdict.sh "$RUNNER_TEMP/review/review_verdict.sh"
-          cp .github/scripts/opencode_review_turn.sh "$RUNNER_TEMP/review/opencode_review_turn.sh"
-      # 说明：下面内联了 anomalyco/opencode/github 的 composite 步骤
-      # （v1.18.33 / 51ef4be1d3c122f18fefb510dca8d778571f4f18）。原 action 的
-      # 「Get opencode version」步骤用未认证 curl 请求 GitHub API，共享 runner 上
-      # 容易触发限流（60 次/小时）并让整步直接失败，而 action 没有对应 input 可用。
-      # 内联后：版本查询走 gh api（认证额度 5000 次/小时）且失败不中断 job。
-      - name: Get opencode version (authenticated, non-fatal)
+        run: bash "$RUNNER_TEMP/review/configure-opencode-permissions.sh"
+      # 版本取自 npm 的 opencode-ai（v1 线）；GitHub 的 latest release 可能是
+      # OpenCode 2，装不上 v1 的平台包。同一个元数据源也保证版本与随后安装的平台
+      # 包一致，不会出现「release 已发、npm 包还没发」的窗口。
+      - name: Get opencode version (npm v1 channel, non-fatal)
         id: version
         run: |
           VERSION=""
           for attempt in 1 2 3; do
-            if VERSION=$(gh api repos/anomalyco/opencode/releases/latest --jq '.tag_name' 2>/dev/null) && [ -n "${VERSION}" ]; then
+            if VERSION=$(curl -fsSL --max-time 20 https://registry.npmjs.org/opencode-ai/latest 2>/dev/null | jq -r '.version // empty') \
+               && [ -n "${VERSION}" ]; then
               break
             fi
 
@@ -96,7 +140,7 @@ jobs:
               sleep 2
             fi
           done
-          # 三连失败时回退到已知良好的固定版本：保证任何路径下安装版本可复现，
+          # 三连失败时回退到已知良好的固定版本：保证任何路径下安装版本可复现
           # 第三方安装端点只影响下载、不影响版本选择
           if [ -z "${VERSION}" ]; then
             VERSION="${OPENCODE_FALLBACK_VERSION}"
@@ -110,23 +154,16 @@ jobs:
             echo "version=${VERSION}"
             echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
-      - name: Cache opencode
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.opencode/bin
-          key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
       - name: Install opencode
-        if: steps.cache.outputs.cache-hit != 'true'
-        # 安装必须有时限：curl 默认无最大时长，挂起会吃掉 attempt 与门禁的余量
-        timeout-minutes: 5
+        # 安装必须有时限：下载挂起会吃掉 attempt 与门禁的余量
+        timeout-minutes: 8
         env:
           PINNED_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -o pipefail
-          # 版本始终固定（查询失败时为 OPENCODE_FALLBACK_VERSION）；
-          # --retry-max-time 把最坏重试总耗时（≤240s + 安装）压在 step 上限内
-          curl -fsSL --max-time 90 --retry 2 --retry-delay 2 --retry-max-time 240 https://opencode.ai/install | bash -s -- --version "${PINNED_VERSION}"
+        # 版本始终固定（查询失败时为 OPENCODE_FALLBACK_VERSION）；脚本内部按该版本
+        # 的 npm sha512 校验安装包，并重试临时 5xx。
+        # 不缓存 ~/.opencode/bin：缓存命中会绕过校验，而审查 agent 有 bash 权限，
+        # 被注入时可以改写该二进制并把毒化结果固化进缓存。
+        run: bash "$RUNNER_TEMP/review/install_opencode.sh" "${PINNED_VERSION}"
       - name: Add opencode to PATH
         run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       # 第一轮（20 分钟）：完整审查。handler 自己负责发评论；provider 卡死/网络抖动
