@@ -79,10 +79,10 @@ def export(
                 collection_type,
                 subject_ids,
             )
-            if (
-                all(subject_id in known for subject_id in subject_ids)
-                and bangumi_projection.detail_pending_count(get_database()) == 0
-                and stop_if_page_known(subject_ids, known)
+            if stop_if_page_known(
+                subject_ids,
+                known,
+                pending_count=bangumi_projection.detail_pending_count(get_database()),
             ):
                 break
 

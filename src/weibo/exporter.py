@@ -131,10 +131,10 @@ def export(
                 get_database(),
                 post_ids,
             )
-            if (
-                all(post_id in known for post_id in post_ids)
-                and weibo_projection.long_text_pending_count(get_database()) == 0
-                and stop_if_page_known(post_ids, known)
+            if stop_if_page_known(
+                post_ids,
+                known,
+                pending_count=weibo_projection.long_text_pending_count(get_database()),
             ):
                 break
 

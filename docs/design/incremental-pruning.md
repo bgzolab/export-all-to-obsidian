@@ -113,12 +113,18 @@ and only Stage 1 remains.
 - No raw deletion or dedupe is introduced.
 - V2EX replies are capped at 200 per topic. If the platform count includes
   deleted/invisible replies, the projected count is compared against
-  `min(topic.replies, 200)`, so the cap is still reachable.
+  `min(topic.replies, 200)`, so the cap is still reachable. A topic whose
+  visible replies stay below that expected count is refetched each run; the
+  200 cap bounds the cost, and an empty-page provenance marker is deferred.
 - All platforms use the optimistic page-level stop: the list is assumed stable
   and ordered newest-first; no per-platform ordering verification is done.
 - Qireader page-level stop uses the global `qireader_entry.entry_id`; tag
   membership is not modeled, so the same entry in another tag is considered
   known. This is accepted for the current single-account, optimistic design.
+- Persistent detail gaps (for example, an item deleted upstream while its detail
+  is missing) keep page-level stop disabled for that platform. The run falls
+  back to Stage 1; this is safe but slower. Clearing such rows needs deletion
+  detection or manual cleanup, both out of scope.
 
 ## 6. Deletion and multi-account
 

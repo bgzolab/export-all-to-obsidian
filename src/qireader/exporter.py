@@ -104,10 +104,10 @@ def export(
                 get_database(),
                 entry_ids,
             )
-            if (
-                all(entry_id in known for entry_id in entry_ids)
-                and qireader_projection.article_pending_count(get_database()) == 0
-                and stop_if_page_known(entry_ids, known)
+            if stop_if_page_known(
+                entry_ids,
+                known,
+                pending_count=qireader_projection.article_pending_count(get_database()),
             ):
                 break
         older_than = str(entries[-1].timestamp)

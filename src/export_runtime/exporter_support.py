@@ -43,16 +43,23 @@ def stop_if_page_known(
     page_ids: list,
     known_ids: set,
     *,
+    pending_count: int = 0,
     message: str = '分页已到达已知数据，停止',
 ) -> bool:
-    """Stop pagination when every item on the current page is already known."""
+    """Stop pagination when every item on the current page is already known.
+
+    ``pending_count`` keeps pagination running while detail/aux rows still need
+    repair, so a page stop cannot lock in an existing gap.
+    """
     if not page_ids:
         return False
-    if all(page_id in known_ids for page_id in page_ids):
-        mark_run_partial()
-        print(message)
-        return True
-    return False
+    if not all(page_id in known_ids for page_id in page_ids):
+        return False
+    if pending_count:
+        return False
+    mark_run_partial()
+    print(message)
+    return True
 
 
 def stop_if_output_exists(

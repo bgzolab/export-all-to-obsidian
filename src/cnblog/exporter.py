@@ -93,10 +93,10 @@ def export(
                 get_database(),
                 bookmark_ids,
             )
-            if (
-                all(bookmark_id in known for bookmark_id in bookmark_ids)
-                and cnblog_projection.post_pending_count(get_database()) == 0
-                and stop_if_page_known(bookmark_ids, known)
+            if stop_if_page_known(
+                bookmark_ids,
+                known,
+                pending_count=cnblog_projection.post_pending_count(get_database()),
             ):
                 break
 

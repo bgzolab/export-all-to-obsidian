@@ -87,6 +87,9 @@
 - 2026-11-09: Added detail/aux pending gates for weibo/bangumi/cnblog/qireader
   page-level stops, plus negative E2E tests that prove pagination continues while
   a detail gap exists. Full suite: 342 passed, 2 skipped; ruff passes.
+- 2026-11-09: Deduplicated pending gates into `stop_if_page_known`. Persistent
+  detail gaps and V2EX repeated refetch are documented as accepted limitations;
+  no deletion detection or provenance marker is added.
 - 2026-11-08: v2ex reply pruning compares the projected reply count with
   `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
   instead of being skipped forever; dropped the unused `topic_exists` helper.
