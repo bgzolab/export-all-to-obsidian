@@ -136,6 +136,14 @@ def known_repo_ids(
     return {row['repo_id'] for row in rows}
 
 
+def readme_pending_count(connection: sqlite3.Connection) -> int:
+    """Return how many starred repositories still lack README provenance."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM github_star WHERE readme_response_id IS NULL',
+    ).fetchone()
+    return int(row['count'])
+
+
 def readme_exists(connection: sqlite3.Connection, repo_id: int) -> bool:
     """Return whether the repository README is already projected."""
     return (

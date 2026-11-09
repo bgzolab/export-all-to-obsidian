@@ -142,7 +142,11 @@ def export(
                 get_database(),
                 repo_ids,
             )
-            if stop_if_page_known(repo_ids, known):
+            if (
+                all(repo_id in known for repo_id in repo_ids)
+                and github_projection.readme_pending_count(get_database()) == 0
+                and stop_if_page_known(repo_ids, known)
+            ):
                 break
 
         page += 1

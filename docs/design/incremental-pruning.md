@@ -58,6 +58,8 @@ Stage 1 uses the same keys for detail/aux checks:
 - bangumi: skip `subject.detail` if `bangumi_subject` exists; skip
   `subject.characters` if `characters_response_id IS NOT NULL`.
 - github: skip `repo.readme` if `readme_response_id IS NOT NULL`.
+  Page-level stop additionally requires `readme_pending_count == 0`; otherwise
+  pagination continues so missing READMEs can be repaired per item.
 - qireader: skip `article` if `qireader_article.url` exists.
 - cnblog: skip `post.body` if `cnblog_post.source_url` exists.
 - v2ex: skip `topic.detail` if `v2ex_topic` exists; skip reply pages only when the

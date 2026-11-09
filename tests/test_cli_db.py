@@ -612,6 +612,12 @@ def test_db_only_github_stops_at_known_page(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)
     record_json(connection, 'github.stars.list', [GITHUB_STAR])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
     rebuild_platform(connection, 'github')
     connection.close()
 
@@ -939,6 +945,61 @@ def test_db_only_github_mixed_page_continues(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert pages == [1, 2]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
+def test_db_only_github_continues_with_pending_readme(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    second = json.loads(json.dumps(GITHUB_STAR))
+    second['repo']['id'] = 456
+    second['repo']['full_name'] = 'octocat/Second'
+    second['repo']['name'] = 'Second'
+
+    connection = connect(db_path)
+    record_json(connection, 'github.stars.list', [GITHUB_STAR, second])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
+    rebuild_platform(connection, 'github')
+    connection.close()
+
+    from github.entity import GitHubStarredResponseItem
+
+    first_item = GitHubStarredResponseItem.from_api(GITHUB_STAR)
+    second_item = GitHubStarredResponseItem.from_api(second)
+    pages = []
+    readme_calls = []
+
+    def fake_stars(page, per_page=100):
+        pages.append(page)
+        if page == 1:
+            return [first_item]
+        if page == 2:
+            return [second_item]
+        return []
+
+    def fake_readme(owner, repo):
+        readme_calls.append((owner, repo))
+        return '# README'
+
+    monkeypatch.setattr('github.exporter.get_starred_repositories', fake_stars)
+    monkeypatch.setattr('github.exporter.get_repository_readme', fake_readme)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'github'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1, 2, 3]
+    assert readme_calls == [('octocat', 'Second')]
     run = _query_one(
         db_path,
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',

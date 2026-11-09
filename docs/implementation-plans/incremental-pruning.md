@@ -49,6 +49,7 @@
   - qireader 因 tag scope 未建模，暂缓 Stage 2；其余平台确认顺序后再接入。
 - Verify:
   - 第二页整页已知时停止；页内混合新旧数据时继续。
+  - github 存在 README provenance 缺失时不得页级停止，继续翻页修复详情。
   - 剪枝 run 为 `partial`；`--force` run 为 `success`。
   - 不会因为剪枝漏掉同一页里的新条目。
   - 每个接入平台一条回归测试。
@@ -70,6 +71,9 @@
 - 2026-11-08: Stage 2 completed for github/bilibili/twitter. A fully known page
   stops pagination and marks the run `partial`; `--force` disables the stop.
   qireader is deferred until tag membership is modeled.
+- 2026-11-09: GitHub page-stop now also requires no pending README provenance;
+  otherwise pagination continues to repair missing READMEs. Added mixed-page,
+  `--force`, complete-reply and per-platform db-only regression tests.
 - 2026-11-08: v2ex reply pruning compares the projected reply count with
   `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
   instead of being skipped forever; dropped the unused `topic_exists` helper.
