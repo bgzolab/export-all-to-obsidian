@@ -74,6 +74,43 @@ def test_db_only_records_subject_characters(monkeypatch):
     connection.close()
 
 
+def test_export_stops_after_short_page(monkeypatch):
+    """末页不足 limit 时停止翻页，避免请求超过 API 的 offset 上限。"""
+    from bangumi import exporter
+
+    offsets = []
+
+    def fake_pages(username, subject_type, collection_type, limit=30, offset=0):
+        offsets.append(offset)
+        if offset == 0:
+            return [SimpleNamespace(subject_id=1)]
+        raise AssertionError(f'unexpected page request: offset={offset}')
+
+    class FakeIndex:
+        def add(self, line):
+            pass
+
+        def flush(self, module):
+            pass
+
+    monkeypatch.setattr(
+        exporter,
+        'BangumiClient',
+        lambda: SimpleNamespace(get_user=lambda: {'username': 'u'}),
+    )
+    monkeypatch.setattr(exporter, 'get_all_collections_by_pages', fake_pages)
+    monkeypatch.setattr(
+        exporter,
+        'write_subject_markdown',
+        lambda **kwargs: (True, 'file', 'title'),
+    )
+    monkeypatch.setattr(exporter, 'is_db_only', lambda: False)
+
+    exporter.export(2, 1, '', '', FakeIndex(), force=False)
+
+    assert offsets == [0]
+
+
 def test_dict_to_slim_subject_v0_with_api_tags():
     """端到端验证：从 API 返回的 subject 字典构造 SlimSubjectV0 不报错。"""
     d = {
