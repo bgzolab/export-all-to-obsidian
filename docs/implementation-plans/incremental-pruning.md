@@ -92,6 +92,10 @@
 - 2026-11-09: Deduplicated pending gates into `stop_if_page_known`. Persistent
   detail gaps and V2EX repeated refetch are documented as accepted limitations;
   no deletion detection or provenance marker is added.
+- 2026-11-09: Weibo/qireader/cnblog items with missing identity fields
+  (`mblogid`/`url`/`link_url`) skip unreachable aux requests; pending gates
+  evaluate lazily. Corrected Stage 2 scope docs (v2ex is Stage 1 only) and
+  `--force` annotations; added capped V2EX refetch test.
 - 2026-11-08: v2ex reply pruning compares the projected reply count with
   `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
   instead of being skipped forever; dropped the unused `topic_exists` helper.

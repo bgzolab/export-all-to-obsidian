@@ -1967,6 +1967,62 @@ def test_db_only_bangumi_continues_with_pending_details(monkeypatch, tmp_path):
     assert run['status'] == 'success'
 
 
+def test_db_only_cnblog_skips_empty_link_url(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO cnblog_bookmark '
+        '(wz_link_id, link_url, from_cnblogs, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES (1, '', 1, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    bookmark = SimpleNamespace(
+        WzLinkId=1,
+        Title='Empty',
+        LinkUrl='',
+        Summary='',
+        Tags=[],
+        DateAdded='',
+        FromCNBlogs=True,
+    )
+    pages = []
+    body_calls = []
+
+    def fake_bookmarks(page_index, page_size):
+        pages.append(page_index)
+        if page_index == 1:
+            return [bookmark]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_bookmark_list',
+        fake_bookmarks,
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_cnblog_post_body_by_url',
+        lambda url: body_calls.append(url) or '<p>body</p>',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'cnblog'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1]
+    assert body_calls == []
+    assert '缺少 url' in result.output
+
+
 def test_db_only_cnblog_continues_with_pending_body(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)

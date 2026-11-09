@@ -53,19 +53,22 @@ def export(
                         type='archive-web',
                     )
 
-                    skip_body = (
-                        is_db_only()
-                        and not force
-                        and cnblog_projection.post_exists(
-                            get_database(),
-                            bookmark.LinkUrl,
-                        )
-                    )
                     body = ''
-                    if not skip_body:
-                        body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
-                        if not body:
-                            mark_run_partial()
+                    if not bookmark.LinkUrl:
+                        print(f'收藏缺少 url，跳过正文抓取: {bookmark.Title}')
+                    else:
+                        skip_body = (
+                            is_db_only()
+                            and not force
+                            and cnblog_projection.post_exists(
+                                get_database(),
+                                bookmark.LinkUrl,
+                            )
+                        )
+                        if not skip_body:
+                            body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
+                            if not body:
+                                mark_run_partial()
 
                     write_markdown_output(
                         output_dir,
