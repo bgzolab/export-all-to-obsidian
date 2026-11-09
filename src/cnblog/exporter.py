@@ -1,12 +1,14 @@
 """博客园导出流程。"""
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
 from cnblog.blog_post import get_cnblog_post_body_by_url
 from cnblog.bookmark import get_bookmark_list
+from db.projections import cnblog as cnblog_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -15,7 +17,11 @@ from utils.md_utils import html_to_markdown_with_bs
 from utils.template import WebPage
 
 
-def export(output_dir: str, index_writer: IndexWriter) -> None:
+def export(
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+) -> None:
     """导出博客园收藏。"""
     page_index = 1
     page_size = 100
@@ -32,6 +38,7 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                     index_writer=index_writer,
                     section_name='cnblog',
                     flush_title=None,
+                    force=force,
                     message='已存在，提前结束: {filename}.md',
                 ):
                     return
@@ -46,9 +53,22 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                         type='archive-web',
                     )
 
-                    body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
-                    if not body:
-                        mark_run_partial()
+                    body = ''
+                    if not bookmark.LinkUrl:
+                        print(f'收藏缺少 url，跳过正文抓取: {bookmark.Title}')
+                    else:
+                        skip_body = (
+                            is_db_only()
+                            and not force
+                            and cnblog_projection.post_exists(
+                                get_database(),
+                                bookmark.LinkUrl,
+                            )
+                        )
+                        if not skip_body:
+                            body = get_cnblog_post_body_by_url(bookmark.LinkUrl)
+                            if not body:
+                                mark_run_partial()
 
                     write_markdown_output(
                         output_dir,
@@ -69,5 +89,30 @@ def export(output_dir: str, index_writer: IndexWriter) -> None:
                 mark_run_partial()
                 print(f'Skip cnblog bookmark: {error}')
                 continue
+
+        bookmark_ids = [getattr(bookmark, 'WzLinkId', None) for bookmark in bookmarks]
+        if is_db_only() and not force and bookmark_ids and all(bookmark_ids):
+            known = cnblog_projection.known_bookmark_ids(
+                get_database(),
+                bookmark_ids,
+            )
+            if stop_if_page_known(
+                bookmark_ids,
+                known,
+                pending_count=lambda: cnblog_projection.post_pending_count(
+                    get_database()
+                ),
+            ):
+                break
+
         page_index += 1
+
+    if is_db_only():
+        pending = cnblog_projection.post_pending_count(get_database())
+        if pending:
+            print(
+                f'正文缺口: {pending} 条收藏仍缺 post body provenance；'
+                '已取消收藏/删除的条目无法自愈，页面剪枝会保持禁用',
+            )
+
     index_writer.flush('cnblog')

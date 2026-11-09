@@ -47,12 +47,12 @@ eto --db-only bangumi -s 2 -c 3
 
 | 命令 | 导出内容 | 必需凭证 | 支持 `--force` |
 | --- | --- | --- | --- |
-| [`cnblog`](./cnblog.md) | 博客园收藏 | `CNBLOG_ACCESS_TOKEN` | 否 |
+| [`cnblog`](./cnblog.md) | 博客园收藏 | `CNBLOG_ACCESS_TOKEN` | 是 |
 | [`bangumi`](./bangumi.md) | Bangumi 收藏 | `BGM_ACCESS_TOKEN` | 是 |
-| [`qireader`](./qireader.md) | 稍后读列表 | `COOKIES` | 否 |
+| [`qireader`](./qireader.md) | 稍后读列表 | `COOKIES` | 是 |
 | [`github`](./github.md) | GitHub stars | `GITHUB_TOKEN` | 是 |
-| [`v2ex`](./v2ex.md) | V2EX 收藏主题 | `V2EX_ACCESS_TOKEN` + `COOKIES` | 否 |
-| [`zhihu`](./zhihu.md) | 知乎收藏夹 | `COOKIES` | 否 |
+| [`v2ex`](./v2ex.md) | V2EX 收藏主题 | `V2EX_ACCESS_TOKEN` + `COOKIES` | 是 |
+| [`zhihu`](./zhihu.md) | 知乎收藏夹 | `COOKIES` | 是 |
 | [`weibo`](./weibo.md) | 微博点赞 | `COOKIES` | 是 |
 | [`bilibili`](./bilibili.md) | Bilibili 收藏夹 | `COOKIES` | 是 |
 | [`twitter`](./twitter.md) | Twitter 点赞 | `COOKIES` | 是 |
@@ -74,8 +74,7 @@ eto --db-only bangumi -s 2 -c 3
 默认情况下，导出器把「目标文件已存在」视为本地增量信号：
 
 - 命中已存在文件时，当前导出流程提前结束，本次同步记录标记为 `partial`。
-- 支持 `--force` 的命令会覆盖已有文件并继续遍历。
-- 不支持 `--force` 的命令（`cnblog`、`qireader`、`v2ex`、`zhihu`）遇到同名文件就会停止；需要重新导出时，请先移走已有文件或换一个输出目录。
+- 所有导出命令都支持 `--force`：命中已存在文件时覆盖并继续遍历。
 
 ### 输出文件
 
@@ -117,6 +116,10 @@ eto --db ./data/eto.db zhihu -c your-collection-id -o output/zhihu
 - 不要求 `-o` / `-t`，不写 Markdown，不写索引，不创建输出目录。
 - 不豁免凭证：各平台的 token / cookie 仍然必需。
 - 不因目标文件已存在而提前结束；`--max-pages` 等显式抓取范围参数仍然生效。
+- 默认启用增量剪枝：列表页照常抓取，但已存在的详情/辅助请求（如 README、长文、
+  正文、角色、主题详情）会跳过；传 `--force` 可关闭剪枝并完整抓取。
+- 除 v2ex 外，所有平台在整页条目都已知时停止后续分页（乐观假设列表稳定、新数据在前），
+  本次 run 标记为 `partial`。v2ex 目前只做详情/回复剪枝，页级停止待补全局回复缺口门槛。
 - 抓取结束后在同一 `sync_run` 内重建该平台的投影表。
 - 传输错误和非 200 响应在重建时跳过并计数；200 响应解析失败或违反约束仍会整体回滚。
 - 投影失败时本次 run 标记为 `partial`，命令非零退出；raw 已保存，可稍后执行

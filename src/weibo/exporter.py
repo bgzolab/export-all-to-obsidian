@@ -2,11 +2,13 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import weibo as weibo_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -76,12 +78,23 @@ def export(
                 title = author_name + ':' + context_digest
 
                 article = item.text_raw
-                if item.isLongText:
-                    longtext = get_weibo_longtext_by_id(post_id)
-                    if longtext is not None:
-                        article = longtext
-                    else:
-                        mark_run_partial()
+                if item.isLongText and not item.mblogid:
+                    print(f'长文缺少 mblogid，跳过: post_id={item.idstr}')
+                elif item.isLongText:
+                    skip_long_text = (
+                        is_db_only()
+                        and not force
+                        and weibo_projection.long_text_exists(
+                            get_database(),
+                            item.mblogid,
+                        )
+                    )
+                    if not skip_long_text:
+                        longtext = get_weibo_longtext_by_id(post_id)
+                        if longtext is not None:
+                            article = longtext
+                        else:
+                            mark_run_partial()
 
                 dt_obj = datetime.strptime(
                     item.created_at,
@@ -114,6 +127,29 @@ def export(
                 mark_run_partial()
                 print(f'处理报文发生错误: {error}，微博可能已经被删除，跳过处理')
 
+        post_ids = [getattr(item, 'idstr', None) for item in item_list]
+        if is_db_only() and not force and post_ids and all(post_ids):
+            known = weibo_projection.known_post_ids(
+                get_database(),
+                post_ids,
+            )
+            if stop_if_page_known(
+                post_ids,
+                known,
+                pending_count=lambda: weibo_projection.long_text_pending_count(
+                    get_database()
+                ),
+            ):
+                break
+
         page_index += 1
+
+    if is_db_only():
+        pending = weibo_projection.long_text_pending_count(get_database())
+        if pending:
+            print(
+                f'长文缺口: {pending} 条微博仍无 long_text provenance；'
+                '已取消收藏/删除的条目无法自愈，页面剪枝会保持禁用',
+            )
 
     index_writer.flush('weibo')

@@ -117,6 +117,35 @@ def _upsert_favorites(
     return rows
 
 
+def topic_reply_count(
+    connection: sqlite3.Connection,
+    topic_id: int,
+) -> int | None:
+    """Return the projected reply count, or None when the topic is unknown."""
+    row = connection.execute(
+        'SELECT replies FROM v2ex_topic WHERE topic_id = ?',
+        (topic_id,),
+    ).fetchone()
+    return int(row['replies']) if row is not None else None
+
+
+def replies_complete(
+    connection: sqlite3.Connection,
+    topic_id: int,
+    expected: int,
+) -> bool:
+    """Return whether the topic has at least ``expected`` projected replies.
+
+    Reply pages are fetched in a loop, so an interrupted run leaves only the
+    first pages in raw; the existence of a row cannot prove the thread is whole.
+    """
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM v2ex_reply WHERE topic_id = ?',
+        (topic_id,),
+    ).fetchone()
+    return int(row['count']) >= expected
+
+
 def _upsert_topic(
     connection: sqlite3.Connection,
     payload: dict[str, Any],

@@ -3,12 +3,14 @@
 import re
 from datetime import datetime
 
-from app.context import is_db_only
+from app.context import get_database, is_db_only
+from db.projections import github as github_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     resolve_output_prefix,
     stop_if_output_exists,
+    stop_if_page_known,
     write_raw_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -102,6 +104,18 @@ def export(
             ):
                 return
 
+            if (
+                is_db_only()
+                and not force
+                and item.repo_id
+                and github_projection.readme_exists(
+                    get_database(),
+                    item.repo_id,
+                )
+            ):
+                print(f'Skip README: {item.full_name}')
+                continue
+
             readme = get_repository_readme(item.owner_login, item.repo_name)
             context = build_template_context(
                 item,
@@ -122,6 +136,29 @@ def export(
             )
             print(f'Done: {item.full_name}')
 
+        repo_ids = [item.repo_id for item in items]
+        if is_db_only() and not force and repo_ids:
+            known = github_projection.known_repo_ids(
+                get_database(),
+                repo_ids,
+            )
+            if stop_if_page_known(
+                repo_ids,
+                known,
+                pending_count=lambda: github_projection.readme_pending_count(
+                    get_database()
+                ),
+            ):
+                break
+
         page += 1
+
+    if is_db_only():
+        pending = github_projection.readme_pending_count(get_database())
+        if pending:
+            print(
+                f'README 缺口: {pending} 个仓库仍无 README provenance；'
+                '已取消收藏的仓库无法通过列表修复，页面剪枝会保持禁用',
+            )
 
     index_writer.flush('github')

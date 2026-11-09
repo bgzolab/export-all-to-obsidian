@@ -529,7 +529,8 @@ CREATE INDEX idx_twitter_tweet_created_at
 - 平台时间 `created`、`last_modified`、`last_touched` 全部保留。
 - `member_json` / `node_json` / `supplements_json` 保存嵌套结构。
 - 回复用独立的分页接口 `GET /api/v2/topics/{topic_id}/replies?p=N`（每页 20 条），
-  全部页都抓，全部入库；后续按 `v2ex_reply.thanks` 排序取“热门回复”。
+  每个主题最多抓前 200 条（约 10 页），超过部分不抓；后续按 `v2ex_reply.thanks`
+  排序取“热门回复”。剪枝时 expected = `min(topic.replies, 200)`。
 - V2 回复文档未明确列出 `thanks`。解析器有就写入，没有就保留默认 0；如果实测确认没有，
   又必须严格按感谢数排序，则改用 V1 `/api/replies/show.json?topic_id=` 或在后续补字段。
 

@@ -85,13 +85,16 @@ ruff format src tests                          # apply formatting
   when omitted, the environment variable `COOKIES` (the file path) is used. `--db` defaults
   to `data/eto.db`; the database file is treated as a credential file.
   `--index-file` and `--db-only` are mutually exclusive.
-- Subcommands: `cnblog(-o)`, `bangumi(-t -s -o [-c] [--force])`, `qireader(-t -o)`,
-  `v2ex(-o)`, `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o)`, `weibo(-u -o [--force])`,
-  `bilibili(-f -o [--force])`, `github(-t -o [--force])`, `import-markdown(<path>)`,
-  `db rebuild(<platform>)`.
+- Subcommands: `cnblog(-o [--force])`, `bangumi(-t -s -o [-c] [--force])`,
+  `qireader(-t -o [--force])`, `v2ex(-o [--force])`,
+  `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o [--force])`,
+  `weibo(-u -o [--force])`, `bilibili(-f -o [--force])`, `github(-t -o [--force])`,
+  `import-markdown(<path>)`, `db rebuild(<platform>)`.
 - `-o` is required unless `--db-only`; `-t` is required for bangumi/github unless
   `--db-only`. Missing values raise `UsageError`.
-- `--force` currently only affects bangumi, github, weibo, bilibili, and twitter.
+- `--force` is available on every export subcommand. Outside `--db-only` it overwrites
+  existing Markdown; under `--db-only` it disables incremental pruning and fetches the full
+  scope again.
 
 ## Environment variables (required by module exports)
 
@@ -110,8 +113,15 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   `--max-pages` truncation and failure paths.
 - `--db-only` disables that pruning; explicit limits such as `--max-pages` still apply. It
   writes no Markdown and no index, and does not require `-o` / `-t`.
-- API responses and imported Markdown are appended to `sync_response`; the database is never
-  used as an incremental cursor yet.
+- API responses and imported Markdown are appended to `sync_response`. `--db-only` uses the
+  projection tables as a detail/aux pruning hint (list pages are still fetched); `--force`
+  disables that pruning. Detail/aux pruning keeps the run `success` because the list is
+  complete. All platforms except v2ex also stop pagination when a whole page is already known
+  (optimistic ordering assumption: lists are stable and newest-first); those runs are `partial`
+  and must not drive deletion detection. github/weibo/bangumi/cnblog/qireader only page-stop
+  when their detail/aux pending count is zero, so missing details are repaired before pruning
+  resumes. V2EX remains Stage 1 only (detail/reply pruning) because a page stop would need a
+  global replies-pending gate. V2EX replies are capped at 200 per topic.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip

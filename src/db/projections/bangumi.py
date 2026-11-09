@@ -162,6 +162,58 @@ def _upsert_subject(
     )
 
 
+def detail_pending_count(connection: sqlite3.Connection) -> int:
+    """Return collection rows whose subject or character detail is missing."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM bangumi_collection c '
+        'LEFT JOIN bangumi_subject s ON s.subject_id = c.subject_id '
+        'WHERE s.subject_id IS NULL OR s.characters_response_id IS NULL',
+    ).fetchone()
+    return int(row['count'])
+
+
+def known_subject_ids(
+    connection: sqlite3.Connection,
+    subject_type: int,
+    collection_type: int,
+    subject_ids: list[int],
+) -> set[int]:
+    """Return the subset of subject ids already in this collection scope."""
+    if not subject_ids:
+        return set()
+    placeholders = ','.join('?' for _ in subject_ids)
+    rows = connection.execute(
+        'SELECT subject_id FROM bangumi_collection '
+        'WHERE type = ? AND subject_type = ? '
+        f'AND subject_id IN ({placeholders})',
+        [collection_type, subject_type, *subject_ids],
+    )
+    return {row['subject_id'] for row in rows}
+
+
+def subject_exists(connection: sqlite3.Connection, subject_id: int) -> bool:
+    """Return whether the subject detail row is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM bangumi_subject WHERE subject_id = ?',
+            (subject_id,),
+        ).fetchone()
+        is not None
+    )
+
+
+def characters_exist(connection: sqlite3.Connection, subject_id: int) -> bool:
+    """Return whether the character list has already been projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM bangumi_subject '
+            'WHERE subject_id = ? AND characters_response_id IS NOT NULL',
+            (subject_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _update_characters(
     connection: sqlite3.Connection,
     payload: Any,

@@ -6,6 +6,7 @@ import pytest
 
 from db.connection import connect
 from db.projections import ProjectionError, rebuild_platform
+from db.projections.bangumi import characters_exist, subject_exists
 from db.raw import finish_run, record_response, start_run
 from tests.projection_helpers import (
     business_rows,
@@ -264,6 +265,18 @@ def test_characters_without_subject_are_reported(capsys):
     assert result.aux_missed == 1
     assert '辅助未命中 1 条' in result.summary()
     assert '辅助数据未命中主行' in capsys.readouterr().out
+    connection.close()
+
+
+def test_projection_helpers_report_known_rows():
+    connection = connect(':memory:')
+    _seed(connection)
+    rebuild_platform(connection, 'bangumi')
+
+    assert subject_exists(connection, 1) is True
+    assert characters_exist(connection, 1) is True
+    assert subject_exists(connection, 2) is False
+    assert characters_exist(connection, 2) is False
     connection.close()
 
 

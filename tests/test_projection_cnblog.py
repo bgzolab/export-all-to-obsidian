@@ -4,6 +4,7 @@ import json
 
 from db.connection import connect
 from db.projections import rebuild_platform
+from db.projections.cnblog import post_exists
 from tests.projection_helpers import business_rows, record_json, record_text
 
 TABLES = ('cnblog_post', 'cnblog_bookmark')
@@ -76,6 +77,23 @@ def test_single_bookmark_object_is_supported():
     connection.close()
 
 
+def test_post_exists_helper():
+    connection = connect(':memory:')
+    record_json(connection, 'cnblog.bookmarks.page', BOOKMARKS)
+    record_text(
+        connection,
+        'cnblog.post.body',
+        '<p>post body</p>',
+        request={'url': 'https://api.cnblogs.com/api/blogposts/123/body'},
+    )
+    rebuild_platform(connection, 'cnblog')
+
+    assert post_exists(connection, BOOKMARKS[0]['LinkUrl']) is True
+    assert post_exists(connection, 'https://example.com/missing') is False
+    assert post_exists(connection, '') is False
+    connection.close()
+
+
 def test_ambiguous_source_url_is_left_empty():
     connection = connect(':memory:')
     bookmark = dict(BOOKMARKS[0], LinkUrl='https://example.com/123')
@@ -91,6 +109,24 @@ def test_ambiguous_source_url_is_left_empty():
 
     post = connection.execute('SELECT * FROM cnblog_post').fetchone()
     assert post['source_url'] == ''
+    connection.close()
+
+
+def test_duplicate_same_source_url_is_not_ambiguous():
+    connection = connect(':memory:')
+    duplicate = dict(BOOKMARKS[0], WzLinkId=3)
+    record_json(connection, 'cnblog.bookmarks.page', [BOOKMARKS[0], duplicate])
+    record_text(
+        connection,
+        'cnblog.post.body',
+        '<p>post body</p>',
+        request={'url': 'https://api.cnblogs.com/api/blogposts/123/body'},
+    )
+
+    rebuild_platform(connection, 'cnblog')
+
+    post = connection.execute('SELECT * FROM cnblog_post').fetchone()
+    assert post['source_url'] == BOOKMARKS[0]['LinkUrl']
     connection.close()
 
 

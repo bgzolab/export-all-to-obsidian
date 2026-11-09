@@ -121,6 +121,41 @@ def _upsert_stars(
     return rows
 
 
+def known_repo_ids(
+    connection: sqlite3.Connection,
+    repo_ids: list[int],
+) -> set[int]:
+    """Return the subset of repo ids already present in the projection."""
+    if not repo_ids:
+        return set()
+    placeholders = ','.join('?' for _ in repo_ids)
+    rows = connection.execute(
+        f'SELECT repo_id FROM github_star WHERE repo_id IN ({placeholders})',
+        repo_ids,
+    )
+    return {row['repo_id'] for row in rows}
+
+
+def readme_pending_count(connection: sqlite3.Connection) -> int:
+    """Return how many starred repositories still lack README provenance."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM github_star WHERE readme_response_id IS NULL',
+    ).fetchone()
+    return int(row['count'])
+
+
+def readme_exists(connection: sqlite3.Connection, repo_id: int) -> bool:
+    """Return whether the repository README is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM github_star '
+            'WHERE repo_id = ? AND readme_response_id IS NOT NULL',
+            (repo_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _update_readme(
     connection: sqlite3.Connection,
     body: bytes,

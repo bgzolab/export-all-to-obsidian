@@ -393,7 +393,7 @@ def test_cli_skips_export_when_probe_invalid(monkeypatch):
         lambda: CredentialProbeResult.invalid('cnblog', 'CNBLOG_ACCESS_TOKEN 已过期'),
     )
 
-    def fake_export(output, index_writer):
+    def fake_export(output, index_writer, force=False):
         called['export'] = True
 
     monkeypatch.setattr('app.cli.export_cnblog', fake_export)
@@ -419,7 +419,7 @@ def test_cli_runs_export_when_probe_valid(monkeypatch):
         lambda: CredentialProbeResult.valid('cnblog'),
     )
 
-    def fake_export(output, index_writer):
+    def fake_export(output, index_writer, force=False):
         called['export'] = True
 
     monkeypatch.setattr('app.cli.export_cnblog', fake_export)
@@ -429,6 +429,27 @@ def test_cli_runs_export_when_probe_valid(monkeypatch):
 
     assert result.exit_code == 0
     assert called['export'] is True
+
+
+def test_cli_cnblog_passes_force_to_export(monkeypatch):
+    from export_to_obsidian import eto
+
+    called = {}
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+
+    def fake_export(output, index_writer, force=False):
+        called['force'] = force
+
+    monkeypatch.setattr('app.cli.export_cnblog', fake_export)
+
+    result = CliRunner().invoke(eto, ['cnblog', '-o', 'output/cnblog', '--force'])
+
+    assert result.exit_code == 0
+    assert called['force'] is True
 
 
 def test_cli_twitter_passes_force_to_export(monkeypatch):

@@ -54,9 +54,12 @@ def test_dict_to_subject_tag_list_with_total_count():
 
 def test_db_only_records_subject_characters(monkeypatch):
     from bangumi import exporter
+    from db.connection import connect
 
+    connection = connect(':memory:')
     calls = []
     monkeypatch.setattr('bangumi.exporter.is_db_only', lambda: True)
+    monkeypatch.setattr('bangumi.exporter.get_database', lambda: connection)
     monkeypatch.setattr(
         'bangumi.exporter.get_subject_info',
         lambda subject_id: SimpleNamespace(),
@@ -68,6 +71,7 @@ def test_db_only_records_subject_characters(monkeypatch):
 
     assert exporter.write_subject_markdown(1, 3, '', '', False) == (True, '', '')
     assert calls == [1]
+    connection.close()
 
 
 def test_dict_to_slim_subject_v0_with_api_tags():

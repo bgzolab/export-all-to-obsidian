@@ -5,7 +5,7 @@
 ## 用法
 
 ```shell
-eto [全局参数] v2ex -o OUTPUT
+eto [全局参数] v2ex -o OUTPUT [--force]
 ```
 
 ## 参数
@@ -13,6 +13,7 @@ eto [全局参数] v2ex -o OUTPUT
 | 参数 | 必需 | 说明 |
 | --- | --- | --- |
 | `-o`, `--output` | 非 `--db-only` 时必需 | 输出目录，不存在时会自动创建 |
+| `--force` | 否 | 覆盖已有文件；`--db-only` 下关闭增量剪枝 |
 
 ## 凭证
 
@@ -40,6 +41,9 @@ OUTPUT/
 `--db-only` 的投影重建也会回滚，不会清空已有 `v2ex_favorite`。如果 signin 页已经被
 记入 raw，修复登录后 rebuild 仍会失败；按 [db.md](./db.md) 的“定位坏行”步骤处置该
 响应后再重建。
+
+`--db-only` 下每个主题最多抓前 200 条回复（约 10 页），超过部分不再抓取；回复数的
+预期值按 `min(topic.replies, 200)` 计算。
 
 ## 示例
 

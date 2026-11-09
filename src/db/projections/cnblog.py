@@ -102,6 +102,44 @@ def _upsert_bookmarks(
     return rows
 
 
+def post_pending_count(connection: sqlite3.Connection) -> int:
+    """Return CNBlog bookmarks whose post body is still missing."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM cnblog_bookmark b '
+        'LEFT JOIN cnblog_post p ON p.source_url = b.link_url '
+        "WHERE b.from_cnblogs = 1 AND b.link_url <> '' AND p.post_id IS NULL",
+    ).fetchone()
+    return int(row['count'])
+
+
+def known_bookmark_ids(
+    connection: sqlite3.Connection,
+    wz_link_ids: list[int],
+) -> set[int]:
+    """Return the subset of bookmark ids already present in the projection."""
+    if not wz_link_ids:
+        return set()
+    placeholders = ','.join('?' for _ in wz_link_ids)
+    rows = connection.execute(
+        f'SELECT wz_link_id FROM cnblog_bookmark WHERE wz_link_id IN ({placeholders})',
+        wz_link_ids,
+    )
+    return {row['wz_link_id'] for row in rows}
+
+
+def post_exists(connection: sqlite3.Connection, source_url: str) -> bool:
+    """Return whether the post body is already projected."""
+    if not source_url:
+        return False
+    return (
+        connection.execute(
+            'SELECT 1 FROM cnblog_post WHERE source_url = ?',
+            (source_url,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _upsert_post(
     connection: sqlite3.Connection,
     body: bytes,
@@ -128,7 +166,7 @@ def _upsert_post(
 
 def _source_url(connection: sqlite3.Connection, post_id: int) -> str:
     rows = connection.execute(
-        'SELECT link_url FROM cnblog_bookmark WHERE link_url LIKE ?',
+        'SELECT DISTINCT link_url FROM cnblog_bookmark WHERE link_url LIKE ?',
         (f'%/{post_id}.html',),
     ).fetchall()
     # 多候选说明关联不唯一，宁可留空也不要写一个无法确认的 URL。

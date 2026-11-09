@@ -2,11 +2,13 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import qireader as qireader_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -17,7 +19,12 @@ from utils.md_utils import html_to_markdown_with_html2text
 from utils.template import WebPage
 
 
-def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
+def export(
+    tag: str,
+    output_dir: str,
+    index_writer: IndexWriter,
+    force: bool = False,
+) -> None:
     """导出稍后读内容。"""
     older_than = None
 
@@ -34,6 +41,7 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                     filename,
                     index_writer=index_writer,
                     section_name='qireader',
+                    force=force,
                 ):
                     return
 
@@ -52,16 +60,28 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                 )
 
                 content = ''
-                try:
-                    content = html_to_markdown_with_html2text(
-                        get_html_text_from_url(entry.url),
+                if not entry.url:
+                    print(f'条目缺少 url，跳过正文抓取: {filename}')
+                else:
+                    skip_article = (
+                        is_db_only()
+                        and not force
+                        and qireader_projection.article_exists(
+                            get_database(),
+                            entry.url,
+                        )
                     )
-                except Exception:
-                    mark_run_partial()
-                    print(
-                        f'处理{filename}时发生异常，源地址可以已经删除，'
-                        '直接跳过，请考虑手动处理！',
-                    )
+                    if not skip_article:
+                        try:
+                            content = html_to_markdown_with_html2text(
+                                get_html_text_from_url(entry.url),
+                            )
+                        except Exception:
+                            mark_run_partial()
+                            print(
+                                f'处理{filename}时发生异常，源地址可以已经删除，'
+                                '直接跳过，请考虑手动处理！',
+                            )
 
                 write_markdown_output(
                     output_dir,
@@ -80,6 +100,29 @@ def export(tag: str, output_dir: str, index_writer: IndexWriter) -> None:
                 mark_run_partial()
                 print(f'Skip qireader entry: {error}')
                 continue
+
+        entry_ids = [getattr(entry, 'id', None) for entry in entries]
+        if is_db_only() and not force and entry_ids and all(entry_ids):
+            known = qireader_projection.known_entry_ids(
+                get_database(),
+                entry_ids,
+            )
+            if stop_if_page_known(
+                entry_ids,
+                known,
+                pending_count=lambda: qireader_projection.article_pending_count(
+                    get_database()
+                ),
+            ):
+                break
         older_than = str(entries[-1].timestamp)
+
+    if is_db_only():
+        pending = qireader_projection.article_pending_count(get_database())
+        if pending:
+            print(
+                f'正文缺口: {pending} 条稍后读仍缺 article provenance；'
+                '已删除或不在列表中的条目无法自愈，页面剪枝会保持禁用',
+            )
 
     index_writer.flush('qireader', '导出index')

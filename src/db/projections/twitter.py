@@ -23,6 +23,21 @@ ENDPOINT = 'twitter.likes.page'
 DELETE_ORDER = ('twitter_tweet',)
 
 
+def known_tweet_ids(
+    connection: sqlite3.Connection,
+    tweet_ids: list[str],
+) -> set[str]:
+    """Return the subset of tweet ids already present in the projection."""
+    if not tweet_ids:
+        return set()
+    placeholders = ','.join('?' for _ in tweet_ids)
+    rows = connection.execute(
+        f'SELECT tweet_id FROM twitter_tweet WHERE tweet_id IN ({placeholders})',
+        tweet_ids,
+    )
+    return {row['tweet_id'] for row in rows}
+
+
 def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     """Rebuild liked tweets from GraphQL responses."""
     now = raw.utc_now()

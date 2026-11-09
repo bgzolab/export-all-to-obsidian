@@ -5,6 +5,7 @@ import json
 
 from db.connection import connect
 from db.projections import rebuild_platform
+from db.projections.github import readme_exists
 from tests.projection_helpers import business_rows, record_json, record_text
 
 TABLES = ('github_star',)
@@ -143,6 +144,22 @@ def test_unexpected_readme_status_is_skipped():
     assert result.responses == 1
     assert result.skipped == 1
     assert connection.execute('SELECT readme FROM github_star').fetchone()[0] == ''
+    connection.close()
+
+
+def test_readme_exists_helper():
+    connection = connect(':memory:')
+    record_json(connection, 'github.stars.list', [STAR])
+    record_text(
+        connection,
+        'github.repo.readme',
+        '# README',
+        request={'url': 'https://api.github.com/repos/octocat/Hello-World/readme'},
+    )
+    rebuild_platform(connection, 'github')
+
+    assert readme_exists(connection, 123) is True
+    assert readme_exists(connection, 999) is False
     connection.close()
 
 

@@ -87,6 +87,7 @@ def test_exporter_support_helpers(tmp_path, capsys):
         build_link_target,
         build_output_path,
         stop_if_output_exists,
+        stop_if_page_known,
         write_markdown_output,
         write_raw_markdown_output,
     )
@@ -111,6 +112,18 @@ def test_exporter_support_helpers(tmp_path, capsys):
 
     add_index_entry(writer, link_target='~demo', title='测试标题')
     assert writer.render() == '- [[~demo|测试标题]]'
+
+    pending_calls = []
+
+    def pending_count():
+        pending_calls.append(1)
+        return 1
+
+    assert stop_if_page_known(['1'], {'1'})
+    assert not stop_if_page_known(['1'], {'1'}, pending_count=pending_count)
+    assert pending_calls == [1]
+    assert not stop_if_page_known(['1', '2'], {'1'}, pending_count=pending_count)
+    assert pending_calls == [1]
 
     assert stop_if_output_exists(
         str(tmp_path),

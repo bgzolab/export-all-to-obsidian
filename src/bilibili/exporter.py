@@ -2,12 +2,14 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
 from bilibili.favlist import get_bilibili_favlistd
+from db.projections import bilibili as bilibili_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -101,6 +103,22 @@ def export(
             except Exception as error:
                 mark_run_partial()
                 print(f'处理报文发生错误: {error}，跳过处理')
+
+        info = getattr(favlist_response.data, 'info', None)
+        media_ids = [
+            item.id
+            for item in favlist_response.data.medias
+            if getattr(item, 'id', None)
+        ]
+        if is_db_only() and not force and info and media_ids:
+            known = bilibili_projection.known_media_ids(
+                get_database(),
+                info.id,
+                media_ids,
+            )
+            if stop_if_page_known(media_ids, known):
+                break
+
         page += 1
 
     index_writer.flush('bilibili')

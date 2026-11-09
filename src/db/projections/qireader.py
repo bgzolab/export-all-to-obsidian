@@ -103,6 +103,42 @@ def _upsert_entries(
     return rows
 
 
+def article_pending_count(connection: sqlite3.Connection) -> int:
+    """Return read-later entries whose article body is still missing."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM qireader_entry e '
+        'LEFT JOIN qireader_article a ON a.url = e.url '
+        "WHERE e.url <> '' AND a.url IS NULL",
+    ).fetchone()
+    return int(row['count'])
+
+
+def known_entry_ids(
+    connection: sqlite3.Connection,
+    entry_ids: list[str],
+) -> set[str]:
+    """Return the subset of entry ids already present in the projection."""
+    if not entry_ids:
+        return set()
+    placeholders = ','.join('?' for _ in entry_ids)
+    rows = connection.execute(
+        f'SELECT entry_id FROM qireader_entry WHERE entry_id IN ({placeholders})',
+        entry_ids,
+    )
+    return {row['entry_id'] for row in rows}
+
+
+def article_exists(connection: sqlite3.Connection, url: str) -> bool:
+    """Return whether the article body is already projected."""
+    return (
+        connection.execute(
+            'SELECT 1 FROM qireader_article WHERE url = ?',
+            (url,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _upsert_article(
     connection: sqlite3.Connection,
     payload: dict[str, Any],

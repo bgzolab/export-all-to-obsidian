@@ -49,6 +49,23 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
     return result
 
 
+def known_content_ids(
+    connection: sqlite3.Connection,
+    collection_id: str,
+    content_ids: list[str],
+) -> set[str]:
+    """Return the subset of content ids already in the collection."""
+    if not content_ids:
+        return set()
+    placeholders = ','.join('?' for _ in content_ids)
+    rows = connection.execute(
+        'SELECT content_id FROM zhihu_collection_item '
+        f'WHERE collection_id = ? AND content_id IN ({placeholders})',
+        [collection_id, *content_ids],
+    )
+    return {row['content_id'] for row in rows}
+
+
 def _upsert_page(
     connection: sqlite3.Connection,
     payload: dict[str, Any],

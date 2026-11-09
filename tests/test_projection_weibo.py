@@ -4,6 +4,7 @@ import json
 
 from db.connection import connect
 from db.projections import rebuild_platform
+from db.projections.weibo import long_text_exists
 from tests.projection_helpers import business_rows, record_json
 
 TABLES = ('weibo_post',)
@@ -68,6 +69,26 @@ def test_rebuild_projects_posts_and_long_text():
     assert row['response_id'] == likes_response
     assert result.responses == 2
     assert result.rows == 2
+    connection.close()
+
+
+def test_long_text_exists_helper():
+    connection = connect(':memory:')
+    record_json(connection, 'weibo.likes.page', _likes())
+    record_json(
+        connection,
+        'weibo.longtext',
+        {'data': {'longTextContent': 'full text'}},
+        request={
+            'url': 'https://weibo.com/ajax/statuses/longtext',
+            'params': {'id': 'AbCdEf'},
+        },
+    )
+    rebuild_platform(connection, 'weibo')
+
+    assert long_text_exists(connection, 'AbCdEf') is True
+    assert long_text_exists(connection, 'missing') is False
+    assert long_text_exists(connection, None) is False
     connection.close()
 
 
