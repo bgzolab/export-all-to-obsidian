@@ -106,6 +106,10 @@ and only Stage 1 remains.
 - `--force` full runs append duplicate raw responses for existing entities. The
   raw layer stays append-only; projection upserts keep one row per natural key.
 - No raw deletion or dedupe is introduced.
+- V2EX `replies` may include deleted/invisible replies; if the projected count
+  never reaches it, the topic is refetched every run. This is safe (no missing
+  data) but can duplicate raw rows; a future empty-page provenance marker can
+  record that the walk completed.
 
 ## 6. Deletion and multi-account
 

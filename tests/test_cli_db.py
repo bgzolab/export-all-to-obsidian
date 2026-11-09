@@ -673,6 +673,7 @@ def test_db_only_bilibili_stops_at_known_page(monkeypatch, tmp_path):
         id=900,
         bvid='BV1',
         title='Video',
+        cover='',
         pubtime=0,
         fav_time=0,
         intro='',
@@ -714,6 +715,73 @@ def test_db_only_bilibili_stops_at_known_page(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'partial'
+
+
+def test_db_only_bilibili_force_continues_pages(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(
+        connection,
+        'bilibili.favlist.page',
+        {
+            'code': 0,
+            'message': '',
+            'ttl': 1,
+            'data': {
+                'info': {'id': 100, 'fid': 100, 'mid': 200},
+                'medias': [{'id': 900, 'fav_time': 1}],
+            },
+        },
+    )
+    rebuild_platform(connection, 'bilibili')
+    connection.close()
+
+    media = SimpleNamespace(
+        id=900,
+        bvid='BV1',
+        title='Video',
+        cover='',
+        pubtime=0,
+        fav_time=0,
+        intro='',
+        upper=SimpleNamespace(name='uploader'),
+    )
+    pages = []
+
+    def fake_favlist(fid, page, size):
+        pages.append(page)
+        if page == 1:
+            return SimpleNamespace(
+                data=SimpleNamespace(
+                    info=SimpleNamespace(id=100),
+                    medias=[media],
+                )
+            )
+        return SimpleNamespace(
+            data=SimpleNamespace(
+                info=SimpleNamespace(id=100),
+                medias=[],
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_bilibili_credentials',
+        lambda fid: CredentialProbeResult.valid('bilibili'),
+    )
+    monkeypatch.setattr('bilibili.exporter.get_bilibili_favlistd', fake_favlist)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'bilibili', '-f', '100', '--force'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1, 2]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
 
 
 def test_db_only_twitter_stops_at_known_page(monkeypatch, tmp_path):
@@ -767,6 +835,59 @@ def test_db_only_twitter_stops_at_known_page(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'partial'
+
+
+def test_db_only_twitter_force_continues_pages(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'twitter.likes.page', {'data': {}})
+    connection.execute(
+        'INSERT INTO twitter_tweet '
+        '(tweet_id, author_json, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', '{}', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    tweet = SimpleNamespace(
+        author=SimpleNamespace(screen_name='alice', name='Alice', id='1'),
+        id_str='1',
+        full_text='text',
+        created_at='',
+        url='https://x.com/alice/status/1',
+    )
+    page = SimpleNamespace(
+        tweets=[tweet],
+        cursor_bottom=SimpleNamespace(value='next'),
+    )
+    calls = []
+
+    def fake_like(client, cursor=None):
+        calls.append(cursor)
+        if len(calls) == 1:
+            return page
+        return SimpleNamespace(tweets=[], cursor_bottom=None)
+
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr('twitter.exporter.TwitterClient', lambda: object())
+    monkeypatch.setattr('twitter.exporter.get_twitter_like_list', fake_like)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'twitter', '--force'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert len(calls) == 2
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
 
 
 def test_db_only_github_force_fetches_known_readme(monkeypatch, tmp_path):
@@ -1000,6 +1121,7 @@ def test_db_only_github_continues_with_pending_readme(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert pages == [1, 2, 3]
     assert readme_calls == [('octocat', 'Second')]
+    assert 'README 缺口' in result.output
     run = _query_one(
         db_path,
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',

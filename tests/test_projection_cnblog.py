@@ -112,6 +112,24 @@ def test_ambiguous_source_url_is_left_empty():
     connection.close()
 
 
+def test_duplicate_same_source_url_is_not_ambiguous():
+    connection = connect(':memory:')
+    duplicate = dict(BOOKMARKS[0], WzLinkId=3)
+    record_json(connection, 'cnblog.bookmarks.page', [BOOKMARKS[0], duplicate])
+    record_text(
+        connection,
+        'cnblog.post.body',
+        '<p>post body</p>',
+        request={'url': 'https://api.cnblogs.com/api/blogposts/123/body'},
+    )
+
+    rebuild_platform(connection, 'cnblog')
+
+    post = connection.execute('SELECT * FROM cnblog_post').fetchone()
+    assert post['source_url'] == BOOKMARKS[0]['LinkUrl']
+    connection.close()
+
+
 def test_non_200_post_body_is_skipped():
     connection = connect(':memory:')
     record_json(connection, 'cnblog.bookmarks.page', BOOKMARKS)

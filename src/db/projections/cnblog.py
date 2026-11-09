@@ -141,7 +141,7 @@ def _upsert_post(
 
 def _source_url(connection: sqlite3.Connection, post_id: int) -> str:
     rows = connection.execute(
-        'SELECT link_url FROM cnblog_bookmark WHERE link_url LIKE ?',
+        'SELECT DISTINCT link_url FROM cnblog_bookmark WHERE link_url LIKE ?',
         (f'%/{post_id}.html',),
     ).fetchall()
     # 多候选说明关联不唯一，宁可留空也不要写一个无法确认的 URL。

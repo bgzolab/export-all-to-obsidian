@@ -151,4 +151,12 @@ def export(
 
         page += 1
 
+    if is_db_only():
+        pending = github_projection.readme_pending_count(get_database())
+        if pending:
+            print(
+                f'README 缺口: {pending} 个仓库仍无 README provenance；'
+                '已取消收藏的仓库无法通过列表修复，页面剪枝会保持禁用',
+            )
+
     index_writer.flush('github')

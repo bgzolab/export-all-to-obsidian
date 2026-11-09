@@ -74,6 +74,10 @@
 - 2026-11-09: GitHub page-stop now also requires no pending README provenance;
   otherwise pagination continues to repair missing READMEs. Added mixed-page,
   `--force`, complete-reply and per-platform db-only regression tests.
+- 2026-11-09: Added a run-end diagnostic for persistent GitHub README gaps,
+  deduplicated CNBlog `source_url` candidates, and added Bilibili/Twitter
+  `--force` page-stop regression tests. V2EX count drift is documented as a
+  future empty-page provenance marker.
 - 2026-11-08: v2ex reply pruning compares the projected reply count with
   `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
   instead of being skipped forever; dropped the unused `topic_exists` helper.
