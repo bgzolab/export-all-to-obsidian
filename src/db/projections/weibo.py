@@ -147,6 +147,16 @@ def known_post_ids(
     return {row['post_id'] for row in rows}
 
 
+def long_text_pending_count(connection: sqlite3.Connection) -> int:
+    """Return long posts whose long text still lacks provenance."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM weibo_post '
+        'WHERE is_long_text = 1 AND long_text_response_id IS NULL '
+        'AND mblogid IS NOT NULL',
+    ).fetchone()
+    return int(row['count'])
+
+
 def long_text_exists(connection: sqlite3.Connection, mblogid: str | None) -> bool:
     """Return whether the long text is already projected."""
     if not mblogid:

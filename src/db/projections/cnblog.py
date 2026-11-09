@@ -102,6 +102,16 @@ def _upsert_bookmarks(
     return rows
 
 
+def post_pending_count(connection: sqlite3.Connection) -> int:
+    """Return CNBlog bookmarks whose post body is still missing."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM cnblog_bookmark b '
+        'LEFT JOIN cnblog_post p ON p.source_url = b.link_url '
+        'WHERE b.from_cnblogs = 1 AND p.post_id IS NULL',
+    ).fetchone()
+    return int(row['count'])
+
+
 def known_bookmark_ids(
     connection: sqlite3.Connection,
     wz_link_ids: list[int],

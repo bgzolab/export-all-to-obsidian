@@ -104,8 +104,17 @@ def export(
                 get_database(),
                 entry_ids,
             )
-            if stop_if_page_known(entry_ids, known):
+            if (
+                all(entry_id in known for entry_id in entry_ids)
+                and qireader_projection.article_pending_count(get_database()) == 0
+                and stop_if_page_known(entry_ids, known)
+            ):
                 break
         older_than = str(entries[-1].timestamp)
+
+    if is_db_only():
+        pending = qireader_projection.article_pending_count(get_database())
+        if pending:
+            print(f'正文缺口: {pending} 条稍后读仍缺 article provenance')
 
     index_writer.flush('qireader', '导出index')

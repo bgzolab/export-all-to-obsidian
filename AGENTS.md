@@ -117,7 +117,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   disables that pruning. Detail/aux pruning keeps the run `success` because the list is
   complete. All platforms also stop pagination when a whole page is already known (optimistic
   ordering assumption: lists are stable and newest-first); those runs are `partial` and must
-  not drive deletion detection. V2EX replies are capped at 200 per topic.
+  not drive deletion detection. github/weibo/bangumi/cnblog/qireader only page-stop when their
+  detail/aux pending count is zero, so missing details are repaired before pruning resumes.
+  V2EX replies are capped at 200 per topic.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip

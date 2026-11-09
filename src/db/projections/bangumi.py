@@ -162,6 +162,16 @@ def _upsert_subject(
     )
 
 
+def detail_pending_count(connection: sqlite3.Connection) -> int:
+    """Return collection rows whose subject or character detail is missing."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM bangumi_collection c '
+        'LEFT JOIN bangumi_subject s ON s.subject_id = c.subject_id '
+        'WHERE s.subject_id IS NULL OR s.characters_response_id IS NULL',
+    ).fetchone()
+    return int(row['count'])
+
+
 def known_subject_ids(
     connection: sqlite3.Connection,
     subject_type: int,

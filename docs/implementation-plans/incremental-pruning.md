@@ -51,10 +51,11 @@
   - V2EX 回复最多抓 200 条，expected = `min(topic.replies, 200)`。
 - Verify:
   - 第二页整页已知时停止；页内混合新旧数据时继续。
-  - github 存在 README provenance 缺失时不得页级停止，继续翻页修复详情。
+  - github/weibo/bangumi/cnblog/qireader 存在详情/辅助 provenance 缺口时
+    不得页级停止，继续翻页修复详情。
   - 剪枝 run 为 `partial`；`--force` run 为 `success`。
   - 不会因为剪枝漏掉同一页里的新条目。
-  - 每个接入平台一条回归测试。
+  - 每个接入平台一条正向和一条“详情缺口继续翻页”的负向回归测试。
 
 ## Acceptance
 
@@ -82,7 +83,10 @@
 - 2026-11-09: Stage 2 extended to all platforms under the optimistic ordering
   assumption. V2EX replies are capped at 200 with expected =
   `min(topic.replies, 200)`. Added page-stop E2E tests for weibo/zhihu/cnblog/
-  bangumi/qireader. Full suite: 338 passed, 2 skipped; ruff passes.
+  bangumi/qireader.
+- 2026-11-09: Added detail/aux pending gates for weibo/bangumi/cnblog/qireader
+  page-level stops, plus negative E2E tests that prove pagination continues while
+  a detail gap exists. Full suite: 342 passed, 2 skipped; ruff passes.
 - 2026-11-08: v2ex reply pruning compares the projected reply count with
   `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
   instead of being skipped forever; dropped the unused `topic_exists` helper.

@@ -62,6 +62,9 @@ Stage 1 uses the same keys for detail/aux checks:
 - github: skip `repo.readme` if `readme_response_id IS NOT NULL`.
   Page-level stop additionally requires `readme_pending_count == 0`; otherwise
   pagination continues so missing READMEs can be repaired per item.
+- weibo/bangumi/cnblog/qireader page-level stop also requires their detail/aux
+  pending count to be zero (long text, subject/characters, post body, article).
+  If a gap exists, pagination continues so the per-item pass can repair it.
 - qireader: skip `article` if `qireader_article.url` exists.
 - cnblog: skip `post.body` if `cnblog_post.source_url` exists.
 - v2ex: skip `topic.detail` if `v2ex_topic` exists; skip reply pages only when the

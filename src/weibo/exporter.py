@@ -131,9 +131,18 @@ def export(
                 get_database(),
                 post_ids,
             )
-            if stop_if_page_known(post_ids, known):
+            if (
+                all(post_id in known for post_id in post_ids)
+                and weibo_projection.long_text_pending_count(get_database()) == 0
+                and stop_if_page_known(post_ids, known)
+            ):
                 break
 
         page_index += 1
+
+    if is_db_only():
+        pending = weibo_projection.long_text_pending_count(get_database())
+        if pending:
+            print(f'长文缺口: {pending} 条微博仍无 long_text provenance')
 
     index_writer.flush('weibo')

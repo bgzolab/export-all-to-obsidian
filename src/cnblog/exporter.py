@@ -93,8 +93,18 @@ def export(
                 get_database(),
                 bookmark_ids,
             )
-            if stop_if_page_known(bookmark_ids, known):
+            if (
+                all(bookmark_id in known for bookmark_id in bookmark_ids)
+                and cnblog_projection.post_pending_count(get_database()) == 0
+                and stop_if_page_known(bookmark_ids, known)
+            ):
                 break
 
         page_index += 1
+
+    if is_db_only():
+        pending = cnblog_projection.post_pending_count(get_database())
+        if pending:
+            print(f'正文缺口: {pending} 条收藏仍缺 post body provenance')
+
     index_writer.flush('cnblog')

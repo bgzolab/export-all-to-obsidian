@@ -1665,6 +1665,308 @@ def test_db_only_qireader_stops_at_known_page(monkeypatch, tmp_path):
     assert run['status'] == 'partial'
 
 
+def test_db_only_weibo_continues_with_pending_long_text(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO weibo_post '
+        '(post_id, mblogid, is_long_text, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', 'm1', 0, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO weibo_post '
+        '(post_id, mblogid, is_long_text, response_id, db_created_at, db_updated_at) '
+        "VALUES ('2', 'm2', 1, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    def item(post_id, mblogid, long_text):
+        return SimpleNamespace(
+            idstr=post_id,
+            mblogid=mblogid,
+            user=SimpleNamespace(id=42, screen_name='user'),
+            text_raw='text',
+            isLongText=long_text,
+            created_at='Wed Jan 01 00:00:00 +0800 2026',
+            pic_num=0,
+            pic_ids=[],
+        )
+
+    pages = []
+    longtext_calls = []
+
+    def fake_like(uid, page_index):
+        pages.append(page_index)
+        if page_index == 1:
+            return SimpleNamespace(
+                ok=1,
+                data=SimpleNamespace(list=[item('1', 'm1', False)]),
+            )
+        if page_index == 2:
+            return SimpleNamespace(
+                ok=1,
+                data=SimpleNamespace(list=[item('2', 'm2', True)]),
+            )
+        return SimpleNamespace(ok=1, data=SimpleNamespace(list=[]))
+
+    monkeypatch.setattr(
+        'app.cli.probe_weibo_credentials',
+        lambda uid: CredentialProbeResult.valid('weibo'),
+    )
+    monkeypatch.setattr('weibo.exporter.get_weibo_like_list', fake_like)
+    monkeypatch.setattr(
+        'weibo.exporter.get_weibo_longtext_by_id',
+        lambda post_id: longtext_calls.append(post_id) or 'long text',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'weibo', '-u', '1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1, 2, 3]
+    assert longtext_calls == ['m2']
+    assert '长文缺口' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
+def test_db_only_bangumi_continues_with_pending_details(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    for subject_id in (1, 2):
+        connection.execute(
+            'INSERT INTO bangumi_collection '
+            '(subject_id, subject_type, type, subject_json, response_id, '
+            'db_created_at, db_updated_at) '
+            "VALUES (?, 2, 3, '{}', ?, 'now', 'now')",
+            (subject_id, response_id),
+        )
+    connection.execute(
+        'INSERT INTO bangumi_subject '
+        '(subject_id, characters_response_id, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES (1, ?, ?, 'now', 'now')",
+        (response_id, response_id),
+    )
+    connection.commit()
+    connection.close()
+
+    offsets = []
+    detail_calls = []
+    character_calls = []
+
+    def fake_collections(username, subject_type, collection_type, limit, offset):
+        offsets.append(offset)
+        if offset == 0:
+            return [SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))]
+        if offset == 30:
+            return [SimpleNamespace(subject_id=2, subject=SimpleNamespace(name='Two'))]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_bangumi_credentials',
+        lambda: CredentialProbeResult.valid('bangumi'),
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.BangumiClient',
+        lambda: SimpleNamespace(get_user=lambda: {'username': 'user'}),
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.get_all_collections_by_pages',
+        fake_collections,
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.get_subject_info',
+        lambda subject_id: detail_calls.append(subject_id) or SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.get_output_character_string',
+        lambda subject_id: character_calls.append(subject_id) or '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'bangumi', '-s', '2', '-c', '3'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert offsets == [0, 30, 60]
+    assert detail_calls == [2]
+    assert character_calls == [2]
+    assert '详情缺口' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
+def test_db_only_cnblog_continues_with_pending_body(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO cnblog_bookmark '
+        '(wz_link_id, link_url, from_cnblogs, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES (1, 'https://example.com/1', 0, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO cnblog_bookmark '
+        '(wz_link_id, link_url, from_cnblogs, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES (2, 'https://www.cnblogs.com/user/p/2.html', 1, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    first = SimpleNamespace(
+        WzLinkId=1,
+        Title='External',
+        LinkUrl='https://example.com/1',
+        Summary='',
+        Tags=[],
+        DateAdded='',
+        FromCNBlogs=False,
+    )
+    second = SimpleNamespace(
+        WzLinkId=2,
+        Title='Post',
+        LinkUrl='https://www.cnblogs.com/user/p/2.html',
+        Summary='',
+        Tags=[],
+        DateAdded='',
+        FromCNBlogs=True,
+    )
+    pages = []
+    body_calls = []
+
+    def fake_bookmarks(page_index, page_size):
+        pages.append(page_index)
+        if page_index == 1:
+            return [first]
+        if page_index == 2:
+            return [second]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_bookmark_list',
+        fake_bookmarks,
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_cnblog_post_body_by_url',
+        lambda url: body_calls.append(url) or '<p>body</p>',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'cnblog'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1, 2, 3]
+    assert body_calls == ['https://www.cnblogs.com/user/p/2.html']
+    assert '正文缺口' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
+def test_db_only_qireader_continues_with_pending_article(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO qireader_entry '
+        '(entry_id, url, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', 'https://example.com/1', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO qireader_entry '
+        '(entry_id, url, response_id, db_created_at, db_updated_at) '
+        "VALUES ('2', 'https://example.com/2', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO qireader_article '
+        '(url, content, response_id, db_created_at, db_updated_at) '
+        "VALUES ('https://example.com/1', 'cached', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    first = SimpleNamespace(
+        id='1',
+        title='One',
+        url='https://example.com/1',
+        timestamp='100',
+    )
+    second = SimpleNamespace(
+        id='2',
+        title='Two',
+        url='https://example.com/2',
+        timestamp='200',
+    )
+    calls = []
+    article_calls = []
+
+    def fake_entries(tag, older_than):
+        calls.append(older_than)
+        if older_than is None:
+            return [first]
+        if older_than == '100':
+            return [second]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_qireader_credentials',
+        lambda tag: CredentialProbeResult.valid('qireader'),
+    )
+    monkeypatch.setattr(
+        'qireader.exporter.get_list_from_read_latter',
+        fake_entries,
+    )
+    monkeypatch.setattr(
+        'qireader.exporter.get_html_text_from_url',
+        lambda url: article_calls.append(url) or '<p>body</p>',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'qireader', '-t', 'tag-1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [None, '100', '200']
+    assert article_calls == ['https://example.com/2']
+    assert '正文缺口' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
 def test_db_rebuild_bangumi(tmp_path):
     db_path = tmp_path / 'eto.db'
     _seed_bangumi_raw(db_path)

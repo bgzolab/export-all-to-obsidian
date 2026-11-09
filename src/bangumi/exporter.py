@@ -79,8 +79,18 @@ def export(
                 collection_type,
                 subject_ids,
             )
-            if stop_if_page_known(subject_ids, known):
+            if (
+                all(subject_id in known for subject_id in subject_ids)
+                and bangumi_projection.detail_pending_count(get_database()) == 0
+                and stop_if_page_known(subject_ids, known)
+            ):
                 break
+
+    if is_db_only():
+        pending = bangumi_projection.detail_pending_count(get_database())
+        if pending:
+            print(f'详情缺口: {pending} 条收藏仍缺 subject/characters provenance')
+
     index_writer.flush('bangumi')
 
 

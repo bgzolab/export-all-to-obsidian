@@ -103,6 +103,16 @@ def _upsert_entries(
     return rows
 
 
+def article_pending_count(connection: sqlite3.Connection) -> int:
+    """Return read-later entries whose article body is still missing."""
+    row = connection.execute(
+        'SELECT COUNT(*) AS count FROM qireader_entry e '
+        'LEFT JOIN qireader_article a ON a.url = e.url '
+        "WHERE e.url <> '' AND a.url IS NULL",
+    ).fetchone()
+    return int(row['count'])
+
+
 def known_entry_ids(
     connection: sqlite3.Connection,
     entry_ids: list[str],
