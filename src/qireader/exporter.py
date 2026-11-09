@@ -60,25 +60,28 @@ def export(
                 )
 
                 content = ''
-                skip_article = (
-                    is_db_only()
-                    and not force
-                    and qireader_projection.article_exists(
-                        get_database(),
-                        entry.url,
+                if not entry.url:
+                    print(f'条目缺少 url，跳过正文抓取: {filename}')
+                else:
+                    skip_article = (
+                        is_db_only()
+                        and not force
+                        and qireader_projection.article_exists(
+                            get_database(),
+                            entry.url,
+                        )
                     )
-                )
-                if not skip_article:
-                    try:
-                        content = html_to_markdown_with_html2text(
-                            get_html_text_from_url(entry.url),
-                        )
-                    except Exception:
-                        mark_run_partial()
-                        print(
-                            f'处理{filename}时发生异常，源地址可以已经删除，'
-                            '直接跳过，请考虑手动处理！',
-                        )
+                    if not skip_article:
+                        try:
+                            content = html_to_markdown_with_html2text(
+                                get_html_text_from_url(entry.url),
+                            )
+                        except Exception:
+                            mark_run_partial()
+                            print(
+                                f'处理{filename}时发生异常，源地址可以已经删除，'
+                                '直接跳过，请考虑手动处理！',
+                            )
 
                 write_markdown_output(
                     output_dir,
