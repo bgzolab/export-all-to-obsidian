@@ -2,11 +2,13 @@
 
 from datetime import datetime
 
-from app.context import mark_run_partial
+from app.context import get_database, is_db_only, mark_run_partial
+from db.projections import zhihu as zhihu_projection
 from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -83,6 +85,16 @@ def export(
                 mark_run_partial()
                 print(f'Skip zhihu item: {error}')
                 continue
+
+        content_ids = [getattr(item.content, 'id', None) for item in page.data]
+        if is_db_only() and not force and content_ids and all(content_ids):
+            known = zhihu_projection.known_content_ids(
+                get_database(),
+                collection,
+                content_ids,
+            )
+            if stop_if_page_known(content_ids, known):
+                break
 
         if not page.data:
             break

@@ -8,6 +8,7 @@ from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -96,6 +97,15 @@ def export(
                 mark_run_partial()
                 print(f'Skip qireader entry: {error}')
                 continue
+
+        entry_ids = [getattr(entry, 'id', None) for entry in entries]
+        if is_db_only() and not force and entry_ids and all(entry_ids):
+            known = qireader_projection.known_entry_ids(
+                get_database(),
+                entry_ids,
+            )
+            if stop_if_page_known(entry_ids, known):
+                break
         older_than = str(entries[-1].timestamp)
 
     index_writer.flush('qireader', '导出index')

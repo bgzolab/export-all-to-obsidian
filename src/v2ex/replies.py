@@ -8,9 +8,9 @@ from export_runtime import http
 from v2ex.api_endpoints import V2EX_API_REPLIES
 from v2ex.cilent import V2exClient
 
-# shortcut: 单主题回复分页上限 1000 页，防止接口忽略 p 参数时无限循环；
-# 遇到超长主题再提高或改为按游标终止。
-V2EX_MAX_REPLY_PAGES = 1000
+# 每个主题只保留前 200 条回复；超过部分不再抓取。按 20 条/页约 10 页，
+# 也天然防止接口忽略 p 参数时无限循环。
+V2EX_MAX_REPLIES = 200
 
 
 def get_replies_page(
@@ -40,16 +40,14 @@ def get_replies_page(
 
 
 def fetch_all_replies(topic_id: int, client: V2exClient | None = None) -> int:
-    """Fetch every reply page so the raw layer has the full thread."""
+    """Fetch reply pages until the thread ends or the 200-reply cap is reached."""
     client = client or V2exClient()
     page = 1
     total = 0
-    while page <= V2EX_MAX_REPLY_PAGES:
+    while total < V2EX_MAX_REPLIES:
         replies = get_replies_page(topic_id, page, client)
         if not replies:
-            return total
+            break
         total += len(replies)
         page += 1
-    raise RuntimeError(
-        f'reply page limit {V2EX_MAX_REPLY_PAGES} reached for topic {topic_id}',
-    )
+    return total

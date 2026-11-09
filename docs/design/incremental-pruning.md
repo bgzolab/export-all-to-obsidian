@@ -27,6 +27,8 @@ already exists.
 
 - Default: prune in `--db-only`.
 - `--force`: disable pruning, fetch and upsert the full scope again.
+- V2EX replies are capped at 200 per topic; the expected count is
+  `min(topic.replies, 200)`. Replies after that are intentionally not fetched.
 - Stage 1 skips only detail/aux requests; list pages are complete, so the run may stay
   `success`. It still is not a full refresh of mutable details.
 - Stage 2 stops pagination early; those runs must be `partial` and must never drive future
@@ -78,7 +80,7 @@ that existing rows do not move behind newer rows:
 | Platform | Order | Risk |
 | --- | --- | --- |
 | twitter | cursor, reverse chronological | low |
-| qireader | `olderThan` timestamp cursor | low (Stage 2 deferred until tag scope is modeled) |
+| qireader | `olderThan` timestamp cursor | low (global entry id check) |
 | github | default `created` desc | low |
 | bilibili | `order=mtime` desc | low |
 | weibo | time desc (verify) | medium |
@@ -106,10 +108,14 @@ and only Stage 1 remains.
 - `--force` full runs append duplicate raw responses for existing entities. The
   raw layer stays append-only; projection upserts keep one row per natural key.
 - No raw deletion or dedupe is introduced.
-- V2EX `replies` may include deleted/invisible replies; if the projected count
-  never reaches it, the topic is refetched every run. This is safe (no missing
-  data) but can duplicate raw rows; a future empty-page provenance marker can
-  record that the walk completed.
+- V2EX replies are capped at 200 per topic. If the platform count includes
+  deleted/invisible replies, the projected count is compared against
+  `min(topic.replies, 200)`, so the cap is still reachable.
+- All platforms use the optimistic page-level stop: the list is assumed stable
+  and ordered newest-first; no per-platform ordering verification is done.
+- Qireader page-level stop uses the global `qireader_entry.entry_id`; tag
+  membership is not modeled, so the same entry in another tag is considered
+  known. This is accepted for the current single-account, optimistic design.
 
 ## 6. Deletion and multi-account
 

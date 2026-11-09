@@ -8,6 +8,7 @@ from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -123,6 +124,15 @@ def export(
             except Exception as error:
                 mark_run_partial()
                 print(f'处理报文发生错误: {error}，微博可能已经被删除，跳过处理')
+
+        post_ids = [getattr(item, 'idstr', None) for item in item_list]
+        if is_db_only() and not force and post_ids and all(post_ids):
+            known = weibo_projection.known_post_ids(
+                get_database(),
+                post_ids,
+            )
+            if stop_if_page_known(post_ids, known):
+                break
 
         page_index += 1
 

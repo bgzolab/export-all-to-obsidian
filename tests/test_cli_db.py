@@ -1185,6 +1185,70 @@ def test_db_only_v2ex_skips_complete_replies(monkeypatch, tmp_path):
     assert replies_calls == []
 
 
+def test_db_only_v2ex_caps_expected_replies(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    topic = {
+        **V2EX_TOPIC,
+        'result': {**V2EX_TOPIC['result'], 'replies': 500},
+    }
+    record_json(
+        connection,
+        'v2ex.topic.detail',
+        topic,
+        request={'url': 'https://www.v2ex.com/api/v2/topics/1'},
+    )
+    record_json(
+        connection,
+        'v2ex.topic.replies.page',
+        {
+            'success': True,
+            'message': '',
+            'result': [
+                {'id': 11, 'content': 'one'},
+                {'id': 12, 'content': 'two'},
+            ],
+        },
+        request={
+            'url': 'https://www.v2ex.com/api/v2/topics/1/replies',
+            'params': {'p': 1},
+        },
+    )
+    rebuild_platform(connection, 'v2ex')
+    connection.close()
+
+    topic_calls = []
+    replies_calls = []
+
+    monkeypatch.setattr('v2ex.exporter.V2EX_MAX_REPLIES', 2)
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_fav_list_topic_id_page',
+        lambda page, client=None: [1] if page == 1 else [],
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter.get_v2ex_topic_info',
+        lambda topic_id: topic_calls.append(topic_id),
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter.fetch_all_replies',
+        lambda topic_id, client=None: replies_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert topic_calls == []
+    assert replies_calls == []
+
+
 def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)
@@ -1321,6 +1385,284 @@ def test_db_only_qireader_skips_known_article(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert article_calls == []
+
+
+def test_db_only_weibo_stops_at_known_page(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO weibo_post '
+        '(post_id, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    item = SimpleNamespace(
+        idstr='1',
+        mblogid='m1',
+        user=SimpleNamespace(id=42, screen_name='user'),
+        text_raw='text',
+        isLongText=False,
+        created_at='Wed Jan 01 00:00:00 +0800 2026',
+        pic_num=0,
+        pic_ids=[],
+    )
+    page = SimpleNamespace(ok=1, data=SimpleNamespace(list=[item]))
+    pages = []
+
+    def fake_like(uid, page_index):
+        pages.append(page_index)
+        if page_index == 1:
+            return page
+        return SimpleNamespace(ok=1, data=SimpleNamespace(list=[]))
+
+    monkeypatch.setattr(
+        'app.cli.probe_weibo_credentials',
+        lambda uid: CredentialProbeResult.valid('weibo'),
+    )
+    monkeypatch.setattr('weibo.exporter.get_weibo_like_list', fake_like)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'weibo', '-u', '1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_db_only_zhihu_stops_at_known_page(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO zhihu_content '
+        '(content_id, content_json, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', '\"x\"', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO zhihu_collection_item '
+        '(collection_id, content_id, response_id, db_created_at, db_updated_at) '
+        "VALUES ('c1', '1', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    item = SimpleNamespace(
+        content=SimpleNamespace(
+            id='1',
+            content='<p>x</p>',
+            title='Title',
+            question=None,
+            url='https://www.zhihu.com/question/1/answer/1',
+            created_time=0,
+            updated_time=0,
+        )
+    )
+    page = SimpleNamespace(data=[item])
+    offsets = []
+
+    def fake_page(collection, offset, limit):
+        offsets.append(offset)
+        if offset == 0:
+            return page
+        return SimpleNamespace(data=[])
+
+    monkeypatch.setattr(
+        'app.cli.probe_zhihu_credentials',
+        lambda collection: CredentialProbeResult.valid('zhihu'),
+    )
+    monkeypatch.setattr('zhihu.exporter.get_collection_page', fake_page)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'zhihu', '-c', 'c1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert offsets == [0]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_db_only_cnblog_stops_at_known_page(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO cnblog_bookmark '
+        '(wz_link_id, response_id, db_created_at, db_updated_at) '
+        "VALUES (1, ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    bookmark = SimpleNamespace(
+        WzLinkId=1,
+        Title='Post',
+        LinkUrl='https://example.com/',
+        Summary='',
+        Tags=[],
+        DateAdded='2026-01-01',
+        FromCNBlogs=False,
+    )
+    pages = []
+
+    def fake_bookmarks(page_index, page_size):
+        pages.append(page_index)
+        if page_index == 1:
+            return [bookmark]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_cnblog_credentials',
+        lambda: CredentialProbeResult.valid('cnblog'),
+    )
+    monkeypatch.setattr(
+        'cnblog.exporter.get_bookmark_list',
+        fake_bookmarks,
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'cnblog'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert pages == [1]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_db_only_bangumi_stops_at_known_page(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO bangumi_collection '
+        '(subject_id, subject_type, type, subject_json, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES (1, 2, 3, '{}', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO bangumi_subject '
+        '(subject_id, characters_response_id, response_id, '
+        'db_created_at, db_updated_at) '
+        "VALUES (1, ?, ?, 'now', 'now')",
+        (response_id, response_id),
+    )
+    connection.commit()
+    connection.close()
+
+    result_item = SimpleNamespace(
+        subject_id=1,
+        subject=SimpleNamespace(name='Subject'),
+    )
+    offsets = []
+
+    def fake_collections(username, subject_type, collection_type, limit, offset):
+        offsets.append(offset)
+        if offset == 0:
+            return [result_item]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_bangumi_credentials',
+        lambda: CredentialProbeResult.valid('bangumi'),
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.BangumiClient',
+        lambda: SimpleNamespace(get_user=lambda: {'username': 'user'}),
+    )
+    monkeypatch.setattr(
+        'bangumi.exporter.get_all_collections_by_pages',
+        fake_collections,
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'bangumi', '-s', '2', '-c', '3'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert offsets == [0]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_db_only_qireader_stops_at_known_page(monkeypatch, tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    response_id = record_json(connection, 'test.seed', {})
+    connection.execute(
+        'INSERT INTO qireader_entry '
+        '(entry_id, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    connection.close()
+
+    entry = SimpleNamespace(
+        id='1',
+        title='Article',
+        url='https://example.com/a',
+        timestamp='1763974116059279295',
+    )
+    calls = []
+
+    def fake_entries(tag, older_than):
+        calls.append(older_than)
+        if older_than is None:
+            return [entry]
+        return []
+
+    monkeypatch.setattr(
+        'app.cli.probe_qireader_credentials',
+        lambda tag: CredentialProbeResult.valid('qireader'),
+    )
+    monkeypatch.setattr(
+        'qireader.exporter.get_list_from_read_latter',
+        fake_entries,
+    )
+    monkeypatch.setattr(
+        'qireader.exporter.get_html_text_from_url',
+        lambda url: '',
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'qireader', '-t', 'tag-1'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [None]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
 
 
 def test_db_rebuild_bangumi(tmp_path):

@@ -102,6 +102,21 @@ def _upsert_bookmarks(
     return rows
 
 
+def known_bookmark_ids(
+    connection: sqlite3.Connection,
+    wz_link_ids: list[int],
+) -> set[int]:
+    """Return the subset of bookmark ids already present in the projection."""
+    if not wz_link_ids:
+        return set()
+    placeholders = ','.join('?' for _ in wz_link_ids)
+    rows = connection.execute(
+        f'SELECT wz_link_id FROM cnblog_bookmark WHERE wz_link_id IN ({placeholders})',
+        wz_link_ids,
+    )
+    return {row['wz_link_id'] for row in rows}
+
+
 def post_exists(connection: sqlite3.Connection, source_url: str) -> bool:
     """Return whether the post body is already projected."""
     if not source_url:

@@ -39,14 +39,16 @@
 
 ## Stage 2. 整页已知停止分页
 
-- Status: Completed（github/bilibili/twitter；qireader 暂缓）
+- Status: Completed（全部平台，乐观顺序假设）
 - Files: 各平台 exporter、`src/app/context.py`、`tests/test_cli_db.py`
 - Work:
   - 每页处理后查询该页全部自然键是否已知（按 scope）。
   - 整页已知才停止后续分页；页内有一条新数据就继续。
   - 剪枝时 `mark_run_partial()`；`--force` 不做页级停止。
-  - 已接入顺序风险低的平台：github、bilibili、twitter。
-  - qireader 因 tag scope 未建模，暂缓 Stage 2；其余平台确认顺序后再接入。
+  - 全部平台接入：github、bilibili、twitter、weibo、zhihu、cnblog、bangumi、
+    qireader。
+  - 采用乐观策略：假设列表稳定且新数据在前，不做逐平台顺序验证。
+  - V2EX 回复最多抓 200 条，expected = `min(topic.replies, 200)`。
 - Verify:
   - 第二页整页已知时停止；页内混合新旧数据时继续。
   - github 存在 README provenance 缺失时不得页级停止，继续翻页修复详情。
@@ -76,8 +78,11 @@
   `--force`, complete-reply and per-platform db-only regression tests.
 - 2026-11-09: Added a run-end diagnostic for persistent GitHub README gaps,
   deduplicated CNBlog `source_url` candidates, and added Bilibili/Twitter
-  `--force` page-stop regression tests. V2EX count drift is documented as a
-  future empty-page provenance marker.
+  `--force` page-stop regression tests.
+- 2026-11-09: Stage 2 extended to all platforms under the optimistic ordering
+  assumption. V2EX replies are capped at 200 with expected =
+  `min(topic.replies, 200)`. Added page-stop E2E tests for weibo/zhihu/cnblog/
+  bangumi/qireader. Full suite: 338 passed, 2 skipped; ruff passes.
 - 2026-11-08: v2ex reply pruning compares the projected reply count with
   `v2ex_topic.replies`, so a reply fetch interrupted mid-pagination is retried
   instead of being skipped forever; dropped the unused `topic_exists` helper.

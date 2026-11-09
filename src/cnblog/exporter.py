@@ -8,6 +8,7 @@ from export_runtime.exporter_support import (
     add_index_entry,
     build_link_target,
     stop_if_output_exists,
+    stop_if_page_known,
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
@@ -85,5 +86,15 @@ def export(
                 mark_run_partial()
                 print(f'Skip cnblog bookmark: {error}')
                 continue
+
+        bookmark_ids = [getattr(bookmark, 'WzLinkId', None) for bookmark in bookmarks]
+        if is_db_only() and not force and bookmark_ids and all(bookmark_ids):
+            known = cnblog_projection.known_bookmark_ids(
+                get_database(),
+                bookmark_ids,
+            )
+            if stop_if_page_known(bookmark_ids, known):
+                break
+
         page_index += 1
     index_writer.flush('cnblog')

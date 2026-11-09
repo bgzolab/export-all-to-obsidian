@@ -162,6 +162,25 @@ def _upsert_subject(
     )
 
 
+def known_subject_ids(
+    connection: sqlite3.Connection,
+    subject_type: int,
+    collection_type: int,
+    subject_ids: list[int],
+) -> set[int]:
+    """Return the subset of subject ids already in this collection scope."""
+    if not subject_ids:
+        return set()
+    placeholders = ','.join('?' for _ in subject_ids)
+    rows = connection.execute(
+        'SELECT subject_id FROM bangumi_collection '
+        'WHERE type = ? AND subject_type = ? '
+        f'AND subject_id IN ({placeholders})',
+        [collection_type, subject_type, *subject_ids],
+    )
+    return {row['subject_id'] for row in rows}
+
+
 def subject_exists(connection: sqlite3.Connection, subject_id: int) -> bool:
     """Return whether the subject detail row is already projected."""
     return (

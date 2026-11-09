@@ -15,7 +15,7 @@ from utils.file_utils import get_clean_filename
 from utils.template import WebPage
 from v2ex.cilent import V2exClient
 from v2ex.mytopic import get_fav_list_topic_id_page
-from v2ex.replies import fetch_all_replies
+from v2ex.replies import V2EX_MAX_REPLIES, fetch_all_replies
 from v2ex.topic import get_v2ex_topic_info
 
 
@@ -41,16 +41,17 @@ def export(
                         topic_id,
                     )
                     if reply_count is not None:
-                        if reply_count > 0 and not v2ex_projection.replies_complete(
+                        expected = min(reply_count, V2EX_MAX_REPLIES)
+                        if expected > 0 and not v2ex_projection.replies_complete(
                             connection,
                             topic_id,
-                            reply_count,
+                            expected,
                         ):
                             total = fetch_all_replies(topic_id, client)
-                            if total < reply_count:
+                            if total < expected:
                                 print(
                                     f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
-                                    f'少于 expected={reply_count}，可能含已删除回复',
+                                    f'少于 expected={expected}，可能含已删除回复',
                                 )
                         continue
                 result = get_v2ex_topic_info(topic_id)
@@ -58,23 +59,24 @@ def export(
                     mark_run_partial()
                     continue
                 topic = result.result
+                expected = min(topic.replies, V2EX_MAX_REPLIES)
                 if (
                     is_db_only()
-                    and topic.replies
+                    and expected > 0
                     and (
                         force
                         or not v2ex_projection.replies_complete(
                             get_database(),
                             topic_id,
-                            topic.replies,
+                            expected,
                         )
                     )
                 ):
                     total = fetch_all_replies(topic_id, client)
-                    if total < topic.replies:
+                    if total < expected:
                         print(
                             f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
-                            f'少于 expected={topic.replies}，可能含已删除回复',
+                            f'少于 expected={expected}，可能含已删除回复',
                         )
                 filename = get_clean_filename(f'{topic_id}-{topic.title}')
                 if stop_if_output_exists(

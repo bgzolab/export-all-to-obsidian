@@ -13,6 +13,7 @@ from export_runtime.exporter_support import (
     build_link_target,
     build_output_path,
     resolve_output_prefix,
+    stop_if_page_known,
 )
 from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
@@ -69,6 +70,17 @@ def export(
                     f'跳过:{result.subject.name}, '
                     f'subject_id={result.subject_id}, error={error}',
                 )
+
+        subject_ids = [getattr(result, 'subject_id', None) for result in results]
+        if is_db_only() and not force and subject_ids and all(subject_ids):
+            known = bangumi_projection.known_subject_ids(
+                get_database(),
+                subject_type,
+                collection_type,
+                subject_ids,
+            )
+            if stop_if_page_known(subject_ids, known):
+                break
     index_writer.flush('bangumi')
 
 

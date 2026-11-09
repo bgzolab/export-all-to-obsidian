@@ -103,6 +103,21 @@ def _upsert_entries(
     return rows
 
 
+def known_entry_ids(
+    connection: sqlite3.Connection,
+    entry_ids: list[str],
+) -> set[str]:
+    """Return the subset of entry ids already present in the projection."""
+    if not entry_ids:
+        return set()
+    placeholders = ','.join('?' for _ in entry_ids)
+    rows = connection.execute(
+        f'SELECT entry_id FROM qireader_entry WHERE entry_id IN ({placeholders})',
+        entry_ids,
+    )
+    return {row['entry_id'] for row in rows}
+
+
 def article_exists(connection: sqlite3.Connection, url: str) -> bool:
     """Return whether the article body is already projected."""
     return (

@@ -132,6 +132,21 @@ def _upsert_posts(
     return rows
 
 
+def known_post_ids(
+    connection: sqlite3.Connection,
+    post_ids: list[str],
+) -> set[str]:
+    """Return the subset of post ids already present in the projection."""
+    if not post_ids:
+        return set()
+    placeholders = ','.join('?' for _ in post_ids)
+    rows = connection.execute(
+        f'SELECT post_id FROM weibo_post WHERE post_id IN ({placeholders})',
+        post_ids,
+    )
+    return {row['post_id'] for row in rows}
+
+
 def long_text_exists(connection: sqlite3.Connection, mblogid: str | None) -> bool:
     """Return whether the long text is already projected."""
     if not mblogid:
