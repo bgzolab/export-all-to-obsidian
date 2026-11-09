@@ -1,7 +1,7 @@
 """导出流程的轻量共用辅助函数。"""
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from app.context import get_output_prefix, is_db_only, mark_run_partial
@@ -43,19 +43,20 @@ def stop_if_page_known(
     page_ids: list,
     known_ids: set,
     *,
-    pending_count: int = 0,
+    pending_count: Callable[[], int] | None = None,
     message: str = '分页已到达已知数据，停止',
 ) -> bool:
     """Stop pagination when every item on the current page is already known.
 
     ``pending_count`` keeps pagination running while detail/aux rows still need
-    repair, so a page stop cannot lock in an existing gap.
+    repair, so a page stop cannot lock in an existing gap. It is only called
+    when the page is fully known.
     """
     if not page_ids:
         return False
     if not all(page_id in known_ids for page_id in page_ids):
         return False
-    if pending_count:
+    if pending_count is not None and pending_count():
         return False
     mark_run_partial()
     print(message)

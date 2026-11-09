@@ -145,7 +145,9 @@ def export(
             if stop_if_page_known(
                 repo_ids,
                 known,
-                pending_count=github_projection.readme_pending_count(get_database()),
+                pending_count=lambda: github_projection.readme_pending_count(
+                    get_database()
+                ),
             ):
                 break
 

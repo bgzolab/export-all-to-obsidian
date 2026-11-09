@@ -82,7 +82,9 @@ def export(
             if stop_if_page_known(
                 subject_ids,
                 known,
-                pending_count=bangumi_projection.detail_pending_count(get_database()),
+                pending_count=lambda: bangumi_projection.detail_pending_count(
+                    get_database()
+                ),
             ):
                 break
 

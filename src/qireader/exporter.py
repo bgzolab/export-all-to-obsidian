@@ -110,7 +110,9 @@ def export(
             if stop_if_page_known(
                 entry_ids,
                 known,
-                pending_count=qireader_projection.article_pending_count(get_database()),
+                pending_count=lambda: qireader_projection.article_pending_count(
+                    get_database()
+                ),
             ):
                 break
         older_than = str(entries[-1].timestamp)

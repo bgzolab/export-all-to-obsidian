@@ -136,7 +136,9 @@ def export(
             if stop_if_page_known(
                 post_ids,
                 known,
-                pending_count=weibo_projection.long_text_pending_count(get_database()),
+                pending_count=lambda: weibo_projection.long_text_pending_count(
+                    get_database()
+                ),
             ):
                 break
 

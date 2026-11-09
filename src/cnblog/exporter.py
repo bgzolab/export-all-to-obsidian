@@ -96,7 +96,9 @@ def export(
             if stop_if_page_known(
                 bookmark_ids,
                 known,
-                pending_count=cnblog_projection.post_pending_count(get_database()),
+                pending_count=lambda: cnblog_projection.post_pending_count(
+                    get_database()
+                ),
             ):
                 break
 
