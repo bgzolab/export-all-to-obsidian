@@ -25,11 +25,14 @@ def export(
     """导出博客园收藏。"""
     page_index = 1
     page_size = 100
+    seen_wz_link_ids: list[int] = []
     while True:
         bookmarks = get_bookmark_list(page_index, page_size)
         if not bookmarks:
             break
         for bookmark in bookmarks:
+            if bookmark.WzLinkId is not None:
+                seen_wz_link_ids.append(bookmark.WzLinkId)
             try:
                 filename = get_clean_filename(bookmark.Title)
                 if stop_if_output_exists(
@@ -100,7 +103,8 @@ def export(
                 bookmark_ids,
                 known,
                 pending_count=lambda: cnblog_projection.post_pending_count(
-                    get_database()
+                    get_database(),
+                    seen_wz_link_ids,
                 ),
             ):
                 break
@@ -112,7 +116,7 @@ def export(
         if pending:
             print(
                 f'正文缺口: {pending} 条收藏仍缺 post body provenance；'
-                '已取消收藏/删除的条目无法自愈，页面剪枝会保持禁用',
+                '已取消收藏/删除的条目无法自愈',
             )
 
     index_writer.flush('cnblog')

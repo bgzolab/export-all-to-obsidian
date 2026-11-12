@@ -61,9 +61,10 @@ Stage 1 使用同一组 key 判断详情/辅助数据：
   请求，也不计入 pending。
 - qireader：`qireader_article.url` 存在则跳过 `article`。页级停止还要求
   `article_pending_count == 0`；空 `url` 的条目跳过正文抓取，也不计入 pending。
-- cnblog：`cnblog_post.source_url` 存在则跳过 `post.body`。页级停止还要求
-  `post_pending_count == 0`，且 pending 只统计 `link_url <> ''` 的书签；空
-  `link_url` 的条目跳过正文抓取。
+- cnblog：`link_url` 能解析出数字 `post_id` 且 `cnblog_post` 存在则跳过
+  `post.body`。页级停止要求“本轮未见过”的 pending 为 0，本轮已处理页里的缺口不再
+  阻塞停止；pending 只统计能解析 `post_id` 的 `from_cnblogs` 书签，空 `link_url` 或
+  slug-only URL 跳过正文抓取，也不计入 pending。
 - v2ex：`v2ex_topic` 存在则跳过 `topic.detail`；回复分页只在投影回复数达到
   `min(topic.replies, 200)` 时跳过。中断的回复抓取只留下页面前缀，计数必然不足，
   下一轮会重抓。
@@ -95,8 +96,10 @@ v2ex 暂缓页级停止：停止收藏页分页需要全局 replies pending gate
 - 这样能容忍新旧交错和分页位移。
 - 如果某平台顺序后来被确认不稳定，禁用其 Stage 2，只保留 Stage 1。
 
-github/weibo/bangumi/cnblog/qireader 的页级停止还要求各自的详情/辅助 pending
+github/weibo/bangumi/qireader 的页级停止还要求各自的详情/辅助 pending
 count 为 0；存在缺口时继续翻页，由逐条处理补抓，避免页级停止把缺口锁死。
+cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺口本轮已经重试过，
+继续翻页也不会再修，因此不阻塞停止。
 
 ## 5. 与投影层、raw 层的交互
 

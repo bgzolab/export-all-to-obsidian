@@ -243,15 +243,28 @@ def test_cnblog_bookmarks_endpoint(monkeypatch):
 def test_cnblog_post_endpoint(monkeypatch):
     from cnblog.blog_post import get_cnblog_post_body_by_url
 
-    endpoints = []
+    requests = []
     client = FakeClient(FakeResponse(text='<p>post</p>'))
     monkeypatch.setattr('cnblog.blog_post.CnblogClient', lambda: client)
-    _patch_get(monkeypatch, 'cnblog.blog_post', client.session.response, endpoints)
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        requests.append((endpoint, url))
+        return client.session.response
+
+    monkeypatch.setattr('cnblog.blog_post.http.get', fake_get)
 
     assert (
         get_cnblog_post_body_by_url('https://cnblogs.com/x/p/1.html') == '<p>post</p>'
     )
-    assert endpoints == ['cnblog.post.body']
+    assert (
+        get_cnblog_post_body_by_url('https://cnblogs.com/x/p/2/how-to-fetch')
+        == '<p>post</p>'
+    )
+    assert get_cnblog_post_body_by_url('https://cnblogs.com/x/p/slug-only.html') == ''
+    assert requests == [
+        ('cnblog.post.body', 'https://api.cnblogs.com/api/blogposts/1/body'),
+        ('cnblog.post.body', 'https://api.cnblogs.com/api/blogposts/2/body'),
+    ]
 
 
 def test_cnblog_user_endpoint(monkeypatch):

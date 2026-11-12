@@ -1317,7 +1317,7 @@ def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     connection.execute(
         'INSERT INTO cnblog_post '
         '(post_id, source_url, body, response_id, db_created_at, db_updated_at) '
-        "VALUES (123, 'https://www.cnblogs.com/user/p/123.html', '', ?, 'now', 'now')",
+        "VALUES (123, '', '', ?, 'now', 'now')",
         (response_id,),
     )
     connection.commit()
@@ -1326,7 +1326,7 @@ def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     bookmark = SimpleNamespace(
         WzLinkId=1,
         Title='Post',
-        LinkUrl='https://www.cnblogs.com/user/p/123.html',
+        LinkUrl='https://www.cnblogs.com/user/p/123',
         Summary='',
         Tags=[],
         DateAdded='2026-01-01',
@@ -2092,14 +2092,15 @@ def test_db_only_cnblog_continues_with_pending_body(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert pages == [1, 2, 3]
+    assert pages == [1, 2]
     assert body_calls == ['https://www.cnblogs.com/user/p/2.html']
+    assert '分页已到达已知数据，停止' in result.output
     assert '正文缺口' in result.output
     run = _query_one(
         db_path,
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
-    assert run['status'] == 'success'
+    assert run['status'] == 'partial'
 
 
 def test_db_only_qireader_continues_with_pending_article(monkeypatch, tmp_path):

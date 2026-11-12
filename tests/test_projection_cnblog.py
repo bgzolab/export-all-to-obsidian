@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 
+from cnblog.urls import post_id_from_url
 from db.connection import connect
 from db.projections import rebuild_platform
-from db.projections.cnblog import post_exists
+from db.projections.cnblog import post_exists, post_pending_count
 from tests.projection_helpers import business_rows, record_json, record_text
 
 TABLES = ('cnblog_post', 'cnblog_bookmark')
@@ -89,9 +90,57 @@ def test_post_exists_helper():
     rebuild_platform(connection, 'cnblog')
 
     assert post_exists(connection, BOOKMARKS[0]['LinkUrl']) is True
+    assert post_exists(connection, 'https://www.cnblogs.com/user/p/123') is True
+    assert post_exists(connection, 'https://www.cnblogs.com/user/p/123/slug') is True
     assert post_exists(connection, 'https://example.com/missing') is False
+    assert post_exists(connection, 'https://www.cnblogs.com/user/p/slug.html') is False
     assert post_exists(connection, '') is False
     connection.close()
+
+
+def test_post_pending_count_uses_url_post_id():
+    connection = connect(':memory:')
+    bookmarks = [
+        dict(BOOKMARKS[0], WzLinkId=10, LinkUrl='https://www.cnblogs.com/user/p/123'),
+        dict(BOOKMARKS[0], WzLinkId=11, LinkUrl='https://www.cnblogs.com/user/p/456'),
+        dict(
+            BOOKMARKS[0],
+            WzLinkId=12,
+            LinkUrl='https://www.cnblogs.com/user/p/slug-only.html',
+        ),
+    ]
+    record_json(connection, 'cnblog.bookmarks.page', bookmarks)
+    record_text(
+        connection,
+        'cnblog.post.body',
+        '<p>post body</p>',
+        request={'url': 'https://api.cnblogs.com/api/blogposts/123/body'},
+    )
+
+    rebuild_platform(connection, 'cnblog')
+
+    # 456 缺正文；slug-only 无法解析 ID，不再虚报；123 已入库。
+    assert post_pending_count(connection) == 1
+    assert post_pending_count(connection, {10}) == 1
+    assert post_pending_count(connection, {11}) == 0
+    post = connection.execute('SELECT * FROM cnblog_post').fetchone()
+    assert post['source_url'] == 'https://www.cnblogs.com/user/p/123'
+    connection.close()
+
+
+def test_post_id_from_url_forms():
+    assert post_id_from_url('https://www.cnblogs.com/user/p/123.html') == 123
+    assert post_id_from_url('https://www.cnblogs.com/user/p/123') == 123
+    assert post_id_from_url('https://www.cnblogs.com/user/p/123/how-to-fetch') == 123
+    assert post_id_from_url('https://news.cnblogs.com/n/456') == 456
+    assert post_id_from_url('https://www.cnblogs.com/user/articles/654') == 654
+    assert (
+        post_id_from_url('https://www.cnblogs.com/user/archive/2007/05/22/789.html')
+        == 789
+    )
+    assert post_id_from_url('https://www.cnblogs.com/user/p/slug-only.html') is None
+    assert post_id_from_url('https://www.cnblogs.com/user/p/-/slug') is None
+    assert post_id_from_url('') is None
 
 
 def test_ambiguous_source_url_is_left_empty():
