@@ -61,6 +61,18 @@ def test_v2ex_client_headers_configured(monkeypatch, tmp_path):
     assert headers['Referer'] == 'https://www.v2ex.com'
 
 
+def test_v2ex_client_includes_www_host_only_cookie(monkeypatch, tmp_path):
+    """www.v2ex.com 的 host-only Cookie 也要发送。"""
+    monkeypatch.setenv('V2EX_ACCESS_TOKEN', 'fake-token')
+    p = _write_cookies_file(
+        tmp_path,
+        'www.v2ex.com\tFALSE\t/\tTRUE\t0\tPB3_SESSION\tfake-session\n',
+    )
+    monkeypatch.setenv('COOKIES', p)
+    client = V2exClient()
+    assert client.session.headers['Cookie'] == 'PB3_SESSION=fake-session'
+
+
 def test_v2ex_client_missing_token_raises(monkeypatch, tmp_path):
     """缺少 V2EX_ACCESS_TOKEN 应抛出 ValueError。"""
     monkeypatch.delenv('V2EX_ACCESS_TOKEN', raising=False)
