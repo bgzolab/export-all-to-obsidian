@@ -571,6 +571,47 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
     assert (output_dir / '~1-Topic-1.md').read_text(encoding='utf-8') == 'exists'
 
 
+def test_db_only_v2ex_stops_on_repeated_page(monkeypatch, tmp_path):
+    pages = {1: [1], 2: [1], 3: [2]}
+    page_calls = []
+    topic_calls = []
+
+    def fake_page(page, client=None):
+        page_calls.append(page)
+        return pages[page]
+
+    def fake_topic(topic_id):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+                replies=0,
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), '--db-only', 'v2ex'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1, 2]
+    assert topic_calls == [1]
+    assert '分页返回重复数据，停止' in result.output
+
+
 def test_db_only_github_skips_known_readme(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)
