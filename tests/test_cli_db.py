@@ -1778,7 +1778,8 @@ def test_db_only_bangumi_stops_at_known_page(monkeypatch, tmp_path):
     def fake_collections(username, subject_type, collection_type, limit, offset):
         offsets.append(offset)
         if offset == 0:
-            return [result_item]
+            # 满页才能走到页级剪枝；短页会按末页直接停止。
+            return [result_item] * 30
         return []
 
     monkeypatch.setattr(
@@ -1965,9 +1966,16 @@ def test_db_only_bangumi_continues_with_pending_details(monkeypatch, tmp_path):
     def fake_collections(username, subject_type, collection_type, limit, offset):
         offsets.append(offset)
         if offset == 0:
-            return [SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))]
+            # 满页 + 一个缺详情条目，页级剪枝应因 pending 继续翻页。
+            return [
+                SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))
+            ] * 29 + [
+                SimpleNamespace(subject_id=2, subject=SimpleNamespace(name='Two'))
+            ]
         if offset == 30:
-            return [SimpleNamespace(subject_id=2, subject=SimpleNamespace(name='Two'))]
+            return [
+                SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))
+            ] * 30
         return []
 
     monkeypatch.setattr(
