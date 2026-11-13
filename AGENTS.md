@@ -122,8 +122,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   their detail/aux pending count is zero, so missing details are repaired before pruning
   resumes. cnblog page-stops when no bookmark unseen in the current run still lacks a post
   body; pending only counts bookmarks whose URL yields a post id, so empty and slug-only URLs
-  never block the stop. V2EX remains Stage 1 only (detail/reply pruning) because a page stop
-  would need a global replies-pending gate. V2EX replies are capped at 200 per topic.
+  never block the stop. v2ex stays `success` when it stops on a repeated favorites page
+  (out-of-range pagination), but has no whole-page-known stop: that would need a global
+  replies-pending gate. V2EX replies are capped at 200 per topic.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip

@@ -28,6 +28,8 @@ Markdown 文件缺失时，会被错误跳过。
 - Stage 1 只跳过详情/辅助请求，列表页仍完整，因此 run 可以保持 `success`。它不是
   可变详情的完整刷新。
 - Stage 2 会提前停止分页，这些 run 必须标记为 `partial`，且不得用于将来的删除检测。
+  例外：v2ex 在收藏页整页重复上一页时停止，表示越界分页已枚举完，run 保持
+  `success`。
 - 完整的 `--force` run 可以是 `success`，将来可以用于删除检测。
 - 普通导出下，`--force` 仍然表示覆盖已有 Markdown。
 - V2EX 每个主题最多抓 200 条回复，expected = `min(topic.replies, 200)`；超过部分
@@ -87,8 +89,9 @@ Stage 2 假设每个列表按平台时间稳定地新数据在前，且已有行
 | bangumi | likely updated_at desc (verify) | medium |
 
 Stage 2 已接入 github、bilibili、twitter、weibo、zhihu、cnblog、bangumi、qireader。
-v2ex 暂缓页级停止：停止收藏页分页需要全局 replies pending gate，否则可能把未完成的
-回复抓取永久锁在更深页。
+v2ex 只在收藏页整页重复上一页时停止（越界分页，视为列表已枚举完），run 保持
+`success`；“整页已知”式停止仍暂缓：停止收藏页分页需要全局 replies pending gate，
+否则可能把未完成的回复抓取永久锁在更深页。
 
 因为存在 medium-risk 平台，Stage 2 使用“整页已知”而不是“遇到第一个已知条目”：
 
@@ -133,7 +136,7 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
   页级停止。run 会回退到 Stage 1，安全但更慢；清理这类行需要删除检测或手工处理，
   均不在当前范围。
 - V2EX 不可见回复导致的重复抓取由 200 条上限约束；空页 provenance marker 暂缓。
-- v2ex 页级停止暂缓，需要全局 replies pending gate。
+- v2ex 的“整页已知”式页级停止暂缓，需要全局 replies pending gate；重复页停止已启用。
 - Qireader tag membership 未建模，使用全局 entry id。
 - 不做多账号。
 
@@ -148,6 +151,7 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
   - github/weibo/bangumi/cnblog/qireader 存在详情/辅助缺口时继续翻页并补抓，
     run 保持 `success`。
   - V2EX 回复中断后重抓；达到 200 条上限后跳过；低于 capped expected 时重抓。
+  - V2EX 收藏页整页重复上一页时停止分页，run 保持 `success`。
   - weibo/qireader/cnblog 缺少身份字段的条目不再发起注定无效的请求。
 
 ## 9. 非目标
