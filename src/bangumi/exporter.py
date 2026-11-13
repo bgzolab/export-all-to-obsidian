@@ -71,6 +71,9 @@ def export(
                     f'subject_id={result.subject_id}, error={error}',
                 )
 
+        if len(results) < limit:
+            break
+
         subject_ids = [getattr(result, 'subject_id', None) for result in results]
         if is_db_only() and not force and subject_ids and all(subject_ids):
             known = bangumi_projection.known_subject_ids(

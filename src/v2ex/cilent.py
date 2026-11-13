@@ -21,7 +21,10 @@ class V2exClient:
         self.token = os.getenv('V2EX_ACCESS_TOKEN')
         if not self.token:
             raise ValueError('V2EX_ACCESS_TOKEN environment variable is not set.')
-        self.cookie = get_cookie_header(('v2ex.com',))
+        self.cookie = get_cookie_header(
+            ('www.v2ex.com', 'v2ex.com'),
+            dedupe_by_name=True,
+        )
 
         self.session = requests.Session()
         # 配置重试：v2ex 偶发 SSL 握手中断 / 限流，需自动重试并退避

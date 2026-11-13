@@ -6,34 +6,33 @@
 
 from cnblog.api_endpoints import BLOG_POST
 from cnblog.client import CnblogClient
+from cnblog.urls import post_id_from_url
 from export_runtime import http
 
 
 def get_cnblog_post_body_by_url(url: str):
     """
-    获取指定 ID 的博客文章正文内容。
+    获取指定 URL 的博客文章正文内容。
 
-    :param id: 博客文章的 ID
-    :return: 博客文章正文内容
+    :param url: 博客文章的 URL
+    :return: 博客文章正文内容；无法解析文章 ID 时返回空字符串
     """
     client = CnblogClient()
 
-    # 从 URL 中提取 ID，并去除 .html 后缀
-    id = url.split('/')[-1]
-    # NOTE: 这里假设 URL 的最后一部分是 ID，且可能以 .html 结尾。如：
-    #  https://api.cnblogs.com/api/blogposts/755751.html/body
-    id = id.removesuffix('.html')
+    post_id = post_id_from_url(url)
+    if post_id is None:
+        print(f'无法从 URL 解析文章 ID，跳过正文抓取: {url}')
+        return ''
 
     response = http.get(
         client.session,
-        BLOG_POST % id,
+        BLOG_POST % post_id,
         endpoint='cnblog.post.body',
     )
-    # % 是 Python 早期的字符串格式化操作符。它会查找字符串中的 % 占位符（如 %s），并用后面的值替换它。
 
     if response.status_code == 200:
         return response.text
     else:
-        print(f'Error fetching post body for ID {id}: {response.status_code}')
+        print(f'Error fetching post body for ID {post_id}: {response.status_code}')
         return ''
         # response.raise_for_status()  # Raise an error for bad responses

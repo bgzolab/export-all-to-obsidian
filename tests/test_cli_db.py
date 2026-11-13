@@ -571,6 +571,47 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
     assert (output_dir / '~1-Topic-1.md').read_text(encoding='utf-8') == 'exists'
 
 
+def test_db_only_v2ex_stops_on_repeated_page(monkeypatch, tmp_path):
+    pages = {1: [1], 2: [1], 3: [2]}
+    page_calls = []
+    topic_calls = []
+
+    def fake_page(page, client=None):
+        page_calls.append(page)
+        return pages[page]
+
+    def fake_topic(topic_id):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+                replies=0,
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), '--db-only', 'v2ex'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1, 2]
+    assert topic_calls == [1]
+    assert '分页返回重复数据，停止' in result.output
+
+
 def test_db_only_github_skips_known_readme(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)
@@ -1317,7 +1358,7 @@ def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     connection.execute(
         'INSERT INTO cnblog_post '
         '(post_id, source_url, body, response_id, db_created_at, db_updated_at) '
-        "VALUES (123, 'https://www.cnblogs.com/user/p/123.html', '', ?, 'now', 'now')",
+        "VALUES (123, '', '', ?, 'now', 'now')",
         (response_id,),
     )
     connection.commit()
@@ -1326,7 +1367,7 @@ def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     bookmark = SimpleNamespace(
         WzLinkId=1,
         Title='Post',
-        LinkUrl='https://www.cnblogs.com/user/p/123.html',
+        LinkUrl='https://www.cnblogs.com/user/p/123',
         Summary='',
         Tags=[],
         DateAdded='2026-01-01',
@@ -1737,7 +1778,8 @@ def test_db_only_bangumi_stops_at_known_page(monkeypatch, tmp_path):
     def fake_collections(username, subject_type, collection_type, limit, offset):
         offsets.append(offset)
         if offset == 0:
-            return [result_item]
+            # 满页才能走到页级剪枝；短页会按末页直接停止。
+            return [result_item] * 30
         return []
 
     monkeypatch.setattr(
@@ -1924,9 +1966,16 @@ def test_db_only_bangumi_continues_with_pending_details(monkeypatch, tmp_path):
     def fake_collections(username, subject_type, collection_type, limit, offset):
         offsets.append(offset)
         if offset == 0:
-            return [SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))]
+            # 满页 + 一个缺详情条目，页级剪枝应因 pending 继续翻页。
+            return [
+                SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))
+            ] * 29 + [
+                SimpleNamespace(subject_id=2, subject=SimpleNamespace(name='Two'))
+            ]
         if offset == 30:
-            return [SimpleNamespace(subject_id=2, subject=SimpleNamespace(name='Two'))]
+            return [
+                SimpleNamespace(subject_id=1, subject=SimpleNamespace(name='One'))
+            ] * 30
         return []
 
     monkeypatch.setattr(
@@ -2092,14 +2141,15 @@ def test_db_only_cnblog_continues_with_pending_body(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert pages == [1, 2, 3]
+    assert pages == [1, 2]
     assert body_calls == ['https://www.cnblogs.com/user/p/2.html']
+    assert '分页已到达已知数据，停止' in result.output
     assert '正文缺口' in result.output
     run = _query_one(
         db_path,
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
-    assert run['status'] == 'success'
+    assert run['status'] == 'partial'
 
 
 def test_db_only_qireader_continues_with_pending_article(monkeypatch, tmp_path):

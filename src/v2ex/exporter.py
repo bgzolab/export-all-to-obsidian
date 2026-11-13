@@ -27,10 +27,15 @@ def export(
     """导出 V2EX 收藏主题。"""
     client = V2exClient()
     page = 1
+    previous_ids: list[int] | None = None
     while True:
         id_list = get_fav_list_topic_id_page(page, client)
         if not id_list:
             break
+        if id_list == previous_ids:
+            print('分页返回重复数据，停止')
+            break
+        previous_ids = id_list
         page += 1
         for topic_id in id_list:
             try:

@@ -61,6 +61,31 @@ def test_v2ex_client_headers_configured(monkeypatch, tmp_path):
     assert headers['Referer'] == 'https://www.v2ex.com'
 
 
+def test_v2ex_client_includes_www_host_only_cookie(monkeypatch, tmp_path):
+    """www.v2ex.com 的 host-only Cookie 也要发送。"""
+    monkeypatch.setenv('V2EX_ACCESS_TOKEN', 'fake-token')
+    p = _write_cookies_file(
+        tmp_path,
+        'www.v2ex.com\tFALSE\t/\tTRUE\t0\tPB3_SESSION\tfake-session\n',
+    )
+    monkeypatch.setenv('COOKIES', p)
+    client = V2exClient()
+    assert client.session.headers['Cookie'] == 'PB3_SESSION=fake-session'
+
+
+def test_v2ex_client_dedupes_same_name_across_domains(monkeypatch, tmp_path):
+    """同名 Cookie 同时命中 www 与域时，只发送 www 的值。"""
+    monkeypatch.setenv('V2EX_ACCESS_TOKEN', 'fake-token')
+    p = _write_cookies_file(
+        tmp_path,
+        '.v2ex.com\tTRUE\t/\tTRUE\t0\tA2\tdomain-value\n'
+        'www.v2ex.com\tFALSE\t/\tTRUE\t0\tA2\twww-value\n',
+    )
+    monkeypatch.setenv('COOKIES', p)
+    client = V2exClient()
+    assert client.session.headers['Cookie'] == 'A2=www-value'
+
+
 def test_v2ex_client_missing_token_raises(monkeypatch, tmp_path):
     """缺少 V2EX_ACCESS_TOKEN 应抛出 ValueError。"""
     monkeypatch.delenv('V2EX_ACCESS_TOKEN', raising=False)
