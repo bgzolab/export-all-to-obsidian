@@ -25,14 +25,14 @@ def export(
     """导出博客园收藏。"""
     page_index = 1
     page_size = 100
-    seen_wz_link_ids: list[int] = []
+    seen_wz_link_ids: set[int] = set()
     while True:
         bookmarks = get_bookmark_list(page_index, page_size)
         if not bookmarks:
             break
         for bookmark in bookmarks:
             if bookmark.WzLinkId is not None:
-                seen_wz_link_ids.append(bookmark.WzLinkId)
+                seen_wz_link_ids.add(bookmark.WzLinkId)
             try:
                 filename = get_clean_filename(bookmark.Title)
                 if stop_if_output_exists(
