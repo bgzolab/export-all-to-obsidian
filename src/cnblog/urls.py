@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit
 
-_POST_PATH_PARTS = {'p', 'n', 'articles'}
+# /n/ 是新闻，id 与 /blogposts/{id}/body 的博客命名空间不同，不能混用。
+_POST_PATH_PARTS = {'p', 'articles'}
 
 
 def _is_cnblogs_host(host: str) -> bool:

@@ -94,6 +94,7 @@ def test_post_exists_helper():
     assert post_exists(connection, 'https://www.cnblogs.com/user/p/123/slug') is True
     assert post_exists(connection, 'https://example.com/missing') is False
     assert post_exists(connection, 'https://www.cnblogs.com/user/p/slug.html') is False
+    assert post_exists(connection, 'https://news.cnblogs.com/n/123') is False
     assert post_exists(connection, '') is False
     connection.close()
 
@@ -132,7 +133,7 @@ def test_post_id_from_url_forms():
     assert post_id_from_url('https://www.cnblogs.com/user/p/123.html') == 123
     assert post_id_from_url('https://www.cnblogs.com/user/p/123') == 123
     assert post_id_from_url('https://www.cnblogs.com/user/p/123/how-to-fetch') == 123
-    assert post_id_from_url('https://news.cnblogs.com/n/456') == 456
+    assert post_id_from_url('https://news.cnblogs.com/n/456') is None
     assert post_id_from_url('https://www.cnblogs.com/user/articles/654') == 654
     assert (
         post_id_from_url('https://www.cnblogs.com/user/archive/2007/05/22/789.html')
