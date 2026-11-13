@@ -140,10 +140,15 @@ def test_post_id_from_url_forms():
     )
     assert post_id_from_url('https://www.cnblogs.com/user/p/slug-only.html') is None
     assert post_id_from_url('https://www.cnblogs.com/user/p/-/slug') is None
+    assert post_id_from_url('https://www.cnblogs.com/user/p/½') is None
+    assert post_id_from_url('https://www.cnblogs.com/user/p/².html') is None
     assert post_id_from_url('https://example.org/user/p/999') is None
     assert post_id_from_url('https://www.cnblogs.com/user/archive/2024/01.aspx') is None
     assert post_id_from_url('https://www.cnblogs.com/user/archive/2024') is None
-    assert post_id_from_url('https://www.cnblogs.com/user/archive/2024/1/2/789.html') is None
+    assert (
+        post_id_from_url('https://www.cnblogs.com/user/archive/2024/1/2/789.html')
+        is None
+    )
     assert post_id_from_url('') is None
 
 
