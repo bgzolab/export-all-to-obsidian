@@ -6,6 +6,9 @@ from urllib.parse import urlsplit
 
 # /n/ 是新闻，id 与 /blogposts/{id}/body 的博客命名空间不同，不能混用。
 _POST_PATH_PARTS = {'p', 'articles'}
+# 站点级路由（如 /sitehome/p/2）也含 p，但它们是列表页，不是文章详情。
+_RESERVED_ROUTES = {'sitehome', 'agg', 'cmt', 'news', 'topic', 'picker'}
+_ARTICLE_SUFFIXES = ('.html', '.aspx')
 
 
 def _is_cnblogs_host(host: str) -> bool:
@@ -23,10 +26,18 @@ def post_id_from_url(url: str) -> int | None:
         return None
     parts = [part for part in split.path.split('/') if part]
     for index, part in enumerate(parts[:-1]):
-        if part in _POST_PATH_PARTS:
-            candidate = _numeric(parts[index + 1].split('.', 1)[0])
-            if candidate is not None:
-                return candidate
+        if part not in _POST_PATH_PARTS:
+            continue
+        # 详情 URL 始终是 /{user}/p/{id}，首段或站点级路由前的不是文章。
+        if index == 0 or parts[index - 1].lower() in _RESERVED_ROUTES:
+            continue
+        raw = parts[index + 1]
+        # 文章详情固定为 /{user}/articles/{id}.html，其余形态按列表页处理。
+        if part == 'articles' and not raw.lower().endswith(_ARTICLE_SUFFIXES):
+            continue
+        candidate = _numeric(raw.split('.', 1)[0])
+        if candidate is not None:
+            return candidate
     if 'archive' in parts:
         index = parts.index('archive')
         # 归档列表页也含 archive，只有完整 /archive/YYYY/MM/DD/{id} 才是文章。
