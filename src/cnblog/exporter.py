@@ -31,8 +31,9 @@ def export(
         if not bookmarks:
             break
         for bookmark in bookmarks:
-            if bookmark.WzLinkId is not None:
-                seen_wz_link_ids.add(bookmark.WzLinkId)
+            wz_link_id = getattr(bookmark, 'WzLinkId', None)
+            if wz_link_id is not None:
+                seen_wz_link_ids.add(wz_link_id)
             try:
                 filename = get_clean_filename(bookmark.Title)
                 if stop_if_output_exists(
