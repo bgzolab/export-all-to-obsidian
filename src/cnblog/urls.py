@@ -7,16 +7,33 @@ from urllib.parse import urlsplit
 _POST_PATH_PARTS = {'p', 'n', 'articles'}
 
 
+def _is_cnblogs_host(host: str) -> bool:
+    return host == 'cnblogs.com' or host.endswith('.cnblogs.com')
+
+
 def post_id_from_url(url: str) -> int | None:
     """Return the numeric post id from a CNBlog article URL, if any."""
-    parts = [part for part in urlsplit(url).path.split('/') if part]
+    split = urlsplit(url)
+    if not _is_cnblogs_host(split.hostname or ''):
+        return None
+    parts = [part for part in split.path.split('/') if part]
     for index, part in enumerate(parts[:-1]):
         if part in _POST_PATH_PARTS:
             candidate = parts[index + 1].split('.', 1)[0]
             if candidate.isdigit():
                 return int(candidate)
     if 'archive' in parts:
-        candidate = parts[-1].split('.', 1)[0]
+        index = parts.index('archive')
+        # 归档列表页也含 archive，只有完整 /archive/YYYY/MM/DD/{id} 才是文章。
+        if len(parts) != index + 5:
+            return None
+        year, month, day = parts[index + 1 : index + 4]
+        if not all(
+            len(part) == width and part.isdigit()
+            for part, width in zip((year, month, day), (4, 2, 2), strict=True)
+        ):
+            return None
+        candidate = parts[index + 4].split('.', 1)[0]
         if candidate.isdigit():
             return int(candidate)
     return None
