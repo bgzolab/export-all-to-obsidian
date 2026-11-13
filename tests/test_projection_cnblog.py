@@ -154,8 +154,11 @@ def test_post_id_from_url_forms():
 
 def test_ambiguous_source_url_is_left_empty():
     connection = connect(':memory:')
-    bookmark = dict(BOOKMARKS[0], LinkUrl='https://example.com/123')
-    record_json(connection, 'cnblog.bookmarks.page', [bookmark])
+    bookmarks = [
+        BOOKMARKS[0],
+        dict(BOOKMARKS[0], WzLinkId=3, LinkUrl='https://www.cnblogs.com/user/p/123'),
+    ]
+    record_json(connection, 'cnblog.bookmarks.page', bookmarks)
     record_text(
         connection,
         'cnblog.post.body',

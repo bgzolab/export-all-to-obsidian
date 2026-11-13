@@ -51,6 +51,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
             now,
         )
 
+    source_urls = _source_url_index(connection)
     for response, body in iter_body_responses(
         connection,
         POST_ENDPOINT,
@@ -66,6 +67,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 body,
                 response,
                 now,
+                source_urls,
             )
         except SkipResponse as exc:
             skip_handler_response(result, POST_ENDPOINT, response, str(exc))
@@ -161,6 +163,7 @@ def _upsert_post(
     body: bytes,
     response: dict[str, Any],
     now: str,
+    source_urls: dict[int, list[str]],
 ) -> int:
     url = request_payload(response).get('url') or ''
     match = _POST_URL_RE.search(url)
@@ -172,7 +175,7 @@ def _upsert_post(
         'cnblog_post',
         {'post_id': post_id},
         {
-            'source_url': _source_url(connection, post_id),
+            'source_url': _source_url(source_urls, post_id),
             'body': body.decode('utf-8', errors='replace'),
         },
         response['id'],
@@ -180,12 +183,20 @@ def _upsert_post(
     )
 
 
-def _source_url(connection: sqlite3.Connection, post_id: int) -> str:
-    rows = connection.execute(
-        'SELECT DISTINCT link_url FROM cnblog_bookmark',
-    ).fetchall()
-    matches = [
-        row['link_url'] for row in rows if post_id_from_url(row['link_url']) == post_id
-    ]
+def _source_url_index(connection: sqlite3.Connection) -> dict[int, list[str]]:
+    """Map each post id to the distinct bookmark URLs that resolve to it."""
+    index: dict[int, list[str]] = {}
+    for row in connection.execute('SELECT DISTINCT link_url FROM cnblog_bookmark'):
+        post_id = post_id_from_url(row['link_url'])
+        if post_id is None:
+            continue
+        urls = index.setdefault(post_id, [])
+        if row['link_url'] not in urls:
+            urls.append(row['link_url'])
+    return index
+
+
+def _source_url(source_urls: dict[int, list[str]], post_id: int) -> str:
+    matches = source_urls.get(post_id, [])
     # 多候选说明关联不唯一，宁可留空也不要写一个无法确认的 URL。
     return matches[0] if len(matches) == 1 else ''
