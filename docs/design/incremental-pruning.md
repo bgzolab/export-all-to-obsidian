@@ -132,9 +132,10 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
 
 ## 7. 已知限制与后续工作
 
-- 不可修复的 pending 行（例如条目已取消收藏/删除，但详情仍缺失）会永久禁用该平台的
-  页级停止。run 会回退到 Stage 1，安全但更慢；清理这类行需要删除检测或手工处理，
-  均不在当前范围。
+- 不可修复的 pending 行（例如条目已取消收藏/删除，但详情仍缺失）会永久禁用
+  github/weibo/bangumi/qireader 的页级停止。run 会回退到 Stage 1，安全但更慢；清理
+  这类行需要删除检测或手工处理，均不在当前范围。cnblog 例外：pending 只统计“本轮
+  未见过”的书签，已处理页里的缺口不会永久阻塞停止，只在运行末尾的缺口报告中出现。
 - V2EX 不可见回复导致的重复抓取由 200 条上限约束；空页 provenance marker 暂缓。
 - v2ex 的“整页已知”式页级停止暂缓，需要全局 replies pending gate；重复页停止已启用。
 - Qireader tag membership 未建模，使用全局 entry id。
@@ -148,8 +149,9 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
   - 第二次 `--db-only` 不再请求已存在的详情/辅助端点，列表端点仍然请求。
   - `--force` 重新请求详情/辅助端点，且不触发页级停止。
   - 整页已知时停止分页并标记 `partial`；页内混合新旧数据时继续。
-  - github/weibo/bangumi/cnblog/qireader 存在详情/辅助缺口时继续翻页并补抓，
-    run 保持 `success`。
+  - github/weibo/bangumi/qireader 存在详情/辅助缺口时继续翻页并补抓，run 保持
+    `success`。
+  - cnblog 只对“本轮未见过”的书签要求 pending 为 0；页级停止 run 为 `partial`。
   - V2EX 回复中断后重抓；达到 200 条上限后跳过；低于 capped expected 时重抓。
   - V2EX 收藏页整页重复上一页时停止分页，run 保持 `success`。
   - weibo/qireader/cnblog 缺少身份字段的条目不再发起注定无效的请求。
