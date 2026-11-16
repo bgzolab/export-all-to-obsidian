@@ -47,6 +47,7 @@ Markdown 文件缺失时，会被错误跳过。
 | github | `repo_id` | single account |
 | qireader | `entry_id` | single account (global `entry_id`; tag membership not modeled) |
 | twitter | `tweet_id` | single account |
+| twitter bookmarks | `tweet_id` | single account; checked in `twitter_bookmark` |
 | v2ex | `topic_id` | single account |
 | weibo | `post_id` | single account (uid scope) |
 | zhihu | `content_id` | `collection_id` membership |
@@ -80,6 +81,7 @@ Stage 2 假设每个列表按平台时间稳定地新数据在前，且已有行
 | Platform | Order | Risk |
 | --- | --- | --- |
 | twitter | cursor, reverse chronological | low |
+| twitter bookmarks | cursor, bookmark order | low (no bookmark timestamp column) |
 | qireader | `olderThan` timestamp cursor | low (global entry id check) |
 | github | default `created` desc | low |
 | bilibili | `order=mtime` desc | low |
@@ -103,6 +105,19 @@ github/weibo/bangumi/qireader 的页级停止还要求各自的详情/辅助 pen
 count 为 0；存在缺口时继续翻页，由逐条处理补抓，避免页级停止把缺口锁死。
 cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺口本轮已经重试过，
 继续翻页也不会再修，因此不阻塞停止。
+
+### Twitter 书签模式
+
+书签只在 `--db-only` 下入库，不参与 Markdown 导出：
+
+- 默认增量：从顶部开始；整页 `tweet_id` 都已在 `twitter_bookmark` 时停止，run 标记
+  `partial`，下次仍从顶部开始。
+- `--full`：从 `latest_bookmark_checkpoint` 推导的断点继续；不触发整页已知停止；到列表
+  末尾的 run 为 `success`，限流、页数上限、游标停滞或失败为 `partial`。
+- `--force`：隐含 `--full` 并忽略断点，从顶部重开一轮全量抓取。
+- 断点只读取 `sync_run.scope='full'` 的 `twitter.bookmarks.page` 响应，增量响应不参与。
+- 点赞剪枝查 `twitter_like`，书签剪枝查 `twitter_bookmark`，两者互不污染。
+- 关系表 `twitter_bookmark` 是剪枝事实来源；`twitter_tweet` 仅保存共享 Tweet 内容。
 
 ## 5. 与投影层、raw 层的交互
 

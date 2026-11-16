@@ -87,14 +87,17 @@ ruff format src tests                          # apply formatting
   `--index-file` and `--db-only` are mutually exclusive.
 - Subcommands: `cnblog(-o [--force])`, `bangumi(-t -s -o [-c] [--force])`,
   `qireader(-t -o [--force])`, `v2ex(-o [--force])`,
-  `twitter(-o [--force] [--max-pages])`, `zhihu(-c -o [--force])`,
+  `twitter(-o [--force] [--max-pages] [--bookmarks] [--full])`, `zhihu(-c -o [--force])`,
   `weibo(-u -o [--force])`, `bilibili(-f -o [--force])`, `github(-t -o [--force])`,
   `import-markdown(<path>)`, `db rebuild(<platform>)`.
 - `-o` is required unless `--db-only`; `-t` is required for bangumi/github unless
   `--db-only`. Missing values raise `UsageError`.
+- `twitter --bookmarks` requires `--db-only` and only ingests data (no bookmark Markdown in
+  this phase); `--full` requires `--bookmarks`. Both invalid combinations raise `UsageError`.
+  Bookmark mode uses a separate `count=1` Bookmarks probe instead of the Likes probe.
 - `--force` is available on every export subcommand. Outside `--db-only` it overwrites
   existing Markdown; under `--db-only` it disables incremental pruning and fetches the full
-  scope again.
+  scope again. For `twitter --bookmarks` it implies `--full` and ignores the saved checkpoint.
 
 ## Environment variables (required by module exports)
 
@@ -125,13 +128,21 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   never block the stop. v2ex stays `success` when it stops on a repeated favorites page
   (out-of-range pagination), but has no whole-page-known stop: that would need a global
   replies-pending gate. V2EX replies are capped at 200 per topic.
+- `twitter --bookmarks` (default incremental) starts at the top and stops when a whole page is
+  already in `twitter_bookmark`; that run is `partial`. `--full` derives its resume cursor from
+  the latest `sync_run.scope='full'` bookmark response, never page-stops, and is `partial` on
+  rate limit, `--max-pages`, cursor stalls, or fetch errors. Its `success` may describe a
+  resumed round rather than one complete top-to-bottom observation. `--force` restarts from the
+  top. Bookmark incremental responses never feed the full-run checkpoint.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip
   invalid 200 JSON or missing auxiliary fields. Main-entity business-level no-data payloads
   (`result: null`, errors-only, `ok != 1`) are skipped and counted; a main-entity 200 body
   that cannot parse or violates constraints rolls back the whole platform. `response_id`
-  points at the producing `sync_response`, not `sync_run`.
+  points at the producing `sync_response`, not `sync_run`. Twitter replays likes before
+  bookmarks; `twitter_tweet` is the shared entity, while `twitter_like` / `twitter_bookmark`
+  hold provenance and independent pruning facts (delete relations before the entity).
 - Main-entity business-level no-data payloads (`v2ex` missing/null `result`, bilibili
   `code != 0`, twitter errors-only, weibo `ok != 1`) are also skipped and counted; malformed
   top-level types still roll back.
@@ -168,5 +179,6 @@ and one `test_projection_<platform>.py` per platform.
 ## Non-goals
 
 - No normalized cross-platform database model; projections are per platform.
+- No Twitter bookmark Markdown export yet; `--bookmarks` only ingests data.
 - No deletion detection, multi-account support, message queue / async task system, web
   service or plugin framework yet.
