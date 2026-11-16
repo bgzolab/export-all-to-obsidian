@@ -8,7 +8,7 @@ from db.connection import connect
 from db.projections import ProjectionError, rebuild_platform
 from tests.projection_helpers import business_rows, record_json
 
-TABLES = ('twitter_tweet',)
+TABLES = ('twitter_like', 'twitter_bookmark', 'twitter_tweet')
 
 TWEET = {
     '__typename': 'TweetWithVisibilityResults',
@@ -34,28 +34,25 @@ TWEET = {
     },
 }
 
-PAGE = {
+ENTRY = {
+    'entryId': 'tweet-111',
+    'content': {
+        'entryType': 'TimelineTimelineItem',
+        'itemContent': {
+            'itemType': 'TimelineTweet',
+            'tweet_results': {'result': TWEET},
+        },
+    },
+}
+
+LIKES_PAGE = {
     'data': {
         'user': {
             'result': {
                 'timeline': {
                     'timeline': {
                         'instructions': [
-                            {
-                                'type': 'TimelineAddEntries',
-                                'entries': [
-                                    {
-                                        'entryId': 'tweet-111',
-                                        'content': {
-                                            'entryType': 'TimelineTimelineItem',
-                                            'itemContent': {
-                                                'itemType': 'TimelineTweet',
-                                                'tweet_results': {'result': TWEET},
-                                            },
-                                        },
-                                    }
-                                ],
-                            }
+                            {'type': 'TimelineAddEntries', 'entries': [ENTRY]}
                         ]
                     }
                 }
@@ -64,10 +61,20 @@ PAGE = {
     }
 }
 
+BOOKMARK_PAGE = {
+    'data': {
+        'bookmark_timeline_v2': {
+            'timeline': {
+                'instructions': [{'type': 'TimelineAddEntries', 'entries': [ENTRY]}]
+            }
+        }
+    }
+}
 
-def test_rebuild_projects_liked_tweets():
+
+def test_rebuild_projects_liked_tweets_and_relation():
     connection = connect(':memory:')
-    response_id = record_json(connection, 'twitter.likes.page', PAGE)
+    response_id = record_json(connection, 'twitter.likes.page', LIKES_PAGE)
 
     result = rebuild_platform(connection, 'twitter')
 
@@ -85,14 +92,58 @@ def test_rebuild_projects_liked_tweets():
     assert row['reply_count'] == 1
     assert row['view_count'] == 100
     assert row['response_id'] == response_id
+
+    like = connection.execute('SELECT * FROM twitter_like').fetchone()
+    assert like['tweet_id'] == '111'
+    assert like['response_id'] == response_id
+    assert (
+        connection.execute('SELECT count(*) FROM twitter_bookmark').fetchone()[0] == 0
+    )
     assert result.responses == 1
-    assert result.rows == 1
+    assert result.rows == 2
+    connection.close()
+
+
+def test_rebuild_projects_bookmarked_tweets_and_relation():
+    connection = connect(':memory:')
+    response_id = record_json(connection, 'twitter.bookmarks.page', BOOKMARK_PAGE)
+
+    result = rebuild_platform(connection, 'twitter')
+
+    assert connection.execute('SELECT count(*) FROM twitter_tweet').fetchone()[0] == 1
+    bookmark = connection.execute('SELECT * FROM twitter_bookmark').fetchone()
+    assert bookmark['tweet_id'] == '111'
+    assert bookmark['response_id'] == response_id
+    assert connection.execute('SELECT count(*) FROM twitter_like').fetchone()[0] == 0
+    assert result.responses == 1
+    assert result.rows == 2
+    connection.close()
+
+
+def test_rebuild_shares_tweet_row_between_like_and_bookmark():
+    connection = connect(':memory:')
+    like_response_id = record_json(connection, 'twitter.likes.page', LIKES_PAGE)
+    bookmark_response_id = record_json(
+        connection, 'twitter.bookmarks.page', BOOKMARK_PAGE
+    )
+
+    result = rebuild_platform(connection, 'twitter')
+
+    tweet = connection.execute('SELECT * FROM twitter_tweet').fetchone()
+    assert tweet['response_id'] == bookmark_response_id
+    like = connection.execute('SELECT * FROM twitter_like').fetchone()
+    assert like['response_id'] == like_response_id
+    bookmark = connection.execute('SELECT * FROM twitter_bookmark').fetchone()
+    assert bookmark['response_id'] == bookmark_response_id
+    assert result.responses == 2
+    assert result.rows == 4
     connection.close()
 
 
 def test_rebuild_is_idempotent():
     connection = connect(':memory:')
-    record_json(connection, 'twitter.likes.page', PAGE)
+    record_json(connection, 'twitter.likes.page', LIKES_PAGE)
+    record_json(connection, 'twitter.bookmarks.page', BOOKMARK_PAGE)
 
     rebuild_platform(connection, 'twitter')
     first = business_rows(connection, TABLES)
@@ -103,13 +154,17 @@ def test_rebuild_is_idempotent():
     connection.close()
 
 
-def test_errors_only_payload_is_skipped():
+@pytest.mark.parametrize(
+    'endpoint',
+    ['twitter.likes.page', 'twitter.bookmarks.page'],
+)
+def test_errors_only_payload_is_skipped(endpoint):
     connection = connect(':memory:')
-    record_json(connection, 'twitter.likes.page', PAGE)
+    record_json(connection, 'twitter.likes.page', LIKES_PAGE)
     rebuild_platform(connection, 'twitter')
     before = business_rows(connection, TABLES)
 
-    record_json(connection, 'twitter.likes.page', {'errors': []})
+    record_json(connection, endpoint, {'errors': []})
 
     result = rebuild_platform(connection, 'twitter')
 
@@ -118,15 +173,22 @@ def test_errors_only_payload_is_skipped():
     connection.close()
 
 
-def test_non_dict_payload_rolls_back():
+@pytest.mark.parametrize(
+    'endpoint,message',
+    [
+        ('twitter.likes.page', 'invalid likes payload'),
+        ('twitter.bookmarks.page', 'invalid bookmarks payload'),
+    ],
+)
+def test_non_dict_payload_rolls_back(endpoint, message):
     connection = connect(':memory:')
-    record_json(connection, 'twitter.likes.page', PAGE)
+    record_json(connection, 'twitter.likes.page', LIKES_PAGE)
     rebuild_platform(connection, 'twitter')
     before = business_rows(connection, TABLES)
 
-    record_json(connection, 'twitter.likes.page', [])
+    record_json(connection, endpoint, [])
 
-    with pytest.raises(ProjectionError, match='invalid likes payload'):
+    with pytest.raises(ProjectionError, match=message):
         rebuild_platform(connection, 'twitter')
 
     assert business_rows(connection, TABLES) == before

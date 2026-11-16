@@ -20,6 +20,8 @@ PROJECTION_TABLES = {
     'qireader_entry',
     'qireader_article',
     'twitter_tweet',
+    'twitter_like',
+    'twitter_bookmark',
     'v2ex_topic',
     'v2ex_reply',
     'v2ex_favorite',
@@ -64,6 +66,8 @@ PLATFORM_TIME_COLUMNS = {
     'qireader_entry': {'published_at', 'crawled_at', 'timestamp'},
     'qireader_article': set(),
     'twitter_tweet': {'created_at'},
+    'twitter_like': set(),
+    'twitter_bookmark': set(),
     'v2ex_topic': {'created', 'last_modified', 'last_touched'},
     'v2ex_reply': {'created', 'last_modified'},
     'v2ex_favorite': set(),
@@ -116,7 +120,7 @@ def test_migration_creates_projection_tables_and_indexes():
 
     assert PROJECTION_TABLES <= _table_names(connection)
     assert PROJECTION_INDEXES <= _index_names(connection)
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 2
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
     connection.close()
 
 
@@ -263,7 +267,7 @@ def test_migrates_existing_layer1_database(tmp_path):
 
     connection = connect(db_path)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 2
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
     assert connection.execute('SELECT count(*) FROM sync_run').fetchone()[0] == 1
     assert PROJECTION_TABLES <= _table_names(connection)
     connection.close()

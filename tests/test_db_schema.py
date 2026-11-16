@@ -7,7 +7,7 @@ import stat
 import pytest
 
 from db.connection import DEFAULT_DB_PATH, connect
-from db.migrate import migrate
+from db.migrate import MIGRATIONS_DIR, migrate
 from db.raw import record_response, start_run
 
 
@@ -33,12 +33,13 @@ def test_connect_creates_raw_tables_and_indexes(tmp_path):
     }
 
     assert {'sync_run', 'sync_response'} <= tables
+    assert {'twitter_tweet', 'twitter_like', 'twitter_bookmark'} <= tables
     assert {
         'idx_sync_response_run',
         'idx_sync_response_lookup',
         'idx_sync_response_sha256',
     } <= indexes
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 2
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
     assert connection.execute('PRAGMA foreign_keys').fetchone()[0] == 1
 
     columns = {row['name'] for row in connection.execute('PRAGMA table_info(sync_run)')}
@@ -52,7 +53,49 @@ def test_connect_is_idempotent(tmp_path):
     migrate(connection)
     migrate(connection)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 2
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
+    connection.close()
+
+
+def test_migration_backfills_existing_tweets_as_likes(tmp_path):
+    db_path = tmp_path / 'eto.db'
+    layer2 = sqlite3.connect(db_path)
+    layer2.row_factory = sqlite3.Row
+    layer2.execute('PRAGMA foreign_keys = ON')
+    layer2.executescript(
+        (MIGRATIONS_DIR / '001_raw_layer.sql').read_text(encoding='utf-8')
+    )
+    layer2.executescript(
+        (MIGRATIONS_DIR / '002_projection_layer.sql').read_text(encoding='utf-8')
+    )
+    layer2.execute('PRAGMA user_version = 2')
+    layer2.execute(
+        'INSERT INTO sync_run (platform, operation, started_at, status) '
+        "VALUES ('twitter', 'likes', '2026-01-01T00:00:00+00:00', 'success')"
+    )
+    layer2.execute(
+        'INSERT INTO sync_response (run_id, endpoint, fetched_at) '
+        "VALUES (1, 'twitter.likes.page', '2026-01-01T00:00:00+00:00')"
+    )
+    layer2.execute(
+        'INSERT INTO twitter_tweet '
+        '(tweet_id, author_json, response_id, db_created_at, db_updated_at) '
+        "VALUES ('111', '{}', 1, 'created', 'updated')"
+    )
+    layer2.commit()
+    layer2.close()
+
+    connection = connect(db_path)
+
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
+    like = connection.execute('SELECT * FROM twitter_like').fetchone()
+    assert like['tweet_id'] == '111'
+    assert like['response_id'] == 1
+    assert like['db_created_at'] == 'created'
+    assert like['db_updated_at'] == 'updated'
+    assert (
+        connection.execute('SELECT count(*) FROM twitter_bookmark').fetchone()[0] == 0
+    )
     connection.close()
 
 
