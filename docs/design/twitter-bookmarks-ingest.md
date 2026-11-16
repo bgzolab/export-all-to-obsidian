@@ -121,8 +121,10 @@ while pages < max_pages:
 
 - 同一游标重复出现时停止，避免死循环。
 - 连续 3 页没有 Tweet 且仍有 cursor 时停止并标记 `partial`，避免空页循环。
-- 全量模式不做整页已知停止；增量模式使用 `stop_if_page_known`，停止时标记 `partial`。
+- 全量模式不做整页已知停止；增量模式整页 `tweet_id` 都已知时停止并标记 `partial`。
 - 无 Tweet 且无 cursor 视为正常结束。
+- X 也可能返回只有 cursor、且 bottom cursor 与请求 cursor 相同的空页；这是列表末尾，
+  同样视为正常结束，不标记 `partial`。
 
 ### 跨运行断点续抓
 
@@ -135,7 +137,8 @@ while pages < max_pages:
 3. 最新响应非 200、body 为空、有 transport error 或 JSON 非法：
    返回 `(该请求的 cursor, True)`，下次重试这一页。
 4. 最新 200 响应能解析出 bottom cursor：
-   返回 `(next_cursor, True)`。
+   返回 `(next_cursor, True)`；但如果该页没有 Tweet 且 `next_cursor` 等于请求 cursor，
+   说明这是上面提到的终止空页，返回 `(None, False)`。
 5. 最新 200 响应没有 bottom cursor：
    返回 `(None, False)`，表示上一轮已经到末尾，下一次全量从顶部重新开始。
 

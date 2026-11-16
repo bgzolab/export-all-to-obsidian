@@ -205,9 +205,14 @@ def latest_bookmark_checkpoint(
         # than silently restarting the full run from the top.
         return BookmarkCheckpoint(cursor=request_cursor, in_progress=True)
 
-    if page.cursor_bottom is not None and page.cursor_bottom.value:
-        return BookmarkCheckpoint(cursor=page.cursor_bottom.value, in_progress=True)
-    return BookmarkCheckpoint(cursor=None, in_progress=False)
+    next_cursor = page.cursor_bottom.value if page.cursor_bottom is not None else ''
+    if not next_cursor:
+        return BookmarkCheckpoint(cursor=None, in_progress=False)
+    if not page.tweets and next_cursor == request_cursor:
+        # Some timelines end with an empty cursor-only page that repeats the
+        # request cursor. Persisting it would trap every future --full run.
+        return BookmarkCheckpoint(cursor=None, in_progress=False)
+    return BookmarkCheckpoint(cursor=next_cursor, in_progress=True)
 
 
 def _request_cursor(response: dict[str, Any]) -> str | None:

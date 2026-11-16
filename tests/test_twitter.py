@@ -896,6 +896,25 @@ def test_latest_bookmark_checkpoint_ignores_incremental_responses():
     connection.close()
 
 
+def test_latest_bookmark_checkpoint_treats_terminal_empty_page_as_complete():
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    _record_bookmark_response(
+        connection,
+        json.dumps(_bookmark_page([], _sample_cursor())).encode(),
+        scope='full',
+        request=_checkpoint_request('NEXT_CURSOR'),
+    )
+
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor is None
+    assert checkpoint.in_progress is False
+    connection.close()
+
+
 def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
     from twitter import exporter as exporter_module
     from twitter.entity import LikesPage, TimelineCursor, Tweet, TwitterUser
@@ -1484,6 +1503,20 @@ def test_ingest_bookmarks_stops_after_three_empty_pages(monkeypatch, capsys):
     assert calls == [None, 'A', 'B']
     assert partials == [True]
     assert '连续 3 页为空' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_treats_terminal_empty_cursor_page_as_end(
+    monkeypatch,
+):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([], cursor='A'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A']
+    assert partials == []
 
 
 def test_ingest_bookmarks_incremental_hints_unfinished_full_run(monkeypatch, capsys):

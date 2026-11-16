@@ -152,6 +152,7 @@ design: docs/design/twitter-bookmarks-ingest.md
   - **修改**（及原因）: 无。
 - **相关代码**: 全仓库验证；手工冒烟使用 `/tmp/opencode/eto-twitter-smoke.db`，结束后已删除。
 - **验证结果**: `PYTHONPATH=src pytest tests -q` 为 409 passed、2 skipped；`ruff check src tests` 与 `ruff format --check src tests` 通过。手工冒烟：首轮 full 抓取 95 条书签后因 `--max-pages 1` 标记 partial；第二轮 full 从断点继续再抓 95 条；第三轮增量因整页已存在停止；三次 run 的 operation 均为 `bookmarks`，scope 分别为 `full`、`full`、`incremental`，状态均为 `partial`，三张表计数为 tweet=190、like=0、bookmark=190。
+- **后续自测修复（2026-11-16）**: 真实全量抓取发现 X 会返回只有 cursor、bottom cursor 与请求 cursor 相同的尾部空页；原逻辑误判为游标停滞并永久保留断点。现已改为正常结束且不持久化该游标。修复后全量 22 个响应、1917 条书签，run 为 `success`；随后 `--full --max-pages 1` 从头开始，增量模式仍能整页剪枝。
 
 ## 涉及文件
 

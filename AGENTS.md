@@ -133,7 +133,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   the latest `sync_run.scope='full'` bookmark response, never page-stops, and is `partial` on
   rate limit, `--max-pages`, cursor stalls, or fetch errors. Its `success` may describe a
   resumed round rather than one complete top-to-bottom observation. `--force` restarts from the
-  top. Bookmark incremental responses never feed the full-run checkpoint.
+  top. Bookmark incremental responses never feed the full-run checkpoint. A cursor-only
+  empty page whose bottom cursor repeats the request cursor marks the list end and keeps the
+  run `success`.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip

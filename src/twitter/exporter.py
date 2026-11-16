@@ -274,6 +274,11 @@ def ingest_bookmarks(
         next_cursor = page.cursor_bottom.value if page.cursor_bottom is not None else ''
         if not next_cursor:
             break
+        if not page.tweets and (next_cursor == cursor or next_cursor in seen_cursors):
+            # X sometimes terminates a timeline with a cursor-only empty page
+            # whose bottom cursor repeats the request cursor. That is the list
+            # end, not a stall or truncation.
+            break
         if next_cursor == cursor or next_cursor in seen_cursors:
             mark_run_partial()
             print('Twitter 书签游标未推进，停止抓取')

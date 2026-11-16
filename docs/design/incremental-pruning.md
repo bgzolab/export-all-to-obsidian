@@ -116,6 +116,7 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
   末尾的 run 为 `success`，限流、页数上限、游标停滞或失败为 `partial`。
 - `--force`：隐含 `--full` 并忽略断点，从顶部重开一轮全量抓取。
 - 断点只读取 `sync_run.scope='full'` 的 `twitter.bookmarks.page` 响应，增量响应不参与。
+- 只有 cursor、且 bottom cursor 与请求 cursor 相同的空页表示列表末尾，按 `success` 结束。
 - 点赞剪枝查 `twitter_like`，书签剪枝查 `twitter_bookmark`，两者互不污染。
 - 关系表 `twitter_bookmark` 是剪枝事实来源；`twitter_tweet` 仅保存共享 Tweet 内容。
 
