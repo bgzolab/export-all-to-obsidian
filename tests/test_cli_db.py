@@ -4,6 +4,7 @@ import json
 import sqlite3
 from types import SimpleNamespace
 
+import pytest
 from click.testing import CliRunner
 
 from app.credential_guard import CredentialProbeResult
@@ -941,6 +942,127 @@ def test_db_only_twitter_force_continues_pages(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'success'
+
+
+def test_cli_twitter_bookmarks_requires_db_only(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            str(tmp_path / 'eto.db'),
+            'twitter',
+            '--bookmarks',
+            '-o',
+            str(tmp_path / 'output'),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert '--bookmarks requires --db-only' in result.output
+
+
+def test_cli_twitter_full_requires_bookmarks(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            str(tmp_path / 'eto.db'),
+            '--db-only',
+            'twitter',
+            '--full',
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert '--full requires --bookmarks' in result.output
+
+
+@pytest.mark.parametrize(
+    'extra_args,expected_full,expected_force,expected_scope',
+    [
+        ([], False, False, 'incremental'),
+        (['--full'], True, False, 'full'),
+        (['--force'], False, True, 'full'),
+    ],
+)
+def test_cli_twitter_bookmarks_runs_ingest(
+    monkeypatch,
+    tmp_path,
+    extra_args,
+    expected_full,
+    expected_force,
+    expected_scope,
+):
+    db_path = str(tmp_path / 'eto.db')
+    called = {}
+
+    def fake_ingest(full=False, force=False, max_pages=None):
+        called.update(full=full, force=force, max_pages=max_pages)
+
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_bookmarks_credentials',
+        lambda: CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr('app.cli.ingest_bookmarks', fake_ingest)
+
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            db_path,
+            '--db-only',
+            'twitter',
+            '--bookmarks',
+            '--max-pages',
+            '2',
+            *extra_args,
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert called == {
+        'full': expected_full,
+        'force': expected_force,
+        'max_pages': 2,
+    }
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['operation'] == 'bookmarks'
+    assert run['scope'] == expected_scope
+    assert run['status'] == 'success'
+
+
+def test_cli_twitter_default_mode_uses_likes_probe(monkeypatch, tmp_path):
+    calls = []
+
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_bookmarks_credentials',
+        lambda: calls.append('bookmarks') or CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr(
+        'app.cli.probe_twitter_credentials',
+        lambda: calls.append('likes') or CredentialProbeResult.valid('twitter'),
+    )
+    monkeypatch.setattr(
+        'app.cli.export_twitter',
+        lambda *args, **kwargs: None,
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            str(tmp_path / 'eto.db'),
+            'twitter',
+            '-o',
+            str(tmp_path / 'output'),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == ['likes']
 
 
 def test_db_only_github_force_fetches_known_readme(monkeypatch, tmp_path):

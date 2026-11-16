@@ -1227,3 +1227,275 @@ def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
     content = (tmp_path / '~alice-111.md').read_text(encoding='utf-8')
     assert 'Alice:111' in content
     assert 'Alice:' not in content.replace('Alice:111', '')
+
+
+def _bookmark_tweet(tweet_id: str):
+    from twitter.entity import Tweet, TwitterUser
+
+    return Tweet(
+        id_str=tweet_id,
+        created_at='Thu Aug 15 12:00:00 +0000 2024',
+        full_text=f'Bookmark {tweet_id}',
+        author=TwitterUser(screen_name='alice', name='Alice'),
+    )
+
+
+def _bookmark_fetch(
+    tweets=None,
+    cursor=None,
+    *,
+    status_code=200,
+    remaining=None,
+    reset=None,
+    error=None,
+):
+    from twitter.bookmark import BookmarksFetch
+    from twitter.entity import BookmarksPage, TimelineCursor
+
+    page = None
+    if error is None and status_code == 200:
+        page = BookmarksPage(
+            tweets=list(tweets or []),
+            cursor_bottom=(
+                TimelineCursor(value=cursor, cursor_type='Bottom') if cursor else None
+            ),
+        )
+    return BookmarksFetch(
+        page=page,
+        status_code=status_code,
+        rate_limit_remaining=remaining,
+        rate_limit_reset=reset,
+        error=error,
+    )
+
+
+def _run_bookmark_ingest(
+    monkeypatch,
+    fetches,
+    *,
+    full=False,
+    force=False,
+    max_pages=None,
+    checkpoint=None,
+    known_ids=(),
+):
+    from db.connection import connect
+    from db.raw import finish_run, record_response, start_run
+    from twitter import exporter as exporter_module
+    from twitter.bookmark import BookmarkCheckpoint
+
+    connection = connect(':memory:')
+    if known_ids:
+        run_id = start_run(connection, 'seed', 'seed')
+        response_id = record_response(
+            connection,
+            run_id,
+            endpoint='seed.page',
+            request={},
+            status_code=200,
+            body=b'{}',
+        )
+        finish_run(connection, run_id, 'success')
+        for tweet_id in known_ids:
+            connection.execute(
+                'INSERT INTO twitter_tweet '
+                '(tweet_id, author_json, response_id, db_created_at, db_updated_at) '
+                "VALUES (?, '{}', ?, 'now', 'now')",
+                (tweet_id, response_id),
+            )
+            connection.execute(
+                'INSERT INTO twitter_bookmark '
+                '(tweet_id, response_id, db_created_at, db_updated_at) '
+                "VALUES (?, ?, 'now', 'now')",
+                (tweet_id, response_id),
+            )
+        connection.commit()
+
+    calls = []
+    partials = []
+
+    def fake_fetch(client, count=100, cursor=None):
+        calls.append(cursor)
+        index = min(len(calls) - 1, len(fetches) - 1)
+        return fetches[index]
+
+    monkeypatch.setattr(exporter_module, 'TwitterClient', lambda: object())
+    monkeypatch.setattr(exporter_module, 'get_database', lambda: connection)
+    monkeypatch.setattr(exporter_module, 'get_twitter_bookmark_list', fake_fetch)
+    monkeypatch.setattr(
+        exporter_module,
+        'latest_bookmark_checkpoint',
+        lambda conn: checkpoint or BookmarkCheckpoint(None, False),
+    )
+    monkeypatch.setattr(
+        exporter_module,
+        'mark_run_partial',
+        lambda: partials.append(True),
+    )
+
+    exporter_module.ingest_bookmarks(
+        full=full,
+        force=force,
+        max_pages=max_pages,
+    )
+    connection.close()
+    return calls, partials
+
+
+def test_ingest_bookmarks_incremental_stops_on_known_page(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='NEXT'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='NEXT2'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        checkpoint=BookmarkCheckpoint(None, False),
+        known_ids={'1'},
+    )
+
+    assert calls == [None]
+    assert partials == [True]
+    assert '整页已存在' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_full_resumes_and_skips_known_page_check(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch([_bookmark_tweet('1')])]
+
+    calls, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        full=True,
+        checkpoint=BookmarkCheckpoint('RESUME_CURSOR', True),
+        known_ids={'1'},
+    )
+
+    assert calls == ['RESUME_CURSOR']
+    assert partials == []
+    assert '从上次断点继续全量书签抓取' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_force_ignores_checkpoint(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch([])]
+
+    calls, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        force=True,
+        checkpoint=BookmarkCheckpoint('RESUME_CURSOR', True),
+    )
+
+    assert calls == [None]
+    assert partials == []
+    assert '忽略上次书签断点' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_reports_rate_limit(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch(
+            status_code=429,
+            remaining=0,
+            reset=1700000000,
+            error='HTTP 429',
+        )
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None]
+    assert partials == [True]
+    output = capsys.readouterr().out
+    assert '1700000000' in output
+    assert '限流' in output
+
+
+def test_ingest_bookmarks_400_with_cursor_suggests_force(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch(status_code=400, error='HTTP 400')]
+
+    _, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        full=True,
+        checkpoint=BookmarkCheckpoint('EXPIRED_CURSOR', True),
+    )
+
+    assert partials == [True]
+    output = capsys.readouterr().out
+    assert '游标可能失效' in output
+    assert '--force' in output
+
+
+@pytest.mark.parametrize('status_code', [400, 404])
+def test_ingest_bookmarks_query_id_hint(monkeypatch, capsys, status_code):
+    fetches = [_bookmark_fetch(status_code=status_code, error=f'HTTP {status_code}')]
+
+    _, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert partials == [True]
+    output = capsys.readouterr().out
+    assert 'queryId' in output
+    assert 'TWITTER_BOOKMARKS_PATH' in output
+
+
+def test_ingest_bookmarks_stops_on_stalled_cursor(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='A'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A']
+    assert partials == [True]
+    assert '游标未推进' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_stops_at_max_pages(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='B'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches, max_pages=1)
+
+    assert calls == [None]
+    assert partials == [True]
+    assert '分页已达上限 1' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_stops_after_three_empty_pages(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([], cursor='A'),
+        _bookmark_fetch([], cursor='B'),
+        _bookmark_fetch([], cursor='C'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A', 'B']
+    assert partials == [True]
+    assert '连续 3 页为空' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_incremental_hints_unfinished_full_run(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch([])]
+
+    _, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        checkpoint=BookmarkCheckpoint('RESUME_CURSOR', True),
+    )
+
+    assert partials == []
+    assert '如需继续请加 --full' in capsys.readouterr().out

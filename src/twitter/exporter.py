@@ -19,6 +19,12 @@ from export_runtime.exporter_support import (
     write_markdown_output,
 )
 from export_runtime.index_writer import IndexWriter
+from twitter.bookmark import (
+    BookmarksFetch,
+    get_twitter_bookmark_list,
+    latest_bookmark_checkpoint,
+    query_id_maintenance_hint,
+)
 from twitter.client import TwitterClient
 from twitter.like import get_twitter_like_list
 from utils.file_utils import get_clean_filename
@@ -186,3 +192,137 @@ def export(
         cursor = next_cursor
 
     index_writer.flush('twitter')
+
+
+def ingest_bookmarks(
+    full: bool = False,
+    force: bool = False,
+    max_pages: int | None = None,
+) -> None:
+    """Fetch X bookmarks into the raw layer for later projection.
+
+    Incremental mode starts at the top and stops once a whole page is already
+    in ``twitter_bookmark``. ``--full`` resumes from the last full run's
+    checkpoint and never stops on a known page; ``--force`` implies full but
+    ignores the checkpoint. Every truncated or failed run is marked partial so
+    ``success`` only means the list end was actually observed.
+    """
+    full = full or force
+    max_pages = max_pages if max_pages and max_pages > 0 else TWITTER_MAX_PAGES
+    try:
+        client = TwitterClient()
+    except ValueError as exc:
+        mark_run_partial()
+        print(exc)
+        return
+
+    connection = get_database()
+    checkpoint = latest_bookmark_checkpoint(connection)
+    cursor: str | None = None
+    if full:
+        if not force:
+            cursor = checkpoint.cursor
+        if checkpoint.in_progress:
+            if force:
+                print('忽略上次书签断点，从顶部重新全量抓取')
+            else:
+                print('从上次断点继续全量书签抓取')
+    elif checkpoint.in_progress:
+        print('存在未完成的全量书签抓取，如需继续请加 --full')
+
+    pages = 0
+    empty_pages = 0
+    seen_cursors: set[str] = set()
+
+    while True:
+        if pages >= max_pages:
+            mark_run_partial()
+            print(f'Twitter 书签分页已达上限 {max_pages}，停止抓取')
+            break
+        pages += 1
+        try:
+            fetch = get_twitter_bookmark_list(client, cursor=cursor)
+        except Exception as error:
+            mark_run_partial()
+            print(f'获取 Twitter 书签列表异常: {error}')
+            break
+
+        if fetch.error is not None or fetch.page is None:
+            mark_run_partial()
+            _print_bookmark_fetch_error(fetch, cursor)
+            break
+
+        page = fetch.page
+        if page.tweets:
+            empty_pages = 0
+        else:
+            empty_pages += 1
+
+        if not full and page.tweets:
+            # Deduplicate before comparing: a malformed page can repeat a tweet
+            # and must not defeat the whole-page-known pruning signal.
+            tweet_ids = {tweet.id_str for tweet in page.tweets}
+            known = twitter_projection.known_bookmark_ids(
+                connection,
+                list(tweet_ids),
+            )
+            if len(known) == len(tweet_ids):
+                mark_run_partial()
+                print('Twitter 书签整页已存在，停止增量抓取')
+                break
+
+        next_cursor = page.cursor_bottom.value if page.cursor_bottom is not None else ''
+        if not next_cursor:
+            break
+        if next_cursor == cursor or next_cursor in seen_cursors:
+            mark_run_partial()
+            print('Twitter 书签游标未推进，停止抓取')
+            break
+        if pages >= max_pages:
+            mark_run_partial()
+            print(f'Twitter 书签分页已达上限 {max_pages}，停止抓取')
+            break
+        if fetch.rate_limit_remaining is not None and fetch.rate_limit_remaining <= 0:
+            mark_run_partial()
+            _print_rate_limit(fetch)
+            break
+        # A few cursor-bearing empty pages can happen when upstream returns
+        # only modules; three in a row is treated as an unproductive loop.
+        if empty_pages >= 3:
+            mark_run_partial()
+            print('Twitter 书签连续 3 页为空，停止抓取')
+            break
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
+
+
+def _print_bookmark_fetch_error(
+    fetch: BookmarksFetch,
+    cursor: str | None,
+) -> None:
+    """Print an actionable message for a failed bookmark page."""
+    status = fetch.status_code
+    if status == 429:
+        _print_rate_limit(fetch)
+        return
+    if status == 400 and cursor:
+        print('Twitter 书签请求失败: HTTP 400，游标可能失效，请加 --force 从顶部重来')
+        return
+    if status in {400, 404}:
+        print(f'Twitter 书签请求失败: {query_id_maintenance_hint(status)}')
+        return
+    if status in {401, 403}:
+        print(f'Twitter 书签 Cookie 已过期或无效: HTTP {status}')
+        return
+    print(f'Twitter 书签请求失败: {fetch.error}')
+
+
+def _print_rate_limit(fetch: BookmarksFetch) -> None:
+    """Report the reset timestamp so cron users know when to retry."""
+    if fetch.rate_limit_reset is None:
+        print('Twitter 书签触发限流，本次抓取停止，稍后重试')
+        return
+    print(
+        f'Twitter 书签触发限流，x-rate-limit-reset={fetch.rate_limit_reset}，'
+        '本次抓取停止，稍后重试'
+    )

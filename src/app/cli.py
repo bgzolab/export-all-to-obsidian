@@ -16,6 +16,7 @@ from app.credential_guard import (
     probe_bilibili_credentials,
     probe_cnblog_credentials,
     probe_qireader_credentials,
+    probe_twitter_bookmarks_credentials,
     probe_twitter_credentials,
     probe_v2ex_credentials,
     probe_weibo_credentials,
@@ -30,7 +31,7 @@ from db.import_markdown import import_markdown
 from db.projections import SUPPORTED_PLATFORMS, rebuild_platform
 from github.exporter import export as export_github
 from qireader.exporter import export as export_qireader
-from twitter.exporter import TWITTER_MAX_PAGES
+from twitter.exporter import TWITTER_MAX_PAGES, ingest_bookmarks
 from twitter.exporter import export as export_twitter
 from v2ex.exporter import export as export_v2ex
 from weibo.exporter import export as export_weibo
@@ -215,12 +216,53 @@ def v2ex(output: str | None, force: bool) -> None:
     required=False,
     type=click.IntRange(min=1),
     default=None,
-    help=f'Twitter 点赞最大分页数（默认 {TWITTER_MAX_PAGES}，即约 '
-    f'{TWITTER_MAX_PAGES * 20} 条）',
+    help=f'Twitter 抓取最大分页数（默认 {TWITTER_MAX_PAGES}；'
+    '点赞约 20 条/页，书签约 100 条/页）',
 )
-def twitter(output: str | None, force: bool, max_pages: int | None) -> None:
-    """导出 Twitter 点赞。"""
+@click.option(
+    '--bookmarks',
+    is_flag=True,
+    help='把 X 书签写入数据库，必须与 --db-only 一起使用',
+)
+@click.option(
+    '--full',
+    is_flag=True,
+    help='全量抓取书签并从上次断点续抓，仅与 --bookmarks 一起使用',
+)
+def twitter(
+    output: str | None,
+    force: bool,
+    max_pages: int | None,
+    bookmarks: bool,
+    full: bool,
+) -> None:
+    """导出 Twitter 点赞，或把 X 书签写入数据库。"""
+    # Bookmark ingest is DB-only in this phase; reject flag combinations that
+    # would otherwise silently produce no Markdown output or no valid scope.
+    if bookmarks and not is_db_only():
+        raise click.UsageError('--bookmarks requires --db-only')
+    if full and not bookmarks:
+        raise click.UsageError('--full requires --bookmarks')
+
     output = _output_dir(output)
+    if bookmarks:
+        run_with_credential_guard(
+            'twitter',
+            probe_twitter_bookmarks_credentials,
+            lambda: run_action(
+                'twitter',
+                'bookmarks',
+                # force implies full; this scope also filters the raw checkpoint.
+                'full' if full or force else 'incremental',
+                lambda: ingest_bookmarks(
+                    full=full,
+                    force=force,
+                    max_pages=max_pages,
+                ),
+            ),
+        )
+        return
+
     run_with_credential_guard(
         'twitter',
         probe_twitter_credentials,
