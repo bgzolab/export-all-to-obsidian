@@ -118,9 +118,44 @@ def iter_responses(
 
     for row in connection.execute(sql, params):
         item = dict(row)
-        if item['body'] is not None:
-            item['body'] = zlib.decompress(item['body'])
+        item['body'] = _decompress_body(item['body'])
         yield item
+
+
+def latest_response(
+    connection: sqlite3.Connection,
+    endpoint: str,
+    *,
+    scope: str | None = None,
+) -> dict[str, Any] | None:
+    """Return the newest response for an endpoint with a decompressed body.
+
+    ``scope`` joins ``sync_run`` so a caller can exclude responses from other
+    run scopes. Bookmark resume checkpoints rely on this to ignore incremental
+    runs that always restart from the top of the list.
+    """
+    sql = 'SELECT sync_response.* FROM sync_response'
+    params: list[Any] = []
+    if scope is not None:
+        sql += ' JOIN sync_run ON sync_run.id = sync_response.run_id'
+    sql += ' WHERE sync_response.endpoint = ?'
+    params.append(endpoint)
+    if scope is not None:
+        sql += ' AND sync_run.scope = ?'
+        params.append(scope)
+    sql += ' ORDER BY sync_response.id DESC LIMIT 1'
+
+    row = connection.execute(sql, params).fetchone()
+    if row is None:
+        return None
+    item = dict(row)
+    item['body'] = _decompress_body(item['body'])
+    return item
+
+
+def _decompress_body(body: bytes | None) -> bytes | None:
+    """Decompress a stored body while preserving missing transport responses."""
+    return zlib.decompress(body) if body is not None else None
 
 
 def _encode_request(request: Any) -> str | None:

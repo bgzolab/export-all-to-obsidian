@@ -106,41 +106,91 @@ class LikesPage:
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> LikesPage:
-        tweets: list[Tweet] = []
-        cursor_bottom: TimelineCursor | None = None
-
         user_result = (data.get('user') or {}).get('result') or {}
         nested = user_result.get('timeline_v2') or user_result.get('timeline') or {}
         timeline = nested.get('timeline') or {}
-        instructions = timeline.get('instructions') or []
-
-        for instruction in instructions:
-            if instruction.get('type') != 'TimelineAddEntries':
-                continue
-            for entry in instruction.get('entries') or []:
-                entry_id = entry.get('entryId', '')
-                content = entry.get('content') or {}
-
-                if content.get('entryType') == 'TimelineTimelineCursor':
-                    cursor = TimelineCursor.from_dict(content)
-                    if cursor.cursor_type == 'Bottom':
-                        cursor_bottom = cursor
-                    continue
-
-                if not entry_id.startswith('tweet-'):
-                    continue
-
-                item_content = (
-                    content.get('itemContent')
-                    or (content.get('content') or {}).get('itemContent')
-                    or {}
-                )
-                if item_content.get('itemType') != 'TimelineTweet':
-                    continue
-
-                tweet_results = item_content.get('tweet_results') or {}
-                tweet = Tweet.from_dict(tweet_results.get('result') or {})
-                if tweet is not None:
-                    tweets.append(tweet)
-
+        tweets, cursor_bottom = _parse_timeline_instructions(
+            timeline.get('instructions') or []
+        )
         return LikesPage(tweets=tweets, cursor_bottom=cursor_bottom)
+
+
+@dataclass
+class BookmarksPage:
+    """One page of bookmark results."""
+
+    tweets: list[Tweet] = field(default_factory=list)
+    cursor_bottom: TimelineCursor | None = None
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> BookmarksPage:
+        # X currently serves bookmark_timeline_v2; older responses used the
+        # non-versioned key, so accept both instead of failing the whole page.
+        nested = data.get('bookmark_timeline_v2') or data.get('bookmark_timeline') or {}
+        timeline = nested.get('timeline') or {}
+        tweets, cursor_bottom = _parse_timeline_instructions(
+            timeline.get('instructions') or []
+        )
+        return BookmarksPage(tweets=tweets, cursor_bottom=cursor_bottom)
+
+
+# Cursor and prompt/module entries are not tweets. Cursor entries are handled
+# before this check; the remaining prefixes are skipped without assuming that
+# content entries use the legacy ``tweet-`` prefix.
+_NON_TWEET_ENTRY_PREFIXES = (
+    'cursor-',
+    'messageprompt-',
+    'module-',
+    'who-to-follow-',
+)
+
+
+def _parse_timeline_instructions(
+    instructions: list[dict[str, Any]],
+) -> tuple[list[Tweet], TimelineCursor | None]:
+    """Extract tweets and the bottom cursor from timeline instructions.
+
+    Likes and Bookmarks share this entry shape: ``TimelineAddEntries`` wraps
+    entries whose ``content.itemContent`` (or legacy nested
+    ``content.content.itemContent``) is a ``TimelineTweet``. Anything else is
+    ignored so new upstream entry types do not break parsing.
+    """
+    tweets: list[Tweet] = []
+    cursor_bottom: TimelineCursor | None = None
+
+    for instruction in instructions:
+        if not isinstance(instruction, dict):
+            continue
+        if instruction.get('type') != 'TimelineAddEntries':
+            continue
+        for entry in instruction.get('entries') or []:
+            if not isinstance(entry, dict):
+                continue
+            content = entry.get('content') or {}
+
+            if content.get('entryType') == 'TimelineTimelineCursor':
+                cursor = TimelineCursor.from_dict(content)
+                if cursor.cursor_type == 'Bottom':
+                    cursor_bottom = cursor
+                continue
+
+            entry_id = entry.get('entryId', '')
+            if isinstance(entry_id, str) and entry_id.startswith(
+                _NON_TWEET_ENTRY_PREFIXES
+            ):
+                continue
+
+            item_content = (
+                content.get('itemContent')
+                or (content.get('content') or {}).get('itemContent')
+                or {}
+            )
+            if item_content.get('itemType') != 'TimelineTweet':
+                continue
+
+            tweet_results = item_content.get('tweet_results') or {}
+            tweet = Tweet.from_dict(tweet_results.get('result') or {})
+            if tweet is not None:
+                tweets.append(tweet)
+
+    return tweets, cursor_bottom

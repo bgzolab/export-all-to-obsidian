@@ -835,6 +835,12 @@ def test_db_only_twitter_stops_at_known_page(monkeypatch, tmp_path):
         "VALUES ('1', '{}', ?, 'now', 'now')",
         (response_id,),
     )
+    connection.execute(
+        'INSERT INTO twitter_like '
+        '(tweet_id, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', ?, 'now', 'now')",
+        (response_id,),
+    )
     connection.commit()
     connection.close()
 
@@ -886,6 +892,12 @@ def test_db_only_twitter_force_continues_pages(monkeypatch, tmp_path):
         'INSERT INTO twitter_tweet '
         '(tweet_id, author_json, response_id, db_created_at, db_updated_at) '
         "VALUES ('1', '{}', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.execute(
+        'INSERT INTO twitter_like '
+        '(tweet_id, response_id, db_created_at, db_updated_at) '
+        "VALUES ('1', ?, 'now', 'now')",
         (response_id,),
     )
     connection.commit()

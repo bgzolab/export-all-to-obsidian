@@ -10,6 +10,7 @@ from db.connection import connect
 from db.raw import (
     finish_run,
     iter_responses,
+    latest_response,
     record_error,
     record_response,
     start_run,
@@ -116,4 +117,79 @@ def test_finish_run_can_mark_partial(tmp_path):
     ).fetchone()
     assert row['status'] == 'partial'
     assert row['finished_at'] is not None
+    connection.close()
+
+
+def test_latest_response_returns_newest_decompressed_row(tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    run_id = start_run(connection, 'twitter', 'bookmarks', 'full')
+    record_response(
+        connection,
+        run_id,
+        endpoint='twitter.bookmarks.page',
+        request={},
+        status_code=200,
+        body=b'{"page": 1}',
+    )
+    record_response(
+        connection,
+        run_id,
+        endpoint='twitter.bookmarks.page',
+        request={},
+        status_code=200,
+        body=b'{"page": 2}',
+    )
+
+    row = latest_response(connection, 'twitter.bookmarks.page')
+
+    assert row is not None
+    assert row['body'] == b'{"page": 2}'
+    assert latest_response(connection, 'missing.endpoint') is None
+    connection.close()
+
+
+def test_latest_response_filters_by_run_scope(tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    full_run = start_run(connection, 'twitter', 'bookmarks', 'full')
+    record_response(
+        connection,
+        full_run,
+        endpoint='twitter.bookmarks.page',
+        request={},
+        status_code=200,
+        body=b'{"source": "full"}',
+    )
+    incremental_run = start_run(connection, 'twitter', 'bookmarks', 'incremental')
+    record_response(
+        connection,
+        incremental_run,
+        endpoint='twitter.bookmarks.page',
+        request={},
+        status_code=200,
+        body=b'{"source": "incremental"}',
+    )
+
+    row = latest_response(connection, 'twitter.bookmarks.page', scope='full')
+
+    assert row is not None
+    assert row['body'] == b'{"source": "full"}'
+    connection.close()
+
+
+def test_latest_response_keeps_missing_body(tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    run_id = start_run(connection, 'twitter', 'bookmarks', 'full')
+    record_error(
+        connection,
+        run_id,
+        endpoint='twitter.bookmarks.page',
+        request={},
+        error='ConnectTimeout: timed out',
+    )
+
+    row = latest_response(connection, 'twitter.bookmarks.page', scope='full')
+
+    assert row is not None
+    assert row['body'] is None
+    assert row['error'] == 'ConnectTimeout: timed out'
     connection.close()
