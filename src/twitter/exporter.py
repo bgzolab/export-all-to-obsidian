@@ -283,10 +283,6 @@ def ingest_bookmarks(
             mark_run_partial()
             print('Twitter 书签游标未推进，停止抓取')
             break
-        if pages >= max_pages:
-            mark_run_partial()
-            print(f'Twitter 书签分页已达上限 {max_pages}，停止抓取')
-            break
         if fetch.rate_limit_remaining is not None and fetch.rate_limit_remaining <= 0:
             mark_run_partial()
             _print_rate_limit(fetch)
