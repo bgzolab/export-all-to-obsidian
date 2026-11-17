@@ -282,7 +282,9 @@ def probe_twitter_bookmarks_credentials() -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, f'响应解析失败: {exc}')
     if not isinstance(payload, dict):
         return CredentialProbeResult.unknown(module, '响应解析失败: 非 JSON 对象')
-    if payload.get('data'):
+    # The fetch path accepts an empty dict as a valid empty page, so an empty
+    # ``data`` object here means the login state worked, not an expired cookie.
+    if isinstance(payload.get('data'), dict):
         return CredentialProbeResult.valid(module)
     return CredentialProbeResult.invalid(
         module,

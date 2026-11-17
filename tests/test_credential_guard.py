@@ -225,8 +225,10 @@ def test_probe_twitter_bookmarks_requests_count_one(monkeypatch):
         session = FakeSession()
 
     monkeypatch.setattr(guard, 'TwitterClient', lambda: FakeClient())
-    guard.probe_twitter_bookmarks_credentials()
+    result = guard.probe_twitter_bookmarks_credentials()
 
+    # An empty ``data`` object is a valid empty page, same as the fetch path.
+    assert result.status == 'valid'
     assert captured['url'].endswith('/Bookmarks')
     assert json.loads(captured['params']['variables'])['count'] == 1
 
