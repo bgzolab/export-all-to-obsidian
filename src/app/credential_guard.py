@@ -56,6 +56,16 @@ def _http_failure_reason(response: requests.Response) -> str:
     return f'HTTP {response.status_code}'
 
 
+def _twitter_errors_result(module: str, payload: dict) -> CredentialProbeResult | None:
+    errors = payload.get('errors')
+    if isinstance(errors, list) and errors:
+        return CredentialProbeResult.unknown(
+            module,
+            f'接口返回错误: {str(errors[0])[:200]}',
+        )
+    return None
+
+
 def _telegram_chat_id() -> str | None:
     return os.getenv('TELEGRAM_CHAT_ID') or os.getenv('TELEGRAM_BOT_CHAT_ID')
 
@@ -242,6 +252,9 @@ def probe_twitter_credentials() -> CredentialProbeResult:
         return CredentialProbeResult.unknown(module, '响应解析失败: 非 JSON 对象')
     if payload.get('data'):
         return CredentialProbeResult.valid(module)
+    errors_result = _twitter_errors_result(module, payload)
+    if errors_result is not None:
+        return errors_result
     return CredentialProbeResult.invalid(
         module,
         'twitter Cookie 已过期或接口未返回有效登录态',
@@ -286,6 +299,9 @@ def probe_twitter_bookmarks_credentials() -> CredentialProbeResult:
     # ``data`` object here means the login state worked, not an expired cookie.
     if isinstance(payload.get('data'), dict):
         return CredentialProbeResult.valid(module)
+    errors_result = _twitter_errors_result(module, payload)
+    if errors_result is not None:
+        return errors_result
     return CredentialProbeResult.invalid(
         module,
         'twitter Cookie 已过期或书签接口未返回有效登录态',

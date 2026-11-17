@@ -167,6 +167,21 @@ def test_probe_twitter_no_data_invalid(monkeypatch):
     assert result.status == 'invalid'
 
 
+@pytest.mark.parametrize(
+    'probe_name',
+    ['probe_twitter_credentials', 'probe_twitter_bookmarks_credentials'],
+)
+def test_twitter_probe_errors_only_is_unknown(monkeypatch, probe_name):
+    guard = _fake_twitter_probe(
+        monkeypatch,
+        status_code=200,
+        payload={'errors': [{'message': 'Internal error'}]},
+    )
+    result = getattr(guard, probe_name)()
+    assert result.status == 'unknown'
+    assert '接口返回错误' in result.reason
+
+
 def test_probe_twitter_value_error_invalid(monkeypatch):
     import app.credential_guard as guard
 
