@@ -51,6 +51,19 @@ TWITTER_LIKES_FEATURES = {
 
 TWITTER_LIKES_FIELD_TOGGLES = {'withArticlePlainText': False}
 
+# Bookmarks GraphQL endpoint (web, Cookie auth).
+# X rotates this queryId too; when it expires the request returns 400/404.
+# Grab the current Bookmarks queryId from x.com/i/bookmarks network calls and
+# update this constant.
+TWITTER_BOOKMARKS_PATH = 'https://x.com/i/api/graphql/Fy0QMy4q_aZCpkO0PnyLYw/Bookmarks'
+
+# The bookmark endpoint supports larger pages. If upstream ignores this value,
+# pagination still works with smaller pages.
+TWITTER_BOOKMARKS_PAGE_SIZE = 100
+
+# Bookmark-specific field toggle; features reuse the Likes timeline set.
+TWITTER_BOOKMARKS_FIELD_TOGGLES = {'graphql_timeline_v2_bookmark_timeline': True}
+
 # X 公共游客 Bearer Token，与网页端一致
 TWITTER_BEARER_TOKEN = (
     'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs'

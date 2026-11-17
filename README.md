@@ -64,6 +64,12 @@ Store only the raw responses and projection tables, without writing Markdown:
 eto --db-only zhihu -c your-collection-id
 ```
 
+Ingest X bookmarks into the database (incremental by default, `--full` to resume a full backfill):
+
+```shell
+eto --db-only twitter --bookmarks
+```
+
 Rebuild a platform's projection from existing raw responses:
 
 ```shell

@@ -26,7 +26,7 @@ eto [全局参数] db rebuild PLATFORM
 | `weibo` | `weibo_post` |
 | `qireader` | `qireader_entry`、`qireader_article` |
 | `cnblog` | `cnblog_bookmark`、`cnblog_post` |
-| `twitter` | `twitter_tweet` |
+| `twitter` | `twitter_tweet`、`twitter_like`、`twitter_bookmark` |
 
 ## 行为
 
@@ -40,6 +40,9 @@ eto [全局参数] db rebuild PLATFORM
 5. 主实体的业务级无数据负载（V2EX `result` 缺失/null、Bilibili `code != 0`、
    Twitter errors-only、Weibo `ok != 1`）跳过并计数；JSON 非法或顶层类型错误时
    整体回滚，命令非零退出。
+
+Twitter 先回放 `twitter.likes.page`，再回放 `twitter.bookmarks.page`；`twitter_tweet`
+是共享实体，`twitter_like` / `twitter_bookmark` 分别记录来源关系。
 
 成功后输出处理的响应数和写入行数；有跳过的错误响应时额外输出“跳过 N 条错误响应”，
 辅助列找不到唯一主行时输出“辅助未命中 N 条”。

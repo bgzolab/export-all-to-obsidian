@@ -119,6 +119,8 @@ db_updated_at TEXT NOT NULL
 | `qireader_entry` | `published_at`, `crawled_at`, `timestamp` |
 | `qireader_article` | 无 |
 | `twitter_tweet` | `created_at` |
+| `twitter_like` | 无 |
+| `twitter_bookmark` | 无 |
 | `v2ex_topic` | `created`, `last_modified`, `last_touched` |
 | `v2ex_reply` | `created`, `last_modified`（接口提供时） |
 | `v2ex_favorite` | 无 |
@@ -137,6 +139,7 @@ db_updated_at TEXT NOT NULL
 ## 3. 平台表
 
 迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引；解析器已覆盖全部九个平台。
+后续 `003_twitter_sources.sql` 新增 `twitter_like`、`twitter_bookmark` 两张来源关系表。
 
 ### 3.1 Bangumi（pilot）
 
@@ -484,15 +487,23 @@ CREATE TABLE qireader_article (
 
 来源接口：
 
-- `twitter.likes.page` -> `twitter_tweet`
+- `twitter.likes.page` -> `twitter_tweet` + `twitter_like`
+- `twitter.bookmarks.page` -> `twitter_tweet` + `twitter_bookmark`
 
 说明：
 
-- 主键 `tweet_id` 对应 `Tweet.id_str`。
+- `twitter_tweet` 是共享 Tweet 实体，主键 `tweet_id` 对应 `Tweet.id_str`。
 - `author_json` 存归一化后的作者对象（`screen_name` / `name` / `id`）；完整 GraphQL
   节点留在 raw 响应。
-- 平台时间只有 `created_at`，原样保留。
-- 单账号，表内每一行都表示当前账号的点赞，不另建关系表。
+- `twitter_like` / `twitter_bookmark` 是来源关系表，`tweet_id` 同时外键引用
+  `twitter_tweet`。同一条 Tweet 同时被点赞和书签时，实体只有一行，两张关系表各一行。
+- 关系表的 `response_id` 指向观察到该关系的响应；`twitter_tweet.response_id` 指向最近
+  一次更新 Tweet 内容的响应。
+- `known_tweet_ids` 查询 `twitter_like`，`known_bookmark_ids` 查询 `twitter_bookmark`，
+  两种来源的剪枝互不污染。
+- 平台时间只有 `created_at`，原样保留。书签接口没有收藏时间字段，关系表不造伪时间列。
+- 迁移 `003_twitter_sources.sql` 创建关系表，并把已有 `twitter_tweet` 全部回填为点赞；
+  迁移前该表只由 Likes 接口写入。
 
 ```sql
 CREATE TABLE twitter_tweet (
@@ -511,6 +522,20 @@ CREATE TABLE twitter_tweet (
 
 CREATE INDEX idx_twitter_tweet_created_at
     ON twitter_tweet(created_at);
+
+CREATE TABLE twitter_like (
+    tweet_id TEXT PRIMARY KEY REFERENCES twitter_tweet(tweet_id),
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE twitter_bookmark (
+    tweet_id TEXT PRIMARY KEY REFERENCES twitter_tweet(tweet_id),
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
+) STRICT;
 ```
 
 ### 3.7 V2EX
@@ -730,7 +755,7 @@ rebuild_platform(conn, platform):
 | cnblog | `cnblog.bookmarks.page` -> `cnblog.post.body` |
 | github | `github.stars.list` -> `github.repo.readme` |
 | qireader | `qireader.readlater.page` -> `qireader.article` |
-| twitter | `twitter.likes.page` |
+| twitter | `twitter.likes.page` -> `twitter.bookmarks.page` |
 | v2ex | `v2ex.fav.page` -> `v2ex.topic.detail` -> `v2ex.topic.replies.page` |
 | weibo | `weibo.likes.page` -> `weibo.longtext` |
 | zhihu | `zhihu.collection.page` |
@@ -873,6 +898,7 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 ## 7. 迁移与实现顺序
 
 1. `002_projection_layer.sql`：一次创建 17 张表、索引，全部使用 `STRICT`。
+   后续 `003_twitter_sources.sql` 新增 Twitter 点赞/书签关系表并回填历史点赞。
 2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言到 2；增加建表、JSON 约束、
    外键约束测试。
 3. pilot：Bangumi 解析器 + `rebuild_platform` + 幂等测试。

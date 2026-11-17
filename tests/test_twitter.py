@@ -388,6 +388,74 @@ def test_likes_page_ignores_non_bottom_cursor():
     assert page.cursor_bottom is None
 
 
+def test_likes_page_accepts_entries_without_tweet_prefix():
+    """Likes shares the parser and must not require a tweet- entry prefix."""
+    from twitter.entity import LikesPage
+
+    tweet = _sample_tweet()
+    tweet['entryId'] = 'profile-conversation-111'
+    payload = _sample_response([tweet])
+    page = LikesPage.from_dict(payload['data'])
+    assert len(page.tweets) == 1
+    assert page.tweets[0].id_str == '111'
+
+
+def test_bookmarks_page_parses_v2_timeline_and_cursor():
+    from twitter.entity import BookmarksPage
+
+    tweet = _sample_tweet()
+    tweet['entryId'] = 'bookmark-item-111'
+    prompt = {
+        'entryId': 'messageprompt-bookmarks',
+        'content': {'entryType': 'TimelineTimelineMessagePrompt'},
+    }
+    module = {
+        'entryId': 'module-bookmarks',
+        'content': {'entryType': 'TimelineTimelineModule'},
+    }
+    data = {
+        'bookmark_timeline_v2': {
+            'timeline': {
+                'instructions': [
+                    {
+                        'type': 'TimelineAddEntries',
+                        'entries': [tweet, prompt, module, _sample_cursor()],
+                    }
+                ]
+            }
+        }
+    }
+
+    page = BookmarksPage.from_dict(data)
+
+    assert len(page.tweets) == 1
+    assert page.tweets[0].id_str == '111'
+    assert page.cursor_bottom is not None
+    assert page.cursor_bottom.value == 'NEXT_CURSOR'
+
+
+def test_bookmarks_page_parses_legacy_timeline_root():
+    from twitter.entity import BookmarksPage
+
+    data = {
+        'bookmark_timeline': {
+            'timeline': {
+                'instructions': [
+                    {
+                        'type': 'TimelineAddEntries',
+                        'entries': [_sample_tweet()],
+                    }
+                ]
+            }
+        }
+    }
+
+    page = BookmarksPage.from_dict(data)
+
+    assert len(page.tweets) == 1
+    assert page.cursor_bottom is None
+
+
 def test_parse_created_at_preserves_timezone():
     from twitter.exporter import _parse_created_at
 
@@ -529,6 +597,322 @@ def test_get_twitter_like_list_returns_none_on_non_dict_data(monkeypatch, tmp_pa
 
     client.session = FakeSession()
     assert get_twitter_like_list(client) is None
+
+
+def _bookmark_page(tweets=None, cursor=None) -> dict:
+    entries = list(tweets or [])
+    if cursor is not None:
+        entries.append(cursor)
+    return {
+        'data': {
+            'bookmark_timeline_v2': {
+                'timeline': {
+                    'instructions': [{'type': 'TimelineAddEntries', 'entries': entries}]
+                }
+            }
+        }
+    }
+
+
+def _invoke_bookmark_fetch(
+    monkeypatch,
+    tmp_path,
+    *,
+    payload=None,
+    status_code=200,
+    headers=None,
+    json_error=None,
+    count=100,
+    cursor=None,
+):
+    from twitter.bookmark import get_twitter_bookmark_list
+
+    client = _make_client(monkeypatch, tmp_path)
+    captured = {}
+
+    class FakeResponse:
+        def __init__(self):
+            self.status_code = status_code
+            self.headers = headers or {}
+
+        def json(self):
+            if json_error is not None:
+                raise json_error
+            return payload
+
+    class FakeSession:
+        def get(self, url, params, **kwargs):
+            captured['url'] = url
+            captured['params'] = params
+            captured['timeout'] = kwargs.get('timeout')
+            return FakeResponse()
+
+    client.session = FakeSession()
+    return get_twitter_bookmark_list(client, count=count, cursor=cursor), captured
+
+
+def test_get_twitter_bookmark_list_builds_params_and_parses_page(monkeypatch, tmp_path):
+    fetch, captured = _invoke_bookmark_fetch(
+        monkeypatch,
+        tmp_path,
+        payload=_bookmark_page([_sample_tweet()], _sample_cursor()),
+        headers={
+            'x-rate-limit-remaining': '42',
+            'x-rate-limit-reset': '1700000000',
+        },
+        count=7,
+        cursor='CURSOR',
+    )
+
+    assert fetch.page is not None
+    assert len(fetch.page.tweets) == 1
+    assert fetch.page.tweets[0].id_str == '111'
+    assert fetch.page.cursor_bottom is not None
+    assert fetch.page.cursor_bottom.value == 'NEXT_CURSOR'
+    assert fetch.status_code == 200
+    assert fetch.rate_limit_remaining == 42
+    assert fetch.rate_limit_reset == 1700000000
+    assert fetch.error is None
+
+    assert captured['url'].endswith('/Bookmarks')
+    variables = json.loads(captured['params']['variables'])
+    assert 'userId' not in variables
+    assert variables['count'] == 7
+    assert variables['cursor'] == 'CURSOR'
+    assert variables['withV2Timeline'] is True
+    assert json.loads(captured['params']['fieldToggles']) == {
+        'graphql_timeline_v2_bookmark_timeline': True
+    }
+    assert captured['timeout'] == 30
+
+
+def test_build_bookmarks_params_without_cursor():
+    from twitter.bookmark import build_bookmarks_params
+
+    variables = json.loads(build_bookmarks_params(100)['variables'])
+
+    assert variables['count'] == 100
+    assert 'cursor' not in variables
+    assert variables['withV2Timeline'] is True
+
+
+@pytest.mark.parametrize('status_code', [429, 400, 404])
+def test_get_twitter_bookmark_list_reports_http_errors(
+    monkeypatch, tmp_path, status_code
+):
+    fetch, _ = _invoke_bookmark_fetch(
+        monkeypatch,
+        tmp_path,
+        status_code=status_code,
+        headers={'x-rate-limit-remaining': '0', 'x-rate-limit-reset': '99'},
+    )
+
+    assert fetch.page is None
+    assert fetch.status_code == status_code
+    assert fetch.error == f'HTTP {status_code}'
+    assert fetch.rate_limit_remaining == 0
+    assert fetch.rate_limit_reset == 99
+
+
+def test_get_twitter_bookmark_list_rejects_non_json(monkeypatch, tmp_path):
+    fetch, _ = _invoke_bookmark_fetch(
+        monkeypatch,
+        tmp_path,
+        json_error=json.JSONDecodeError('Expecting value', 'doc', 0),
+    )
+
+    assert fetch.page is None
+    assert fetch.status_code == 200
+    assert '响应解析失败' in fetch.error
+
+
+def test_get_twitter_bookmark_list_rejects_non_dict_payload(monkeypatch, tmp_path):
+    fetch, _ = _invoke_bookmark_fetch(
+        monkeypatch,
+        tmp_path,
+        payload=['not', 'a', 'dict'],
+    )
+
+    assert fetch.page is None
+    assert '非 JSON 对象' in fetch.error
+
+
+def test_get_twitter_bookmark_list_rejects_missing_data(monkeypatch, tmp_path):
+    fetch, _ = _invoke_bookmark_fetch(monkeypatch, tmp_path, payload={'errors': []})
+
+    assert fetch.page is None
+    assert fetch.error == '响应缺少 data'
+
+
+def test_get_twitter_bookmark_list_accepts_empty_data(monkeypatch, tmp_path):
+    fetch, _ = _invoke_bookmark_fetch(monkeypatch, tmp_path, payload={'data': {}})
+
+    assert fetch.page is not None
+    assert fetch.page.tweets == []
+    assert fetch.page.cursor_bottom is None
+    assert fetch.error is None
+
+
+def test_get_twitter_bookmark_list_rejects_non_dict_data(monkeypatch, tmp_path):
+    fetch, _ = _invoke_bookmark_fetch(
+        monkeypatch,
+        tmp_path,
+        payload={'data': ['not', 'a', 'dict']},
+    )
+
+    assert fetch.page is None
+    assert fetch.error == '响应 data 不是 JSON 对象'
+
+
+def _record_bookmark_response(
+    connection,
+    body,
+    *,
+    scope='full',
+    status_code=200,
+    request=None,
+    error=None,
+):
+    from db.raw import finish_run, record_response, start_run
+
+    run_id = start_run(connection, 'twitter', 'bookmarks', scope)
+    response_id = record_response(
+        connection,
+        run_id,
+        endpoint='twitter.bookmarks.page',
+        request=request or {},
+        status_code=status_code,
+        body=body,
+        error=error,
+    )
+    finish_run(connection, run_id, 'success')
+    return response_id
+
+
+def _checkpoint_request(cursor):
+    return {'params': {'variables': json.dumps({'cursor': cursor})}}
+
+
+def test_latest_bookmark_checkpoint_without_responses():
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor is None
+    assert checkpoint.in_progress is False
+    connection.close()
+
+
+def test_latest_bookmark_checkpoint_reads_next_cursor():
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    _record_bookmark_response(
+        connection,
+        json.dumps(_bookmark_page([_sample_tweet()], _sample_cursor())).encode(),
+        scope='full',
+    )
+
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor == 'NEXT_CURSOR'
+    assert checkpoint.in_progress is True
+    connection.close()
+
+
+def test_latest_bookmark_checkpoint_marks_completed_run():
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    _record_bookmark_response(
+        connection,
+        json.dumps(_bookmark_page([_sample_tweet()])).encode(),
+        scope='full',
+        request=_checkpoint_request('OLD_CURSOR'),
+    )
+
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor is None
+    assert checkpoint.in_progress is False
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    'body,status_code,error',
+    [
+        (b'{"data": {}}', 429, None),
+        (b'not-json', 200, None),
+        (None, 200, 'ConnectTimeout: timed out'),
+    ],
+)
+def test_latest_bookmark_checkpoint_retries_request_cursor(body, status_code, error):
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    _record_bookmark_response(
+        connection,
+        body,
+        scope='full',
+        status_code=status_code,
+        request=_checkpoint_request('RETRY_CURSOR'),
+        error=error,
+    )
+
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor == 'RETRY_CURSOR'
+    assert checkpoint.in_progress is True
+    connection.close()
+
+
+def test_latest_bookmark_checkpoint_ignores_incremental_responses():
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    _record_bookmark_response(
+        connection,
+        json.dumps(_bookmark_page([_sample_tweet()], _sample_cursor())).encode(),
+        scope='full',
+    )
+    _record_bookmark_response(
+        connection,
+        json.dumps(_bookmark_page([])).encode(),
+        scope='incremental',
+        status_code=429,
+        request=_checkpoint_request('INCREMENTAL_CURSOR'),
+    )
+
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor == 'NEXT_CURSOR'
+    assert checkpoint.in_progress is True
+    connection.close()
+
+
+def test_latest_bookmark_checkpoint_treats_terminal_empty_page_as_complete():
+    from db.connection import connect
+    from twitter.bookmark import latest_bookmark_checkpoint
+
+    connection = connect(':memory:')
+    _record_bookmark_response(
+        connection,
+        json.dumps(_bookmark_page([], _sample_cursor())).encode(),
+        scope='full',
+        request=_checkpoint_request('NEXT_CURSOR'),
+    )
+
+    checkpoint = latest_bookmark_checkpoint(connection)
+
+    assert checkpoint.cursor is None
+    assert checkpoint.in_progress is False
+    connection.close()
 
 
 def test_exporter_writes_files_and_index(monkeypatch, tmp_path):
@@ -862,3 +1246,303 @@ def test_exporter_title_falls_back_to_id_when_text_empty(monkeypatch, tmp_path):
     content = (tmp_path / '~alice-111.md').read_text(encoding='utf-8')
     assert 'Alice:111' in content
     assert 'Alice:' not in content.replace('Alice:111', '')
+
+
+def _bookmark_tweet(tweet_id: str):
+    from twitter.entity import Tweet, TwitterUser
+
+    return Tweet(
+        id_str=tweet_id,
+        created_at='Thu Aug 15 12:00:00 +0000 2024',
+        full_text=f'Bookmark {tweet_id}',
+        author=TwitterUser(screen_name='alice', name='Alice'),
+    )
+
+
+def _bookmark_fetch(
+    tweets=None,
+    cursor=None,
+    *,
+    status_code=200,
+    remaining=None,
+    reset=None,
+    error=None,
+):
+    from twitter.bookmark import BookmarksFetch
+    from twitter.entity import BookmarksPage, TimelineCursor
+
+    page = None
+    if error is None and status_code == 200:
+        page = BookmarksPage(
+            tweets=list(tweets or []),
+            cursor_bottom=(
+                TimelineCursor(value=cursor, cursor_type='Bottom') if cursor else None
+            ),
+        )
+    return BookmarksFetch(
+        page=page,
+        status_code=status_code,
+        rate_limit_remaining=remaining,
+        rate_limit_reset=reset,
+        error=error,
+    )
+
+
+def _run_bookmark_ingest(
+    monkeypatch,
+    fetches,
+    *,
+    full=False,
+    force=False,
+    max_pages=None,
+    checkpoint=None,
+    known_ids=(),
+):
+    from db.connection import connect
+    from db.raw import finish_run, record_response, start_run
+    from twitter import exporter as exporter_module
+    from twitter.bookmark import BookmarkCheckpoint
+
+    connection = connect(':memory:')
+    if known_ids:
+        run_id = start_run(connection, 'seed', 'seed')
+        response_id = record_response(
+            connection,
+            run_id,
+            endpoint='seed.page',
+            request={},
+            status_code=200,
+            body=b'{}',
+        )
+        finish_run(connection, run_id, 'success')
+        for tweet_id in known_ids:
+            connection.execute(
+                'INSERT INTO twitter_tweet '
+                '(tweet_id, author_json, response_id, db_created_at, db_updated_at) '
+                "VALUES (?, '{}', ?, 'now', 'now')",
+                (tweet_id, response_id),
+            )
+            connection.execute(
+                'INSERT INTO twitter_bookmark '
+                '(tweet_id, response_id, db_created_at, db_updated_at) '
+                "VALUES (?, ?, 'now', 'now')",
+                (tweet_id, response_id),
+            )
+        connection.commit()
+
+    calls = []
+    partials = []
+
+    def fake_fetch(client, count=100, cursor=None):
+        calls.append(cursor)
+        index = min(len(calls) - 1, len(fetches) - 1)
+        return fetches[index]
+
+    monkeypatch.setattr(exporter_module, 'TwitterClient', lambda: object())
+    monkeypatch.setattr(exporter_module, 'get_database', lambda: connection)
+    monkeypatch.setattr(exporter_module, 'get_twitter_bookmark_list', fake_fetch)
+    monkeypatch.setattr(
+        exporter_module,
+        'latest_bookmark_checkpoint',
+        lambda conn: checkpoint or BookmarkCheckpoint(None, False),
+    )
+    monkeypatch.setattr(
+        exporter_module,
+        'mark_run_partial',
+        lambda: partials.append(True),
+    )
+
+    exporter_module.ingest_bookmarks(
+        full=full,
+        force=force,
+        max_pages=max_pages,
+    )
+    connection.close()
+    return calls, partials
+
+
+def test_ingest_bookmarks_incremental_stops_on_known_page(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='NEXT'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='NEXT2'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        checkpoint=BookmarkCheckpoint(None, False),
+        known_ids={'1'},
+    )
+
+    assert calls == [None]
+    assert partials == [True]
+    assert '整页已存在' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_full_resumes_and_skips_known_page_check(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch([_bookmark_tweet('1')])]
+
+    calls, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        full=True,
+        checkpoint=BookmarkCheckpoint('RESUME_CURSOR', True),
+        known_ids={'1'},
+    )
+
+    assert calls == ['RESUME_CURSOR']
+    assert partials == []
+    assert '从上次断点继续全量书签抓取' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_force_ignores_checkpoint(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch([])]
+
+    calls, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        force=True,
+        checkpoint=BookmarkCheckpoint('RESUME_CURSOR', True),
+    )
+
+    assert calls == [None]
+    assert partials == []
+    assert '忽略上次书签断点' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_reports_rate_limit(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch(
+            status_code=429,
+            remaining=0,
+            reset=1700000000,
+            error='HTTP 429',
+        )
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None]
+    assert partials == [True]
+    output = capsys.readouterr().out
+    assert '1700000000' in output
+    assert '限流' in output
+
+
+def test_ingest_bookmarks_400_with_cursor_suggests_force(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch(status_code=400, error='HTTP 400')]
+
+    _, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        full=True,
+        checkpoint=BookmarkCheckpoint('EXPIRED_CURSOR', True),
+    )
+
+    assert partials == [True]
+    output = capsys.readouterr().out
+    assert '游标可能失效' in output
+    assert '--force' in output
+
+
+@pytest.mark.parametrize('status_code', [400, 404])
+def test_ingest_bookmarks_query_id_hint(monkeypatch, capsys, status_code):
+    fetches = [_bookmark_fetch(status_code=status_code, error=f'HTTP {status_code}')]
+
+    _, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert partials == [True]
+    output = capsys.readouterr().out
+    assert 'queryId' in output
+    assert 'TWITTER_BOOKMARKS_PATH' in output
+
+
+def test_ingest_bookmarks_stops_on_stalled_cursor(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='A'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A']
+    assert partials == [True]
+    assert '游标未推进' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_stops_at_max_pages(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='B'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches, max_pages=1)
+
+    assert calls == [None]
+    assert partials == [True]
+    assert '分页已达上限 1' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_stops_after_three_empty_pages(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([], cursor='A'),
+        _bookmark_fetch([], cursor='B'),
+        _bookmark_fetch([], cursor='C'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A', 'B']
+    assert partials == [True]
+    assert '连续 3 页为空' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_treats_terminal_empty_cursor_page_as_end(
+    monkeypatch,
+):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([], cursor='A'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A']
+    assert partials == []
+
+
+def test_ingest_bookmarks_empty_page_with_older_cursor_is_partial(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='B'),
+        _bookmark_fetch([], cursor='A'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A', 'B']
+    assert partials == [True]
+    assert '游标未推进' in capsys.readouterr().out
+
+
+def test_ingest_bookmarks_incremental_hints_unfinished_full_run(monkeypatch, capsys):
+    from twitter.bookmark import BookmarkCheckpoint
+
+    fetches = [_bookmark_fetch([])]
+
+    _, partials = _run_bookmark_ingest(
+        monkeypatch,
+        fetches,
+        checkpoint=BookmarkCheckpoint('RESUME_CURSOR', True),
+    )
+
+    assert partials == []
+    assert '如需继续请加 --full' in capsys.readouterr().out

@@ -304,6 +304,39 @@ def test_twitter_likes_endpoint(monkeypatch):
     assert endpoints == ['twitter.likes.page']
 
 
+def test_twitter_bookmarks_endpoint(monkeypatch):
+    from twitter.bookmark import get_twitter_bookmark_list
+
+    endpoints = []
+
+    class FakeTwitterClient:
+        user_id = '42'
+
+        def __init__(self):
+            self.session = FakeSession(
+                FakeResponse(
+                    {
+                        'data': {
+                            'bookmark_timeline_v2': {'timeline': {'instructions': []}}
+                        }
+                    }
+                )
+            )
+
+    client = FakeTwitterClient()
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        endpoints.append(endpoint)
+        return client.session.response
+
+    monkeypatch.setattr('twitter.bookmark.http.get', fake_get)
+
+    fetch = get_twitter_bookmark_list(client, count=1)
+
+    assert fetch.page is not None
+    assert endpoints == ['twitter.bookmarks.page']
+
+
 def test_zhihu_non_200_raises(monkeypatch):
     from zhihu.collection import get_collection_page
 

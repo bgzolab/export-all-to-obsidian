@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from click.testing import CliRunner
 
@@ -165,6 +167,21 @@ def test_probe_twitter_no_data_invalid(monkeypatch):
     assert result.status == 'invalid'
 
 
+@pytest.mark.parametrize(
+    'probe_name',
+    ['probe_twitter_credentials', 'probe_twitter_bookmarks_credentials'],
+)
+def test_twitter_probe_errors_only_is_unknown(monkeypatch, probe_name):
+    guard = _fake_twitter_probe(
+        monkeypatch,
+        status_code=200,
+        payload={'errors': [{'message': 'Internal error'}]},
+    )
+    result = getattr(guard, probe_name)()
+    assert result.status == 'unknown'
+    assert '接口返回错误' in result.reason
+
+
 def test_probe_twitter_value_error_invalid(monkeypatch):
     import app.credential_guard as guard
 
@@ -193,12 +210,98 @@ def test_probe_twitter_config_missing_raises_click_exception(monkeypatch):
         guard.probe_twitter_credentials()
 
 
+def test_probe_twitter_bookmarks_valid(monkeypatch):
+    guard = _fake_twitter_probe(
+        monkeypatch,
+        payload={'data': {'bookmark_timeline_v2': {}}},
+    )
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'valid'
+
+
+def test_probe_twitter_bookmarks_requests_count_one(monkeypatch):
+    import app.credential_guard as guard
+
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {'data': {}}
+
+    class FakeSession:
+        def get(self, url, params=None, **kwargs):
+            captured['url'] = url
+            captured['params'] = params
+            return FakeResponse()
+
+    class FakeClient:
+        session = FakeSession()
+
+    monkeypatch.setattr(guard, 'TwitterClient', lambda: FakeClient())
+    result = guard.probe_twitter_bookmarks_credentials()
+
+    # An empty ``data`` object is a valid empty page, same as the fetch path.
+    assert result.status == 'valid'
+    assert captured['url'].endswith('/Bookmarks')
+    assert json.loads(captured['params']['variables'])['count'] == 1
+
+
+@pytest.mark.parametrize('status_code', [401, 403])
+def test_probe_twitter_bookmarks_unauthorized(monkeypatch, status_code):
+    guard = _fake_twitter_probe(monkeypatch, status_code=status_code)
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'invalid'
+    assert '已过期' in result.reason
+
+
+@pytest.mark.parametrize('status_code', [400, 404])
+def test_probe_twitter_bookmarks_query_id_unknown(monkeypatch, status_code):
+    guard = _fake_twitter_probe(monkeypatch, status_code=status_code)
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'unknown'
+    assert 'queryId' in result.reason
+    assert 'TWITTER_BOOKMARKS_PATH' in result.reason
+
+
+def test_probe_twitter_bookmarks_http_error_unknown(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, status_code=500)
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'unknown'
+    assert 'HTTP 500' in result.reason
+
+
+def test_probe_twitter_bookmarks_non_json_payload_unknown(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, payload=None)
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'unknown'
+    assert '解析失败' in result.reason
+
+
+def test_probe_twitter_bookmarks_json_decode_error_unknown(monkeypatch):
+    guard = _fake_twitter_probe(
+        monkeypatch,
+        json_error=json.JSONDecodeError('Expecting value', 'doc', 0),
+    )
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'unknown'
+    assert '解析失败' in result.reason
+
+
+def test_probe_twitter_bookmarks_no_data_invalid(monkeypatch):
+    guard = _fake_twitter_probe(monkeypatch, payload={})
+    result = guard.probe_twitter_bookmarks_credentials()
+    assert result.status == 'invalid'
+
+
 @pytest.mark.parametrize(
     'client_attr,probe_name,probe_args',
     [
         ('QiReaderClient', 'probe_qireader_credentials', ('tag',)),
         ('V2exClient', 'probe_v2ex_credentials', ()),
         ('TwitterClient', 'probe_twitter_credentials', ()),
+        ('TwitterClient', 'probe_twitter_bookmarks_credentials', ()),
         ('ZhihuClient', 'probe_zhihu_credentials', ('collection',)),
         ('WeiboClient', 'probe_weibo_credentials', (1,)),
         ('BilibiliClient', 'probe_bilibili_credentials', (1,)),
