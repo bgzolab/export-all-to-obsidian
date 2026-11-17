@@ -1,13 +1,14 @@
 ---
 status: 已实现
 created: 2026-11-13
-modified: 2026-11-16
+modified: 2026-11-17
 tags: [feature, data]
 ---
 
 # Twitter 书签入库设计
 
 - Issue: [#7](https://github.com/bgzolab/export-all-to-obsidian/issues/7)
+- PR: [#27](https://github.com/bgzolab/export-all-to-obsidian/pull/27)
 - Status: 已实现
 - Date: 2026-11-13
 - Implemented: 2026-11-16
@@ -48,6 +49,10 @@ tags: [feature, data]
   - 书签文件夹、收藏时间、收藏顺序。
   - 删除检测、多账号、官方 API。
   - 自动 queryId 发现和自动重试调度。
+
+约束：
+
+- 复用现有 `requests`、`sqlite3`、`click`，不新增运行时依赖。
 
 ## 报文调研结论
 
@@ -112,23 +117,28 @@ while pages < max_pages:
         整页 tweet_id 都在 twitter_bookmark 中 -> 停止并标记 partial
     next_cursor = result.page.cursor_bottom
     if next_cursor 为空: 正常结束
-    if next_cursor 与当前游标重复: 标记 partial 并停止
+    if next_cursor 与当前游标重复:
+        若本页无 Tweet: 正常结束（终止空页）
+        否则: 标记 partial 并停止
+    if next_cursor 命中本轮已出现过的游标: 标记 partial 并停止
     if rate_limit_remaining <= 0: 标记 partial 并停止
     cursor = next_cursor
 ```
 
 分页保护：
 
-- 同一游标重复出现时停止，避免死循环。
+- 游标重复（等于当前请求游标或本轮已出现过的游标）时停止，避免死循环；唯一例外是
+  只有 cursor、bottom cursor 等于当前请求游标且本页无 Tweet 的空页，这是列表末尾，
+  正常结束且不标记 `partial`。
 - 连续 3 页没有 Tweet 且仍有 cursor 时停止并标记 `partial`，避免空页循环。
 - 全量模式不做整页已知停止；增量模式整页 `tweet_id` 都已知时停止并标记 `partial`。
 - 无 Tweet 且无 cursor 视为正常结束。
-- X 也可能返回只有 cursor、且 bottom cursor 与请求 cursor 相同的空页；这是列表末尾，
-  同样视为正常结束，不标记 `partial`。
 
 ### 跨运行断点续抓
 
 不新增游标状态表，直接从 raw 层推导。每次 bookmarks 请求都已经写入 `sync_response`，`request.params.variables.cursor` 和响应 body 都在库中。
+
+`src/db/raw.py` 新增 `latest_response(connection, endpoint, *, scope=None)`：按 `sync_response.id DESC` 取最近一条响应并解压 body，`scope` 非空时 join `sync_run` 过滤；`iter_responses` 复用同一解压 helper。
 
 `latest_bookmark_checkpoint(connection)` 返回 `BookmarkCheckpoint(cursor, in_progress)`：
 
@@ -248,7 +258,8 @@ queryId 维护提示必须包含：
 ### 凭证
 
 - 新增 `probe_twitter_bookmarks_credentials`，请求 Bookmarks 接口 `count=1`。
-- 200 且返回 `data` 判为 `valid`；401/403 判为 `invalid`；400/404 判为 `unknown` 并在原因中包含 queryId 维护提示；其他状态判为 `unknown`。
+- 200 且 `data` 为对象（含空对象 `{}`）判为 `valid`；`data` 缺失或非对象但含 `errors` 数组判为 `unknown`，原因记录错误摘要；其余 200 无 `data` 判为 `invalid`；401/403 判为 `invalid`；400/404 判为 `unknown` 并在原因中包含 queryId 维护提示；其他状态判为 `unknown`。
+- Likes 验活仅把 200 + errors-only 归为 `unknown`；`data` 为空仍按点赞抓取语义判为 `invalid`。
 - 书签验活独立于点赞验活，多消耗一次配额；这是为了能单独判断书签端点是否可用。
 - Cookie、`TWITTER_CSRF_TOKEN`、`TWITTER_USER_ID` 的现有规则不变。
 
@@ -296,7 +307,7 @@ queryId 维护提示必须包含：
 - **TEST-002**：点赞响应写入 `twitter_tweet` + `twitter_like`；书签响应写入 `twitter_tweet` + `twitter_bookmark`；同一条 Tweet 同时出现时实体只有一行。
 - **TEST-003**：`db rebuild twitter` 幂等；错误负载跳过或回滚符合现有投影规则。
 - **TEST-004**：Likes/Bookmarks 两种信封都能解析出 Tweet 和 bottom cursor。
-- **TEST-005**：断点函数覆盖无响应、成功带 cursor、成功无 cursor、429、非法 JSON 五种情况，并且只读取 `scope='full'` 的响应。
+- **TEST-005**：断点函数覆盖无响应、成功带 cursor、成功无 cursor、失败响应按请求游标重试、终止空页，且增量响应不参与，并且只读取 `scope='full'` 的响应。
 - **TEST-006**：增量模式整页已知停止并标记 `partial`；全量模式不因整页已知停止；`--force` 从顶部开始；限流停止后下一次 `--full` 从断点继续；400/404 打印维护提示。
 - **TEST-007**：CLI 的 `--bookmarks` / `--full` / `--force` / `--max-pages` 组合正确，非 `--db-only` 被拒绝，书签验活独立于点赞。
 - **TEST-008**：`PYTHONPATH=src pytest tests -q`、`ruff check src tests`、`ruff format --check src tests` 全部通过；有 Cookie 时手工跑一轮 `--full --max-pages 1` 并检查 raw/投影。
