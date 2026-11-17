@@ -1519,6 +1519,20 @@ def test_ingest_bookmarks_treats_terminal_empty_cursor_page_as_end(
     assert partials == []
 
 
+def test_ingest_bookmarks_empty_page_with_older_cursor_is_partial(monkeypatch, capsys):
+    fetches = [
+        _bookmark_fetch([_bookmark_tweet('1')], cursor='A'),
+        _bookmark_fetch([_bookmark_tweet('2')], cursor='B'),
+        _bookmark_fetch([], cursor='A'),
+    ]
+
+    calls, partials = _run_bookmark_ingest(monkeypatch, fetches)
+
+    assert calls == [None, 'A', 'B']
+    assert partials == [True]
+    assert '游标未推进' in capsys.readouterr().out
+
+
 def test_ingest_bookmarks_incremental_hints_unfinished_full_run(monkeypatch, capsys):
     from twitter.bookmark import BookmarkCheckpoint
 
