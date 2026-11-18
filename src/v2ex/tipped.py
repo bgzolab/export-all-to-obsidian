@@ -26,7 +26,7 @@ V2EX_MAX_BALANCE_PAGES = 1000
 THANKS_TYPE = '发送谢意'
 
 _TOPIC_HREF_RE = re.compile(r'/t/(\d+)')
-_MEMBER_PATTERN = re.compile(r'感谢\s+(\S+?)\s+的(?:回复|主题)')
+_MEMBER_PATTERN = re.compile(r'感谢\s+(\S+?)\s+的(回复|主题)')
 
 
 @dataclass(frozen=True)
@@ -127,9 +127,11 @@ def _parse_thanks_row(
 ) -> ThanksEntry | None:
     """Build one thanks entry, or skip rows that cannot name a topic.
 
-    The kind comes from the description wording ("的回复" vs "的主题"). A row
-    without a numeric topic link cannot be tied to an entity, so it is
-    ignored rather than failing the whole page.
+    The kind comes from the fixed "感谢 <member> 的(回复|主题)" prefix, not from
+    a bare substring: a topic title may itself contain "的回复", which would
+    otherwise turn a topic thanks into a reply one. A row without a numeric
+    topic link cannot be tied to an entity, so it is ignored rather than
+    failing the whole page.
     """
     description_cell = cells[4]
     description = texts[4]
@@ -140,12 +142,10 @@ def _parse_thanks_row(
     if match is None:
         return None
 
-    if '的回复' in description:
-        content_kind = 'reply'
-    elif '的主题' in description:
-        content_kind = 'topic'
-    else:
+    kind_match = _MEMBER_PATTERN.search(description)
+    if kind_match is None:
         return None
+    content_kind = 'reply' if kind_match.group(2) == '回复' else 'topic'
 
     amount = _parse_float(texts[2])
     balance = _parse_float(texts[3])
@@ -153,10 +153,7 @@ def _parse_thanks_row(
         return None
 
     member_link = description_cell.select_one('a[href^="/member/"]')
-    member = _cell_text(member_link) if member_link is not None else ''
-    if not member:
-        member_match = _MEMBER_PATTERN.search(description)
-        member = member_match.group(1) if member_match else ''
+    member = _cell_text(member_link) if member_link is not None else kind_match.group(1)
 
     return ThanksEntry(
         thanked_at=texts[0],

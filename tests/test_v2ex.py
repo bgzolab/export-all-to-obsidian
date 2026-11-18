@@ -394,6 +394,25 @@ def test_parse_balance_page_without_table_is_empty():
     assert page.max_page is None
 
 
+def test_parse_balance_page_keeps_topic_thanks_when_title_mentions_reply():
+    """A topic title containing "的回复" must not flip the kind to reply."""
+    page = parse_balance_page(
+        """
+        <table class="data">
+            <tr><td>2026-11-17 09:00:00 +08:00</td><td>发送谢意</td>
+                <td>-15.0</td><td>1244.5</td>
+                <td>感谢 <a href="/member/bob">bob</a> 的主题
+                    <span class="fade">›</span>
+                    <a href="/t/202">客服的回复太慢了</a></td></tr>
+        </table>
+        """
+    )
+
+    entry = page.thanks[0]
+    assert entry.content_kind == 'topic'
+    assert entry.member == 'bob'
+
+
 def test_parse_balance_page_skips_thanks_without_topic_link():
     page = parse_balance_page(
         """
