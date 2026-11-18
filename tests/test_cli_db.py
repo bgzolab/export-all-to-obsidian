@@ -1784,6 +1784,44 @@ def test_cli_v2ex_tipped_stops_on_repeated_page_without_max_page(
     assert run['status'] == 'success'
 
 
+def test_cli_v2ex_tipped_stops_on_page_without_flow_table(monkeypatch, tmp_path):
+    """A maintenance page must not look like a complete, empty history."""
+    db_path = tmp_path / 'eto.db'
+    pages = [BalancePage(None, [], [], has_table=False)]
+    page_calls = []
+    topic_calls = []
+
+    def fake_balance(page, client=None):
+        page_calls.append(page)
+        return pages[page - 1]
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr(
+        'v2ex.exporter.get_v2ex_topic_info',
+        lambda topic_id: topic_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1]
+    assert topic_calls == []
+    assert '缺少流水表' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
 def test_cli_v2ex_tipped_aborts_scan_after_consecutive_failures(
     monkeypatch,
     tmp_path,

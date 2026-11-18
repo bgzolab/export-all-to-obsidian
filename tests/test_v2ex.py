@@ -392,6 +392,7 @@ def test_parse_balance_page_without_table_is_empty():
     assert page.thanks == []
     assert page.transaction_keys == []
     assert page.max_page is None
+    assert page.has_table is False
 
 
 def test_parse_balance_page_requires_the_member_prefix():

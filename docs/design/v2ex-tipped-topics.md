@@ -85,7 +85,8 @@ eto --db-only v2ex --tipped
 - 非 200 调用 `raise_for_status()`；
 - 检测跳转到 `/signin` 或 signin 表单，抛出 `RuntimeError('V2EX login required')`；
 - 解析 `table.data` 的每一行，只保留类型为 `发送谢意` 的行；
-- 从描述中区分 `的回复` -> `reply`、`的主题` -> `topic`；
+- 描述必须以 `感谢 <member> 的(回复|主题)` 前缀开头（`re.Pattern.match`）；标题里出现“的回复”等字样不影响分类；
+- 没有 `table.data` 的页面（维护页、风控页）返回 `has_table=False` 的空页；`export_tipped` 视为异常，标记 `partial` 并结束翻页，避免把“没抓到流水”当成“空流水”；
 - 时间保留原字符串，金额和余额解析为 `float`；
 - `transaction_keys` 保存该页全部流水的文本签名，用于最后一页重复检测；
 - `max_page` 从 `input.page_input[max]` 读取；缺失时返回 `None`，由调用方使用重复页检测和页数上限兜底。
@@ -179,6 +180,7 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 
 - `/balance` 非 200：由 `raise_for_status()` 抛出，run 失败，不重建投影。
 - signin 页：抓取阶段抛 `RuntimeError`；投影阶段抛 `ValueError` 并整体回滚，避免清空已有感谢记录。
+- 缺少 `table.data` 的余额页（维护页、风控页）：抓取阶段无法区分，交由 `has_table=False` 标记；`export_tipped` 打印警告、标记 `partial` 并结束翻页。raw 仍保留该页，修好解析后可 `eto db rebuild v2ex`。
 - 单个主题详情 404/403/网络错误：`_ensure_topic_data` 标记 `partial`，跳过该主题，下一轮继续。
 - 连续 10 个主题抓取失败：`export_tipped` 停止本轮剩余扫描（run 已因上述失败标记为 `partial`）。客户端对 429 会走满 5 次重试退避，单个主题失败约 6 次请求、30 秒；不中止时 600+ 个主题会对着限流端点空转数小时。剩余主题在下一轮配额恢复后收敛。
 - 被删除的主题：保留 `v2ex_thanks` 行，主题详情持续缺失，run 保持 `partial`；不做删除检测。
@@ -208,7 +210,7 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 
 ## 风险与限制
 
-- **RISK-001**：V2EX 余额页 HTML 结构变化会导致解析失败。解析器必须有固定 fixture 测试；原始 HTML 保留在 raw 层，修复后可 `eto db rebuild v2ex`。
+- **RISK-001**：V2EX 余额页 HTML 结构变化会导致解析失败。缺少 `table.data` 时 `export_tipped` 会告警并标记 `partial`，不再静默当成空流水；解析器必须有固定 fixture 测试，原始 HTML 保留在 raw 层，修复后可 `eto db rebuild v2ex`。
 - **RISK-002**：余额页最后一页重复返回。依赖 `max_page`，并用 `transaction_keys` 重复检测和 1000 页上限兜底。
 - **RISK-003**：V2EX API 600 次/小时限制。首次 515 个以上主题需要多轮续跑；每轮 run 可能是 `partial`，这是预期行为。
 - **RISK-004**：部分旧主题已被删除。`v2ex_thanks` 保留，主题详情抓取会持续失败并标记 `partial`；不引入删除检测。
@@ -220,9 +222,9 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 
 ## 验证方式
 
-- **TEST-001**：余额页解析 fixture 覆盖回复感谢、主题感谢、标题含“的回复”的主题感谢、非感谢流水、无感谢页、重复末页、signin 页和 `max_page`。
+- **TEST-001**：余额页解析 fixture 覆盖回复感谢、主题感谢、标题含“的回复”的主题感谢、非前缀描述、非感谢流水、无感谢页、无流水表页、重复末页、signin 页和 `max_page`。
 - **TEST-002**：投影重建覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚、`thanks_page_known` 和 `tipped_topic_ids`。
-- **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、无 `max_page` 时的重复末页停止、连续 10 个主题抓取失败中止扫描、`sync_run.operation='tipped'`。
+- **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、无 `max_page` 时的重复末页停止、无流水表页中止、连续 10 个主题抓取失败中止扫描（含回复抓取异常计数）、`sync_run.operation='tipped'`。
 - **TEST-004**：schema 测试覆盖 `v2ex_thanks` 表、索引、平台时间列和 `user_version = 4`。
 - **TEST-005**：`ruff check src tests`、`ruff format --check src tests` 通过。
 - **TEST-006**：真实环境 smoke（可选，注意配额）：运行 `eto --db-only v2ex --tipped`，确认页级剪枝生效、旧主题缺口继续补齐、无 Markdown 写入。

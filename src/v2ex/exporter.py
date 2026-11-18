@@ -177,6 +177,12 @@ def export_tipped(force: bool = False) -> None:
 
     while True:
         balance_page = get_balance_page(page, client)
+        if not balance_page.has_table:
+            # 维护页/风控页没有流水表：继续翻页只会拿到更多空页，且不能把
+            # “没抓到流水”当成“已完整观察”，所以按 partial 结束本轮。
+            mark_run_partial()
+            print(f'警告: 余额页第 {page} 页缺少流水表，HTML 结构可能变化')
+            break
         if max_page is None:
             max_page = balance_page.max_page
         new_entries.extend(balance_page.thanks)

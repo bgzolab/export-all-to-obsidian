@@ -55,20 +55,29 @@ class BalancePage:
     max_page: int | None
     thanks: list[ThanksEntry]
     transaction_keys: list[str]
+    # 维护页/风控页没有流水表；空表（只有表头）仍算抓到了表。
+    has_table: bool = True
 
 
 def parse_balance_page(html: str) -> BalancePage:
     """Parse the /balance HTML table into thanks entries and page markers.
 
     Missing ``table.data`` (for example a signin or error page) yields an
-    empty page instead of raising: the projection layer treats a signin body
-    as fatal, while the fetch layer detects it before calling the parser.
+    empty page marked ``has_table=False`` instead of raising: the projection
+    layer treats a signin body as fatal, while the fetch layer detects it
+    before calling the parser, and the pager treats a missing table as a
+    broken page rather than as an empty history.
     """
     soup = BeautifulSoup(html, 'html.parser')
     max_page = _parse_max_page(soup)
     table = soup.select_one('table.data')
     if table is None:
-        return BalancePage(max_page=max_page, thanks=[], transaction_keys=[])
+        return BalancePage(
+            max_page=max_page,
+            thanks=[],
+            transaction_keys=[],
+            has_table=False,
+        )
 
     thanks: list[ThanksEntry] = []
     transaction_keys: list[str] = []
@@ -130,8 +139,10 @@ def _parse_thanks_row(
     The kind comes from the fixed "感谢 <member> 的(回复|主题)" prefix, not from
     a bare substring: a topic title may itself contain "的回复", which would
     otherwise turn a topic thanks into a reply one. A row without a numeric
-    topic link cannot be tied to an entity, so it is ignored rather than
-    failing the whole page.
+    topic link (or without that prefix) cannot be tied to an entity, so it is
+    ignored rather than failing the whole page. Such rows also keep their page
+    from ever becoming fully known, so page-level pruning still relies on
+    ``max_page`` and the repeated-page check.
     """
     description_cell = cells[4]
     description = texts[4]
