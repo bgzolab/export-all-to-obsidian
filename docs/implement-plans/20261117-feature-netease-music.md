@@ -68,7 +68,17 @@ design: docs/design/netease-music.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-004 | Pending | 新增 `src/netease/exporter.py`：歌单列表分页（limit=1000，最多 20 页）、只保留 creator 为自己的歌单、按 `trackCount` / `trackUpdateTime` / `detailResponseId` 剪枝、`--force` 绕过、歌曲详情每批 500、历史 100 条、周榜/总榜各 1000 条；按资源粒度标记 partial。 | `PYTHONPATH=src pytest tests/test_netease.py -q`；用 fake 客户端断言调用顺序、分批、剪枝、429/HTTP/code 错误的 partial 行为。 | |
+| TASK-004 | Completed | 新增 `src/netease/exporter.py`：歌单列表分页（limit=1000，最多 20 页）、只保留 creator 为自己的歌单、按 `trackCount` / `trackUpdateTime` / `detailResponseId` 剪枝、`--force` 绕过、歌曲详情每批 500、历史 100 条、周榜/总榜各 1000 条；按资源粒度标记 partial。 | `PYTHONPATH=src pytest tests/test_netease.py -q`；用 fake 客户端断言调用顺序、分批、剪枝、429/HTTP/code 错误的 partial 行为。 | 2026-11-18 |
+
+#### TASK-004 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增网易云抓取编排，覆盖歌单分页、详情剪枝、歌曲分批、历史与排行。
+- **逻辑变更**:
+  - **新增**: `src/netease/exporter.py`（`sync`、分页/剪枝/批量/partial/429 停止）与对应 fake 客户端测试。
+  - **修改**: 无。
+  - **说明**: 剪枝状态通过 `_playlist_states()` 懒加载 `db.projections.netease.playlist_state`，投影模块在 TASK-008 落地；`--force` 时不查询投影。
+- **相关代码**: `sync` 先校验账号 uid，再按“歌单列表 → 详情/歌曲 → 最近播放 → 周榜/总榜”顺序抓取；HTTP 429 抛 `_RateLimited` 终止本轮。
+- **验证结果**: `tests/test_netease.py` 25 项通过；ruff check/format 通过。
 | TASK-005 | Pending | 在 `src/app/cli.py` 增加 `netease` 子命令：非 `--db-only` 报 `UsageError`；`--uid` / `-u` 可选；`--force`；通过 `run_with_credential_guard` 和 `run_action('netease', 'sync', None, ...)` 执行。 | `PYTHONPATH=src pytest tests/test_cli_db.py tests/test_netease.py -q`；`CliRunner` 断言非 db-only 退出码、uid 传参、force 传参、run 行 platform/operation。 | |
 | TASK-006 | Pending | 补齐 exporter 与 CLI 测试：账号 uid 自动识别、`--uid` 不一致拒绝、空账号报错、单个歌单失败后继续、历史/排行失败不影响其他数据。 | `PYTHONPATH=src pytest tests/test_netease.py tests/test_cli_db.py -q`；断言失败路径 `sync_run.status='partial'` 或命令非零退出。 | |
 
