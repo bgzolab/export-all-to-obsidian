@@ -105,7 +105,16 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 收藏循环改为调用 helper；异常打印和 `mark_run_partial` 移入 helper，收藏侧的 Markdown/索引异常仍由外层捕获。
 - **相关代码**: `src/v2ex/exporter.py`
 - **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_cli_db.py -q -k v2ex`，10 项通过。
-| TASK-007 | Pending | 在 `src/app/cli.py` 为 `v2ex` 增加 `--tipped`，校验必须 `--db-only`，并用 `run_action('v2ex', 'tipped', None, ...)` 调用 `export_tipped`；不创建索引写入器。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过；新增测试覆盖无 `--db-only` 时退出码非 0、`sync_run.operation='tipped'`、页级停止后仍补旧主题、`--force` 全量、无 Markdown 写入。 |      |
+| TASK-007 | Completed | 在 `src/app/cli.py` 为 `v2ex` 增加 `--tipped`，校验必须 `--db-only`，并用 `run_action('v2ex', 'tipped', None, ...)` 调用 `export_tipped`；不创建索引写入器。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过；新增测试覆盖无 `--db-only` 时退出码非 0、`sync_run.operation='tipped'`、页级停止后仍补旧主题、`--force` 全量、无 Markdown 写入。 | 2026-11-18 |
+
+#### TASK-007 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: `eto v2ex --tipped` 已可用，且强制要求 `--db-only`。
+- **逻辑变更**:
+  - **新增**: `--tipped` 选项与 `run_action('v2ex', 'tipped', ...)` 分支；测试覆盖缺 `--db-only`、页级停止补旧主题、`--force` 全量、`operation='tipped'` 和无 Markdown 写入。
+  - **修改**（及原因）: `v2ex` 命令的 operation 由 tip 状态决定，收藏路径行为保持不变。
+- **相关代码**: `src/app/cli.py`、`tests/test_cli_db.py`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_cli_db.py -q -k v2ex`，14 项通过。
 
 ### 阶段 4：文档与收尾
 
