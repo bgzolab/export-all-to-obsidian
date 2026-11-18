@@ -10,8 +10,11 @@ from v2ex.cilent import V2exClient
 from v2ex.entity import TopicResponse
 
 
-def get_v2ex_topic_info(topic_id: int) -> TopicResponse | None:
-    client = V2exClient()
+def get_v2ex_topic_info(
+    topic_id: int,
+    client: V2exClient | None = None,
+) -> TopicResponse | None:
+    client = client or V2exClient()
     response = http.get(
         client.session,
         V2EX_API_TOPICS.format(topic_id=topic_id),

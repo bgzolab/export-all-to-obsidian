@@ -4,6 +4,7 @@ import json
 import sqlite3
 from types import SimpleNamespace
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -12,6 +13,8 @@ from db.connection import connect
 from db.projections import rebuild_platform
 from export_to_obsidian import eto
 from tests.projection_helpers import record_json, record_missing, record_text
+from v2ex.exporter import export_tipped
+from v2ex.tipped import BalancePage, ThanksEntry
 
 BANGUMI_COLLECTION = {
     'subject_id': 1,
@@ -531,7 +534,7 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
         page_calls.append(page)
         return pages[page]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -581,7 +584,7 @@ def test_db_only_v2ex_stops_on_repeated_page(monkeypatch, tmp_path):
         page_calls.append(page)
         return pages[page]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -1128,7 +1131,7 @@ def test_db_only_v2ex_skips_known_topic(monkeypatch, tmp_path):
     def fake_page(page, client=None):
         return [1] if page == 1 else []
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(result=SimpleNamespace(replies=0))
 
@@ -1190,7 +1193,7 @@ def test_db_only_v2ex_refetches_incomplete_replies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1343,7 +1346,7 @@ def test_db_only_v2ex_skips_complete_replies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1407,7 +1410,7 @@ def test_db_only_v2ex_caps_expected_replies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1468,7 +1471,7 @@ def test_db_only_v2ex_refetches_below_capped_expected(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1483,6 +1486,484 @@ def test_db_only_v2ex_refetches_below_capped_expected(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert topic_calls == []
     assert replies_calls == [1]
+
+
+def test_v2ex_export_tipped_merges_new_and_known_topics(monkeypatch, tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    response_id = record_text(connection, 'test.seed', '')
+    connection.execute(
+        'INSERT INTO v2ex_thanks '
+        '(thanked_at, topic_id, content_kind, member, amount, balance, '
+        'topic_title, description, response_id, db_created_at, db_updated_at) '
+        "VALUES ('2026-11-01 00:00:00 +08:00', 3, 'topic', 'carol', -10.0, "
+        "900.0, 'Old', '感谢 carol 的主题', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+
+    def entry(topic_id):
+        return ThanksEntry(
+            thanked_at=f'2026-11-{18 - topic_id} 00:00:00 +08:00',
+            topic_id=topic_id,
+            content_kind='reply',
+            member=f'member{topic_id}',
+            amount=-10.0,
+            balance=1000.0,
+            topic_title=f'Topic {topic_id}',
+            description=f'感谢 member{topic_id} 的回复',
+        )
+
+    pages = {
+        1: BalancePage(2, [entry(1)], ['key-1']),
+        2: BalancePage(2, [entry(2)], ['key-2']),
+    }
+    calls = []
+
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_balance_page',
+        lambda page, client=None: pages[page],
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter._ensure_topic_data',
+        lambda topic_id, client, force: (
+            calls.append((topic_id, force)) or (None, False)
+        ),
+    )
+
+    root = click.Context(click.Command('test'))
+    root.obj = {'db_only': True, 'database': connection, 'run_partial': False}
+    with root:
+        export_tipped()
+
+    assert calls == [(1, False), (2, False), (3, False)]
+    connection.close()
+
+
+def _balance_entry(topic_id: int, thanked_at: str) -> ThanksEntry:
+    return ThanksEntry(
+        thanked_at=thanked_at,
+        topic_id=topic_id,
+        content_kind='reply',
+        member=f'member{topic_id}',
+        amount=-10.0,
+        balance=1000.0 + topic_id,
+        topic_title=f'Topic {topic_id}',
+        description=f'感谢 member{topic_id} 的回复',
+    )
+
+
+def _seed_v2ex_thanks(connection, entries):
+    response_id = record_text(connection, 'test.seed', '')
+    for entry in entries:
+        connection.execute(
+            'INSERT INTO v2ex_thanks '
+            '(thanked_at, topic_id, content_kind, member, amount, balance, '
+            'topic_title, description, response_id, db_created_at, '
+            'db_updated_at) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (
+                entry.thanked_at,
+                entry.topic_id,
+                entry.content_kind,
+                entry.member,
+                entry.amount,
+                entry.balance,
+                entry.topic_title,
+                entry.description,
+                response_id,
+                'now',
+                'now',
+            ),
+        )
+    connection.commit()
+
+
+def test_cli_v2ex_tipped_requires_db_only(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        [
+            '--db',
+            str(tmp_path / 'eto.db'),
+            'v2ex',
+            '--tipped',
+            '-o',
+            str(tmp_path / 'output'),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert '--tipped requires --db-only' in result.output
+
+
+def test_cli_v2ex_tipped_stops_on_known_page_and_repairs_old_topics(
+    monkeypatch,
+    tmp_path,
+):
+    db_path = tmp_path / 'eto.db'
+    page_entry = _balance_entry(1, '2026-11-18 00:00:00 +08:00')
+    old_entry = _balance_entry(3, '2026-11-01 00:00:00 +08:00')
+    connection = connect(db_path)
+    _seed_v2ex_thanks(connection, [page_entry, old_entry])
+    connection.close()
+
+    pages = [
+        BalancePage(2, [page_entry], ['key-1']),
+        BalancePage(2, [], ['key-2']),
+    ]
+    page_calls = []
+    topic_calls = []
+    writes = []
+
+    def fake_balance(page, client=None):
+        page_calls.append(page)
+        return pages[page - 1]
+
+    def fake_topic(topic_id, client=None):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                replies=0,
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+    monkeypatch.setattr(
+        'v2ex.exporter.write_markdown_output',
+        lambda *args: writes.append(args),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1]
+    assert topic_calls == [1, 3]
+    assert writes == []
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['operation'] == 'tipped'
+    assert run['status'] == 'partial'
+
+
+def test_cli_v2ex_tipped_force_refetches_all_pages_and_topics(
+    monkeypatch,
+    tmp_path,
+):
+    db_path = tmp_path / 'eto.db'
+    first_entry = _balance_entry(1, '2026-11-18 00:00:00 +08:00')
+    second_entry = _balance_entry(2, '2026-11-17 00:00:00 +08:00')
+    old_entry = _balance_entry(3, '2026-11-01 00:00:00 +08:00')
+    connection = connect(db_path)
+    _seed_v2ex_thanks(connection, [first_entry, old_entry])
+    connection.close()
+
+    pages = [
+        BalancePage(2, [first_entry], ['key-1']),
+        BalancePage(2, [second_entry], ['key-2']),
+    ]
+    page_calls = []
+    topic_calls = []
+    writes = []
+
+    def fake_balance(page, client=None):
+        page_calls.append(page)
+        return pages[page - 1]
+
+    def fake_topic(topic_id, client=None):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                replies=0,
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+    monkeypatch.setattr(
+        'v2ex.exporter.write_markdown_output',
+        lambda *args: writes.append(args),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped', '--force'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1, 2]
+    assert topic_calls == [1, 2, 3]
+    assert writes == []
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['operation'] == 'tipped'
+    assert run['status'] == 'success'
+
+
+def test_cli_v2ex_tipped_stops_on_repeated_page_without_max_page(
+    monkeypatch,
+    tmp_path,
+):
+    """A page without `max_page` falls back to repeated-page detection."""
+    db_path = tmp_path / 'eto.db'
+    entry = _balance_entry(1, '2026-11-18 00:00:00 +08:00')
+    pages = [
+        BalancePage(None, [entry], ['key-1']),
+        BalancePage(None, [entry], ['key-1']),
+    ]
+    page_calls = []
+    topic_calls = []
+
+    def fake_balance(page, client=None):
+        page_calls.append(page)
+        return pages[page - 1]
+
+    def fake_topic(topic_id, client=None):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                replies=0,
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1, 2]
+    assert '余额分页返回重复数据，停止' in result.output
+    # The repeated page repeats the same entry, so its topic is scanned once.
+    assert topic_calls == [1]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['operation'] == 'tipped'
+    assert run['status'] == 'success'
+
+
+def test_cli_v2ex_tipped_stops_on_page_without_flow_table(monkeypatch, tmp_path):
+    """A maintenance page stops paging but the tipped scan still runs."""
+    db_path = tmp_path / 'eto.db'
+    entries = [_balance_entry(i, '2026-11-01 00:00:00 +08:00') for i in (1, 2)]
+    connection = connect(db_path)
+    _seed_v2ex_thanks(connection, entries)
+    connection.close()
+
+    pages = [BalancePage(None, [], [], has_table=False)]
+    page_calls = []
+    topic_calls = []
+
+    def fake_balance(page, client=None):
+        page_calls.append(page)
+        return pages[page - 1]
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr(
+        'v2ex.exporter.get_v2ex_topic_info',
+        lambda topic_id, client=None: topic_calls.append(topic_id),
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1]
+    assert sorted(topic_calls) == [1, 2]
+    assert '缺少流水表' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_cli_v2ex_tipped_warns_on_empty_first_page(monkeypatch, tmp_path):
+    """A table that yields no rows may be an empty history or broken markup."""
+    db_path = tmp_path / 'eto.db'
+    pages = [BalancePage(1, [], [])]
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_balance_page',
+        lambda page, client=None: pages[page - 1],
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '解析不到任何流水' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
+def test_cli_v2ex_tipped_aborts_scan_after_consecutive_failures(
+    monkeypatch,
+    tmp_path,
+):
+    """A quota-exhausted run stops instead of retrying every remaining topic."""
+    db_path = tmp_path / 'eto.db'
+    entries = [_balance_entry(i, f'2026-11-18 00:00:0{i} +08:00') for i in range(1, 13)]
+    pages = [BalancePage(1, entries, ['key-1'])]
+    topic_calls = []
+
+    def fake_balance(page, client=None):
+        return pages[0]
+
+    def fake_topic(topic_id, client=None):
+        topic_calls.append(topic_id)
+        if topic_id > 2:
+            return None
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                replies=0,
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    # Two successes reset the counter, then ten consecutive failures abort.
+    assert topic_calls == list(range(1, 13))
+    assert '连续 10 个主题抓取失败' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def _seed_v2ex_topics(connection, topic_ids, replies=5):
+    response_id = record_text(connection, 'test.seed', '')
+    for topic_id in topic_ids:
+        connection.execute(
+            'INSERT INTO v2ex_topic '
+            '(topic_id, replies, response_id, db_created_at, db_updated_at) '
+            "VALUES (?, ?, ?, 'now', 'now')",
+            (topic_id, replies, response_id),
+        )
+    connection.commit()
+
+
+def test_cli_v2ex_tipped_counts_reply_exceptions_as_failures(
+    monkeypatch,
+    tmp_path,
+):
+    """Reply fetch exceptions feed the consecutive-failure abort counter."""
+    db_path = tmp_path / 'eto.db'
+    entries = [_balance_entry(i, f'2026-11-18 00:00:0{i} +08:00') for i in range(1, 13)]
+    connection = connect(db_path)
+    _seed_v2ex_thanks(connection, entries)
+    _seed_v2ex_topics(connection, [entry.topic_id for entry in entries])
+    connection.close()
+
+    pages = [BalancePage(1, [], ['key-1'])]
+    reply_calls = []
+
+    def fake_replies(topic_id, client=None):
+        reply_calls.append(topic_id)
+        raise RuntimeError('429 quota exhausted')
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_balance_page',
+        lambda page, client=None: pages[0],
+    )
+    monkeypatch.setattr('v2ex.exporter.fetch_all_replies', fake_replies)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert len(reply_calls) == 10
+    assert 'Skip v2ex topic' in result.output
+    assert '连续 10 个主题抓取失败' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
 
 
 def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
@@ -2559,7 +3040,7 @@ def test_v2ex_write_error_marks_partial_and_continues(monkeypatch, tmp_path):
     def fake_page(page, client=None):
         return pages[page]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         return SimpleNamespace(
             result=SimpleNamespace(
                 title=f'Topic {topic_id}',
@@ -2614,7 +3095,7 @@ def test_v2ex_null_topic_result_marks_partial(monkeypatch, tmp_path):
     monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: SimpleNamespace(result=None),
+        lambda topic_id, client=None: SimpleNamespace(result=None),
     )
 
     result = CliRunner().invoke(
