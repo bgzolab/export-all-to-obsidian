@@ -116,7 +116,17 @@ design: docs/design/netease-music.md
   - **修改**: 两个 schema 测试的 `user_version` 断言 3 → 4；投影表/索引/平台时间列集合纳入网易云。
 - **相关代码**: `netease_playlist`、`netease_song`、`netease_playlist_song`、`netease_play_record`。
 - **验证结果**: `tests/test_db_schema.py` + `tests/test_projection_schema.py` 19 项通过；ruff check/format 通过。
-| TASK-008 | Pending | 新增 `src/db/projections/netease.py`：按固定顺序回放 4 类响应；歌单列表按 `request.meta.uid` 过滤；详情替换成员并插占位歌曲；歌曲详情 upsert；历史按 `(song_id, play_time)` upsert；实现 `playlist_state` 供导出器剪枝；在 `src/db/projections/__init__.py` 注册 `netease`。 | `PYTHONPATH=src pytest tests/test_projection_netease.py -q`；覆盖只保留自建歌单、成员替换、空歌单、占位、历史去重、301 回滚、坏辅助响应跳过、两次重建幂等。 | |
+| TASK-008 | Completed | 新增 `src/db/projections/netease.py`：按固定顺序回放 4 类响应；歌单列表按 `request.meta.uid` 过滤；详情替换成员并插占位歌曲；歌曲详情 upsert；历史按 `(song_id, play_time)` upsert；实现 `playlist_state` 供导出器剪枝；在 `src/db/projections/__init__.py` 注册 `netease`。 | `PYTHONPATH=src pytest tests/test_projection_netease.py -q`；覆盖只保留自建歌单、成员替换、空歌单、占位、历史去重、301 回滚、坏辅助响应跳过、两次重建幂等。 | 2026-11-18 |
+
+#### TASK-008 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增网易云投影解析器并注册平台，支持剪枝状态查询。
+- **逻辑变更**:
+  - **新增**: `src/db/projections/netease.py`（4 类响应回放、自建歌单过滤、成员替换、占位歌曲、历史去重、`playlist_state`）、`tests/test_projection_netease.py`。
+  - **修改**: `src/db/projections/__init__.py` 注册 `netease`。
+  - **边界**: 详情 `trackIds` 缺失/非法时在删除成员前拒绝，保留旧成员；空列表才清空成员。
+- **相关代码**: `rebuild`、`_upsert_playlists`、`_replace_members`、`_upsert_songs`、`_upsert_recent`、`playlist_state`。
+- **验证结果**: `tests/test_projection_netease.py` 13 项通过；相关投影/ schema 测试 38 项通过；ruff check/format 通过。
 | TASK-009 | Pending | 补 `db rebuild netease` 测试与 raw endpoint 测试：`SUPPORTED_PLATFORMS` 包含 `netease`；`rebuild_platform` 调用新解析器；6 个 endpoint 通过 `http.post` 记录。 | `PYTHONPATH=src pytest tests/test_cli_db.py tests/test_raw_platforms.py tests/test_projection_base.py -q`；断言重建命令、endpoint 名称和 raw 行。 | |
 
 ### 阶段 4：文档与最终验证
