@@ -132,7 +132,16 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 删除“该命令不支持 --force”的错误描述，改为说明 `--force` 覆盖文件并关闭剪枝。
 - **相关代码**: `docs/usages/v2ex.md`
 - **验证结果**: 人工核对文档命令与 `PYTHONPATH=src .venv/bin/python -c "...v2ex --help..."` 输出一致。
-| TASK-009 | Pending | 更新 `AGENTS.md`：CLI 契约加入 `v2ex(...[--tipped])`，说明 `--tipped` 仅配合 `--db-only`；增量章节加入余额页整页已知停止、随后全量主题扫描、页级停止标记 `partial`；非目标加入投币主题 Markdown 导出。 | `grep -n "tipped\|v2ex_thanks" AGENTS.md` 能看到对应条目。 |      |
+| TASK-009 | Completed | 更新 `AGENTS.md`：CLI 契约加入 `v2ex(...[--tipped])`，说明 `--tipped` 仅配合 `--db-only`；增量章节加入余额页整页已知停止、随后全量主题扫描、页级停止标记 `partial`；非目标加入投币主题 Markdown 导出。 | `grep -n "tipped\|v2ex_thanks" AGENTS.md` 能看到对应条目。 | 2026-11-18 |
+
+#### TASK-009 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: `AGENTS.md` 已记录 `--tipped` 契约、增量语义和非目标。
+- **逻辑变更**:
+  - **新增**: CLI 契约中的 `--tipped` 约束与 `operation='tipped'`；余额页整页已知停止后仍全量扫描投币主题；投币主题 Markdown/索引导出列为非目标。
+  - **修改**（及原因）: 原“v2ex 无整页已知停止”收窄为“v2ex favourites”，避免与 `--tipped` 行为冲突。
+- **相关代码**: `AGENTS.md`
+- **验证结果**: `grep -n "tipped\|v2ex_thanks" AGENTS.md` 命中 CLI 契约、增量和非目标条目。
 | TASK-010 | Pending | 更新 `README.md` 增加 `eto --db-only v2ex --tipped` 示例；更新 `docs/design/projection-layer.md` 增加 `v2ex_thanks`、`thanked_at` 时间列和 V2EX 4 张表的例外说明；更新 `docs/design/incremental-pruning.md` 增加投币页级停止 + 主题全量扫描的理由。 | 三份文档中均能检索到 `v2ex_thanks` 或 `--tipped`，且与设计文档一致。 |      |
 | TASK-011 | Pending | 运行完整相关测试与 Ruff，更新本计划任务的 Status/Date，记录执行结果。 | `ruff check src tests`、`ruff format --check src tests`、`PYTHONPATH=src pytest tests/test_v2ex.py tests/test_projection_v2ex.py tests/test_projection_schema.py tests/test_cli_db.py tests/test_raw_platforms.py -q` 全部通过。 |      |
 
