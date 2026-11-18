@@ -140,9 +140,13 @@ def _parse_thanks_row(
     a bare substring: a topic title may itself contain "的回复", which would
     otherwise turn a topic thanks into a reply one. A row without a numeric
     topic link (or without that prefix) cannot be tied to an entity, so it is
-    ignored rather than failing the whole page. Such rows also keep their page
-    from ever becoming fully known, so page-level pruning still relies on
-    ``max_page`` and the repeated-page check.
+    ignored rather than failing the whole page.
+
+    Such rows are invisible to ``thanks_page_known``: it only sees parseable
+    thanks, so a page can still count as fully known while it holds ignored
+    rows. Page-level pruning therefore covers the parseable subset only; the
+    catalogue of ignored rows stays visible in raw, and a parser regression is
+    caught by the empty-page warning instead.
     """
     description_cell = cells[4]
     description = texts[4]
