@@ -1,8 +1,8 @@
 ---
 goal: 新增 eto --db-only netease，抓取自建歌单、歌曲、歌单歌曲关联和最近播放历史，排行只保留 raw 响应
 created: 2026-11-17
-modified: 2026-11-17
-status: Planned
+modified: 2026-11-18
+status: Completed
 design: docs/design/netease-music.md
 ---
 
@@ -155,7 +155,17 @@ design: docs/design/netease-music.md
   - **修正**: 文档里“`--force` 在 db-only 下无意义”的旧说法改为“关闭详情剪枝”。
 - **相关代码**: 无代码变更。
 - **验证结果**: 6 个 endpoint、4 张表在文档中均可检索；`grep -R "netease" docs README.md AGENTS.md` 覆盖完整。
-| TASK-011 | Pending | 全量验证：运行测试、lint、format；用有效 `MUSIC_U` 手工执行 `eto --db-only netease`，检查 4 张表和 raw 排行；连续执行两次 `eto db rebuild netease` 验证幂等。 | `PYTHONPATH=src pytest tests -q`；`ruff check src tests`；`ruff format --check src tests`；手工命令见 `docs/usages/netease.md`。 | |
+| TASK-011 | Completed | 全量验证：运行测试、lint、format；用有效 `MUSIC_U` 手工执行 `eto --db-only netease`，检查 4 张表和 raw 排行；连续执行两次 `eto db rebuild netease` 验证幂等。 | `PYTHONPATH=src pytest tests -q`；`ruff check src tests`；`ruff format --check src tests`；手工命令见 `docs/usages/netease.md`。 | 2026-11-18 |
+
+#### TASK-011 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 全量测试、lint、format 与真实账号端到端验证全部通过。
+- **逻辑变更**:
+  - **新增**: 无。
+  - **修改**: 计划 front matter 收尾；`docs/design/netease-music.md` 状态改为已实现并更新 `RISK-014`。
+- **相关代码**: `netease.exporter.sync`、`db.projections.netease.rebuild`、`app.cli.netease`。
+- **验证结果**: `PYTHONPATH=src pytest tests -q` 490 passed / 2 skipped；ruff check/format 通过。用仓库根目录 `cookies.txt` 在临时库执行：首次同步 `success`，34 个歌单、4360 首歌、5327 条成员关系、300 条历史，raw 含 6 类数据 endpoint 与周榜/总榜；`--force` 再次同步成功；`db rebuild netease` 连续两次输出一致，业务列逐列相等。
+- **环境备注**: 本地 `data/eto.db` 的 `user_version` 已被未合并的 `feature/v2ex-tipped-topics` 分支占为 4，导致本分支 `004_netease.sql` 不会自动应用；端到端改用 `/tmp/opencode/netease-e2e.db`。合并前需要先解决 004 迁移编号冲突。
 
 ## 涉及文件
 
