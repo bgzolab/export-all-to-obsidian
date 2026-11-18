@@ -2,7 +2,7 @@
 goal: 为 V2EX 新增 --tipped 入口，从 /balance 流水增量落库所有感谢（投币）回复/主题及其详情与回复
 created: 2026-11-18
 modified: 2026-11-18
-status: Planned
+status: Completed
 design: docs/design/v2ex-tipped-topics.md
 ---
 
@@ -61,15 +61,6 @@ design: docs/design/v2ex-tipped-topics.md
 | TASK-003 | Completed | 新建 `src/db/migrations/004_v2ex_thanks.sql`，创建 `v2ex_thanks` 表、主键和 `idx_v2ex_thanks_topic` 索引；更新 `tests/test_projection_schema.py` 的表集合、索引集合、平台时间列和 `user_version = 4`。 | `PYTHONPATH=src pytest tests/test_projection_schema.py -q` 通过。 | 2026-11-18 |
 | TASK-004 | Completed | 修改 `src/db/projections/v2ex.py`：增加 `THANKS_ENDPOINT`，把 `v2ex_thanks` 加入 `DELETE_ORDER`，回放 `v2ex.balance.page`，实现 `_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；signin 页抛出 `ValueError` 触发整体回滚。 | `PYTHONPATH=src pytest tests/test_projection_v2ex.py -q` 通过；新增测试覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚和两个 helper。 | 2026-11-18 |
 
-#### TASK-004 执行记录
-- **状态**: 已完成（2026-11-18）
-- **变更摘要**: 余额页 raw 响应可投影到 `v2ex_thanks`，并提供页级已知判断和已感谢主题查询。
-- **逻辑变更**:
-  - **新增**: `THANKS_ENDPOINT`、`_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；余额页 signin 检测触发整体回滚。
-  - **修改**（及原因）: `DELETE_ORDER` 加入 `v2ex_thanks`，全量重建时先清空旧投影；测试表集合同步。
-- **相关代码**: `src/db/projections/v2ex.py`、`tests/test_projection_v2ex.py`
-- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_projection_v2ex.py -q`，15 项通过。
-
 #### TASK-003 执行记录
 - **状态**: 已完成（2026-11-18）
 - **变更摘要**: 新增 `v2ex_thanks` 迁移表及索引，迁移版本升至 4。
@@ -79,6 +70,15 @@ design: docs/design/v2ex-tipped-topics.md
 - **相关代码**: `src/db/migrations/004_v2ex_thanks.sql`
 - **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_projection_schema.py tests/test_db_schema.py -q`，18 项通过。
 
+#### TASK-004 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 余额页 raw 响应可投影到 `v2ex_thanks`，并提供页级已知判断和已感谢主题查询。
+- **逻辑变更**:
+  - **新增**: `THANKS_ENDPOINT`、`_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；余额页 signin 检测触发整体回滚。
+  - **修改**（及原因）: `DELETE_ORDER` 加入 `v2ex_thanks`，全量重建时先清空旧投影；测试表集合同步。
+- **相关代码**: `src/db/projections/v2ex.py`、`tests/test_projection_v2ex.py`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_projection_v2ex.py -q`，15 项通过。
+
 ### 阶段 3：导出器与 CLI
 
 完成标准：`eto --db-only v2ex --tipped` 可发现感谢主题、补抓详情/回复，增量停止后仍扫描旧主题，且不写 Markdown。
@@ -87,15 +87,7 @@ design: docs/design/v2ex-tipped-topics.md
 | -------- | ------- | ----------- | ------------------ | ---- |
 | TASK-005 | Completed | 从 `src/v2ex/exporter.py` 的收藏路径抽取 `_ensure_topic_data(topic_id, client, force)`，收藏导出改为调用该 helper，保持原有 Markdown、索引和失败处理行为不变。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过，确认现有收藏剪枝测试无回归。 | 2026-11-18 |
 | TASK-006 | Completed | 在 `src/v2ex/exporter.py` 实现 `export_tipped(force=False)`：余额页循环、`max_page`/重复页/1000 页保护、`thanks_page_known` 停止并标记 `partial`、合并新主题与 `tipped_topic_ids`、逐主题调用 `_ensure_topic_data`。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k tipped` 通过。 | 2026-11-18 |
-
-#### TASK-006 执行记录
-- **状态**: 已完成（2026-11-18）
-- **变更摘要**: 新增 `export_tipped`，按余额页发现投币主题并合并历史投币主题后补齐详情/回复。
-- **逻辑变更**:
-  - **新增**: 余额页循环、`max_page` 终止、重复页保护、整页已知停止并标记 `partial`、新主题与 `tipped_topic_ids` 去重合并、逐主题调用 `_ensure_topic_data`。
-  - **修改**（及原因）: 无既有逻辑改动；`--force` 关闭页级剪枝并交由 helper 重抓详情/回复。
-- **相关代码**: `src/v2ex/exporter.py`、`tests/test_cli_db.py`
-- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_cli_db.py -q -k tipped`，1 项通过。
+| TASK-007 | Completed | 在 `src/app/cli.py` 为 `v2ex` 增加 `--tipped`，校验必须 `--db-only`，并用 `run_action('v2ex', 'tipped', None, ...)` 调用 `export_tipped`；不创建索引写入器。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过；新增测试覆盖无 `--db-only` 时退出码非 0、`sync_run.operation='tipped'`、页级停止后仍补旧主题、`--force` 全量、无 Markdown 写入。 | 2026-11-18 |
 
 #### TASK-005 执行记录
 - **状态**: 已完成（2026-11-18）
@@ -105,7 +97,15 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 收藏循环改为调用 helper；异常打印和 `mark_run_partial` 移入 helper，收藏侧的 Markdown/索引异常仍由外层捕获。
 - **相关代码**: `src/v2ex/exporter.py`
 - **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_cli_db.py -q -k v2ex`，10 项通过。
-| TASK-007 | Completed | 在 `src/app/cli.py` 为 `v2ex` 增加 `--tipped`，校验必须 `--db-only`，并用 `run_action('v2ex', 'tipped', None, ...)` 调用 `export_tipped`；不创建索引写入器。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过；新增测试覆盖无 `--db-only` 时退出码非 0、`sync_run.operation='tipped'`、页级停止后仍补旧主题、`--force` 全量、无 Markdown 写入。 | 2026-11-18 |
+
+#### TASK-006 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增 `export_tipped`，按余额页发现投币主题并合并历史投币主题后补齐详情/回复。
+- **逻辑变更**:
+  - **新增**: 余额页循环、`max_page` 终止、重复页保护、整页已知停止并标记 `partial`、新主题与 `tipped_topic_ids` 去重合并、逐主题调用 `_ensure_topic_data`。
+  - **修改**（及原因）: 无既有逻辑改动；`--force` 关闭页级剪枝并交由 helper 重抓详情/回复。
+- **相关代码**: `src/v2ex/exporter.py`、`tests/test_cli_db.py`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_cli_db.py -q -k tipped`，1 项通过。
 
 #### TASK-007 执行记录
 - **状态**: 已完成（2026-11-18）
@@ -123,6 +123,9 @@ design: docs/design/v2ex-tipped-topics.md
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
 | TASK-008 | Completed | 更新 `docs/usages/v2ex.md`：增加 `--tipped` 参数、示例、只写库说明、增量与配额限制，并修正现有“该命令不支持 --force”的错误描述。 | 人工核对文档中的命令与 `eto v2ex --help` 输出一致。 | 2026-11-18 |
+| TASK-009 | Completed | 更新 `AGENTS.md`：CLI 契约加入 `v2ex(...[--tipped])`，说明 `--tipped` 仅配合 `--db-only`；增量章节加入余额页整页已知停止、随后全量主题扫描、页级停止标记 `partial`；非目标加入投币主题 Markdown 导出。 | `grep -n "tipped\|v2ex_thanks" AGENTS.md` 能看到对应条目。 | 2026-11-18 |
+| TASK-010 | Completed | 更新 `README.md` 增加 `eto --db-only v2ex --tipped` 示例；更新 `docs/design/projection-layer.md` 增加 `v2ex_thanks`、`thanked_at` 时间列和 V2EX 4 张表的例外说明；更新 `docs/design/incremental-pruning.md` 增加投币页级停止 + 主题全量扫描的理由。 | 三份文档中均能检索到 `v2ex_thanks` 或 `--tipped`，且与设计文档一致。 | 2026-11-18 |
+| TASK-011 | Completed | 运行完整相关测试与 Ruff，更新本计划任务的 Status/Date，记录执行结果。 | `ruff check src tests`、`ruff format --check src tests`、`PYTHONPATH=src pytest tests/test_v2ex.py tests/test_projection_v2ex.py tests/test_projection_schema.py tests/test_cli_db.py tests/test_raw_platforms.py -q` 全部通过。 | 2026-11-18 |
 
 #### TASK-008 执行记录
 - **状态**: 已完成（2026-11-18）
@@ -132,7 +135,6 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 删除“该命令不支持 --force”的错误描述，改为说明 `--force` 覆盖文件并关闭剪枝。
 - **相关代码**: `docs/usages/v2ex.md`
 - **验证结果**: 人工核对文档命令与 `PYTHONPATH=src .venv/bin/python -c "...v2ex --help..."` 输出一致。
-| TASK-009 | Completed | 更新 `AGENTS.md`：CLI 契约加入 `v2ex(...[--tipped])`，说明 `--tipped` 仅配合 `--db-only`；增量章节加入余额页整页已知停止、随后全量主题扫描、页级停止标记 `partial`；非目标加入投币主题 Markdown 导出。 | `grep -n "tipped\|v2ex_thanks" AGENTS.md` 能看到对应条目。 | 2026-11-18 |
 
 #### TASK-009 执行记录
 - **状态**: 已完成（2026-11-18）
@@ -142,7 +144,6 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 原“v2ex 无整页已知停止”收窄为“v2ex favourites”，避免与 `--tipped` 行为冲突。
 - **相关代码**: `AGENTS.md`
 - **验证结果**: `grep -n "tipped\|v2ex_thanks" AGENTS.md` 命中 CLI 契约、增量和非目标条目。
-| TASK-010 | Completed | 更新 `README.md` 增加 `eto --db-only v2ex --tipped` 示例；更新 `docs/design/projection-layer.md` 增加 `v2ex_thanks`、`thanked_at` 时间列和 V2EX 4 张表的例外说明；更新 `docs/design/incremental-pruning.md` 增加投币页级停止 + 主题全量扫描的理由。 | 三份文档中均能检索到 `v2ex_thanks` 或 `--tipped`，且与设计文档一致。 | 2026-11-18 |
 
 #### TASK-010 执行记录
 - **状态**: 已完成（2026-11-18）
@@ -152,7 +153,15 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 设计文档状态改为“已实现”；V2EX signin 回滚说明覆盖余额页。
 - **相关代码**: `README.md`、`docs/design/projection-layer.md`、`docs/design/incremental-pruning.md`、`docs/design/v2ex-tipped-topics.md`
 - **验证结果**: 三份文档均检索到 `v2ex_thanks` / `--tipped`，且与 `docs/design/v2ex-tipped-topics.md` 一致。
-| TASK-011 | Pending | 运行完整相关测试与 Ruff，更新本计划任务的 Status/Date，记录执行结果。 | `ruff check src tests`、`ruff format --check src tests`、`PYTHONPATH=src pytest tests/test_v2ex.py tests/test_projection_v2ex.py tests/test_projection_schema.py tests/test_cli_db.py tests/test_raw_platforms.py -q` 全部通过。 |      |
+
+#### TASK-011 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 完整相关测试与 Ruff 通过，计划收尾。
+- **逻辑变更**:
+  - **新增**: TASK-011 执行记录与计划完成状态。
+  - **修改**（及原因）: `src/db/projections/v2ex.py` 补 `ThanksEntry` 导入（Ruff F821 在延迟注解下不会让测试失败，但必须修复）；`src/app/cli.py`、`tests/test_projection_v2ex.py` 按 Ruff 格式化。
+- **相关代码**: `src/v2ex/tipped.py`、`src/v2ex/exporter.py`、`src/db/projections/v2ex.py`、`src/app/cli.py`、相关测试与文档
+- **验证结果**: `ruff check src tests` 通过；`ruff format --check src tests` 130 个文件已格式化；指定五个测试文件 137 项通过；额外跑完整套件 431 项通过、2 项跳过。
 
 ## 涉及文件
 

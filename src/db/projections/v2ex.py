@@ -22,7 +22,7 @@ from db.projections._upsert import (
     upsert,
 )
 from v2ex.html import is_signin_page, parse_fav_topic_ids
-from v2ex.tipped import parse_balance_page
+from v2ex.tipped import ThanksEntry, parse_balance_page
 
 FAV_ENDPOINT = 'v2ex.fav.page'
 THANKS_ENDPOINT = 'v2ex.balance.page'

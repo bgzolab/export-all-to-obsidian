@@ -215,9 +215,11 @@ def v2ex(output: str | None, force: bool, tipped: bool) -> None:
             'v2ex',
             'tipped' if tipped else 'favorites',
             None,
-            lambda: export_tipped(force)
-            if tipped
-            else export_v2ex(output, get_index_writer(), force),
+            lambda: (
+                export_tipped(force)
+                if tipped
+                else export_v2ex(output, get_index_writer(), force)
+            ),
         ),
     )
 

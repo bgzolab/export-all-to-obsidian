@@ -385,8 +385,13 @@ def test_thanks_helpers_report_known_rows():
     assert thanks_page_known(connection, page.thanks) is True
     assert thanks_page_known(connection, page.thanks[:1]) is True
     assert thanks_page_known(connection, []) is False
-    assert thanks_page_known(connection, [replace(page.thanks[0], balance=1.0)]) is False
-    assert thanks_page_known(connection, [replace(page.thanks[0], member='other')]) is False
+    assert (
+        thanks_page_known(connection, [replace(page.thanks[0], balance=1.0)]) is False
+    )
+    assert (
+        thanks_page_known(connection, [replace(page.thanks[0], member='other')])
+        is False
+    )
     assert tipped_topic_ids(connection) == [1, 2]
 
     record_text(
