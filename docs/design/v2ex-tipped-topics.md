@@ -75,7 +75,7 @@ eto --db-only v2ex --tipped
 - `V2EX_BALANCE = 'https://www.v2ex.com/balance'`
 - `V2EX_MAX_BALANCE_PAGES = 1000`
 - `ThanksEntry`：`thanked_at`、`topic_id`、`content_kind`、`member`、`amount`、`balance`、`topic_title`、`description`
-- `BalancePage`：`max_page`、`thanks`、`transaction_keys`
+- `BalancePage`：`max_page`、`thanks`、`transaction_keys`、`has_table`
 - `parse_balance_page(html) -> BalancePage`
 - `get_balance_page(page, client=None) -> BalancePage`
 
