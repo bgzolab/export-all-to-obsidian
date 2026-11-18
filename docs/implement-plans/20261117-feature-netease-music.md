@@ -127,7 +127,16 @@ design: docs/design/netease-music.md
   - **边界**: 详情 `trackIds` 缺失/非法时在删除成员前拒绝，保留旧成员；空列表才清空成员。
 - **相关代码**: `rebuild`、`_upsert_playlists`、`_replace_members`、`_upsert_songs`、`_upsert_recent`、`playlist_state`。
 - **验证结果**: `tests/test_projection_netease.py` 13 项通过；相关投影/ schema 测试 38 项通过；ruff check/format 通过。
-| TASK-009 | Pending | 补 `db rebuild netease` 测试与 raw endpoint 测试：`SUPPORTED_PLATFORMS` 包含 `netease`；`rebuild_platform` 调用新解析器；6 个 endpoint 通过 `http.post` 记录。 | `PYTHONPATH=src pytest tests/test_cli_db.py tests/test_raw_platforms.py tests/test_projection_base.py -q`；断言重建命令、endpoint 名称和 raw 行。 | |
+| TASK-009 | Completed | 补 `db rebuild netease` 测试与 raw endpoint 测试：`SUPPORTED_PLATFORMS` 包含 `netease`；`rebuild_platform` 调用新解析器；6 个 endpoint 通过 `http.post` 记录。 | `PYTHONPATH=src pytest tests/test_cli_db.py tests/test_raw_platforms.py tests/test_projection_base.py -q`；断言重建命令、endpoint 名称和 raw 行。 | 2026-11-18 |
+
+#### TASK-009 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 补平台注册、`db rebuild netease` 幂等与 6 个数据 endpoint 的记录测试。
+- **逻辑变更**:
+  - **新增**: `test_projection_base.py` 的 netease 分发测试、`test_raw_platforms.py` 的 6 endpoint 与“账号不落 raw”测试、`test_cli_db.py` 的 `db rebuild netease` 连续两次重建测试。
+  - **修改**: 无生产代码。
+- **相关代码**: `db.projections.SUPPORTED_PLATFORMS`、`NeteaseClient` 各数据方法、`eto db rebuild`。
+- **验证结果**: 三个测试文件 105 项通过；ruff check/format 通过。
 
 ### 阶段 4：文档与最终验证
 

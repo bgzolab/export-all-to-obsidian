@@ -2793,3 +2793,44 @@ def test_cli_netease_resource_failure_marks_run_partial(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'partial'
+
+
+def test_db_rebuild_netease_is_idempotent(tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(
+        connection,
+        'netease.playlists.page',
+        {
+            'code': 200,
+            'playlist': [
+                {
+                    'id': 7,
+                    'name': 'mine',
+                    'creator': {'userId': 42},
+                    'trackCount': 0,
+                    'trackUpdateTime': 1,
+                }
+            ],
+            'more': False,
+        },
+        request={'meta': {'uid': 42}},
+    )
+    connection.close()
+
+    first = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), 'db', 'rebuild', 'netease'],
+    )
+    second = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), 'db', 'rebuild', 'netease'],
+    )
+
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+    assert '重建完成: 1 个响应，1 行' in second.output
+    row = _query_one(db_path, 'SELECT * FROM netease_playlist')
+    assert row['playlist_id'] == 7
+    count = _query_one(db_path, 'SELECT count(*) AS n FROM netease_playlist')
+    assert count['n'] == 1

@@ -396,3 +396,84 @@ def test_bilibili_error_code_raises(monkeypatch):
 
     with pytest.raises(RuntimeError, match='code=-101'):
         get_bilibili_favlistd(1, 1, 20)
+
+
+def test_netease_data_endpoints_are_recorded(monkeypatch):
+    from netease import client as netease_client
+    from netease.client import NeteaseClient
+
+    endpoints = []
+    monkeypatch.setattr(
+        netease_client,
+        'get_cookie_header',
+        lambda domains: 'MUSIC_U=secret',
+    )
+    client = NeteaseClient()
+
+    def fake_encrypt(payload, secret=None):
+        return {'params': 'p', 'encSecKey': 'k'}
+
+    def fake_post(
+        session,
+        url,
+        *,
+        endpoint,
+        data=None,
+        request_meta=None,
+        **kwargs,
+    ):
+        endpoints.append(endpoint)
+        return FakeResponse(
+            {
+                'code': 200,
+                'playlist': [],
+                'songs': [],
+                'data': {'list': []},
+            }
+        )
+
+    monkeypatch.setattr(netease_client, 'weapi_encrypt', fake_encrypt)
+    monkeypatch.setattr(netease_client.http, 'post', fake_post)
+
+    client.list_playlists(42)
+    client.get_playlist_detail(7)
+    client.get_song_details([1])
+    client.get_recent_plays()
+    client.get_play_rank(42, 'week')
+    client.get_play_rank(42, 'all')
+
+    assert endpoints == [
+        'netease.playlists.page',
+        'netease.playlist.detail',
+        'netease.songs.detail',
+        'netease.play.recent',
+        'netease.play.rank.week',
+        'netease.play.rank.all',
+    ]
+
+
+def test_netease_account_is_not_recorded(monkeypatch):
+    from netease import client as netease_client
+    from netease.client import NeteaseClient
+
+    monkeypatch.setattr(
+        netease_client,
+        'get_cookie_header',
+        lambda domains: 'MUSIC_U=secret',
+    )
+    client = NeteaseClient()
+
+    monkeypatch.setattr(
+        client.session,
+        'post',
+        lambda url, data=None, timeout=None: FakeResponse(
+            {'code': 200, 'account': {'id': 42}}
+        ),
+    )
+
+    def fail(*args, **kwargs):
+        raise AssertionError('account must not go through http.post')
+
+    monkeypatch.setattr(netease_client.http, 'post', fail)
+
+    assert client.get_account()['account'] == {'id': 42}
