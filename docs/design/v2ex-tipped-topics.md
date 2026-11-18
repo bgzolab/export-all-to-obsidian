@@ -7,6 +7,11 @@ tags: [feature]
 
 # V2EX 投币（感谢）主题落库
 
+- PR: [#28](https://github.com/bgzolab/export-all-to-obsidian/pull/28)
+- Status: 已实现
+- Date: 2026-11-18
+- Related: [projection-layer.md](projection-layer.md)、[incremental-pruning.md](incremental-pruning.md)、[raw-response-layer.md](raw-response-layer.md)
+
 ## 背景与目标
 
 V2EX 当前的 `v2ex` 命令只抓 `/my/topics` 收藏。用户希望对所有“投过币”的回复和主题建立同样的主题详情与回复数据，供未来导出或分析。
@@ -70,7 +75,7 @@ eto --db-only v2ex --tipped
 
 ### 2. 数据源与解析
 
-新增 `src/v2ex/tipped.py`：
+新增 `src/v2ex/tipped.py`（沿用 `requests`、`beautifulsoup4` 与现有 SQLite 迁移机制，不新增依赖）：
 
 - `V2EX_BALANCE = 'https://www.v2ex.com/balance'`
 - `V2EX_MAX_BALANCE_PAGES = 1000`
@@ -176,6 +181,11 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 
 收藏路径改为调用该 helper，Markdown 写入、索引和文件名逻辑保持不变。`export_tipped` 只调用 helper，不写 Markdown、不写索引，并用第二项统计连续失败次数。
 
+回复与详情的共用抓取约定：
+
+- `get_v2ex_topic_info(topic_id, client=None)` 与 `get_balance_page` / `get_replies_page_info` 一致，复用调用方的 `V2exClient`；投币回填每轮要扫数百个主题，不能每个主题重建一次 Session 和 retry adapter。
+- `fetch_all_replies` 以响应里的 `pagination.pages` 作为停止依据；旧响应缺该字段时退回“整页回复 id 重复”检测。V2EX 对越界的 `p` 会重复返回最后一页，因此不能等空页，也不能把重复页的行再计入总数。
+
 ### 7. 错误处理
 
 - `/balance` 非 200：由 `raise_for_status()` 抛出，run 失败，不重建投影。
@@ -187,6 +197,18 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 - 被删除的主题：保留 `v2ex_thanks` 行，主题详情持续缺失，run 保持 `partial`；不做删除检测。
 - API 配额 600 次/小时：首次补齐 515 个以上主题会跨多个小时窗口；余额页是 HTML，不占 API 2.0 配额，主题详情和回复占配额。
 - 回复上限沿用 `V2EX_MAX_REPLIES = 200`。
+
+## 文件布局
+
+- `src/v2ex/api_endpoints.py`：新增 `V2EX_BALANCE`。
+- `src/v2ex/tipped.py`：余额页抓取、解析与数据结构。
+- `src/v2ex/exporter.py`：抽取 `_ensure_topic_data`，新增 `export_tipped`。
+- `src/v2ex/replies.py`、`src/v2ex/topic.py`：回复分页停止条件与详情 client 复用。
+- `src/db/migrations/004_v2ex_thanks.sql`：`v2ex_thanks` 表与索引。
+- `src/db/projections/v2ex.py`：余额页回放、`_upsert_thanks` 与两个剪枝 helper。
+- `src/app/cli.py`：`--tipped` 选项与 `--db-only` 校验。
+- `tests/`：`test_v2ex.py`、`test_projection_v2ex.py`、`test_projection_schema.py`、`test_cli_db.py`、`test_raw_platforms.py` 分别覆盖解析、投影、schema、CLI 与 raw endpoint。
+- `docs/usages/v2ex.md`、`docs/usages/db.md`、`AGENTS.md`、`README.md`、`docs/design/projection-layer.md`、`docs/design/incremental-pruning.md`：文档同步。
 
 ## 关键决策
 
