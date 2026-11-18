@@ -2628,3 +2628,65 @@ def test_v2ex_null_topic_result_marks_partial(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'partial'
+
+
+def test_cli_netease_requires_db_only(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), 'netease'],
+    )
+
+    assert result.exit_code == 2
+    assert 'netease requires --db-only' in result.output
+
+
+def test_cli_netease_passes_uid_and_force(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    called = {}
+
+    def fake_sync(uid=None, force=False):
+        called.update(uid=uid, force=force)
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr('app.cli.sync_netease', fake_sync)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease', '-u', '42', '--force'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert called == {'uid': 42, 'force': True}
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['platform'] == 'netease'
+    assert run['operation'] == 'sync'
+    assert run['scope'] is None
+    assert run['status'] == 'success'
+
+
+def test_cli_netease_defaults_uid_and_force(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    called = {}
+
+    def fake_sync(uid=None, force=False):
+        called.update(uid=uid, force=force)
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr('app.cli.sync_netease', fake_sync)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert called == {'uid': None, 'force': False}
