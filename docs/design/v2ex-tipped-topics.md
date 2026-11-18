@@ -94,19 +94,18 @@ eto --db-only v2ex --tipped
 
 `export_tipped(force=False)` 的流程：
 
-1. 从当前投影读取所有已感谢主题：`tipped_topic_ids(connection)`。
-2. 从第 1 页开始抓 `/balance`，记录 raw 响应。
-3. 收集本页 `thanks`，并累加到 `new_entries`。
-4. 增量停止条件：`entries` 非空，且 `thanks_page_known(connection, entries)` 为真时，标记本次 run 为 `partial`，停止翻页。
-5. 没有 `max_page` 时，用 `transaction_keys` 与上一页比较；相同则停止，避免最后一页重复导致无限循环。
-6. 页数超过 `V2EX_MAX_BALANCE_PAGES` 时抛错。
-7. 组装待检查主题：先按余额页出现顺序放 `new_entries` 的 topic_id，再追加投影中已有、但本次未出现的 topic_id（按 `MAX(thanked_at) DESC` 排序）。
-8. 对每个 topic_id 调用 `_ensure_topic_data(topic_id, client, force)`：详情缺失则抓详情，回复不完整则抓回复，已完成则跳过。
-9. 由 `run_action` 在同一个 `sync_run` 内重建 `v2ex` 投影。
+1. 从第 1 页开始抓 `/balance`，记录 raw 响应。
+2. 收集本页 `thanks`，并累加到 `new_entries`。
+3. 增量停止条件：`entries` 非空，且 `thanks_page_known(connection, entries)` 为真时，标记本次 run 为 `partial`，停止翻页。
+4. 没有 `max_page` 时，用 `transaction_keys` 与上一页比较；相同则停止，避免最后一页重复导致无限循环。
+5. 页数超过 `V2EX_MAX_BALANCE_PAGES` 时抛错。
+6. 翻页结束后再从当前投影读取所有已感谢主题 `tipped_topic_ids(connection)`，组装待检查主题：先按余额页出现顺序放 `new_entries` 的 topic_id，再追加投影中已有、但本次未出现的 topic_id（按 `MAX(thanked_at) DESC` 排序）。顺序不影响正确性，因为投影尚未在本次 run 内重建。
+7. 对每个 topic_id 调用 `_ensure_topic_data(topic_id, client, force)`：详情缺失则抓详情，回复不完整则抓回复，已完成则跳过。
+8. 由 `run_action` 在同一个 `sync_run` 内重建 `v2ex` 投影。
 
 关键点：**余额页停止翻页后必须继续扫描投影中的全部感谢主题**。否则第 1 页全部命中时，前面几轮因 API 配额未补齐的旧主题会被永久跳过。这是与收藏页剪枝不同的地方。
 
-`--force` 下跳过第 4 步的页级剪枝，也不跳过任何主题详情/回复。
+`--force` 下跳过第 3 步的页级剪枝，也不跳过任何主题详情/回复。
 
 ### 4. 数据模型
 
