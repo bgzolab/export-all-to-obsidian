@@ -17,6 +17,7 @@ from bilibili.api_endpoints import BILIBILI_FAV_URL
 from bilibili.cilent import BilibiliClient
 from cnblog.api_endpoints import USER as CNBLOG_USER
 from cnblog.client import CnblogClient
+from netease.client import NeteaseClient, NeteaseClientError
 from qireader.api_endpoints import READ_LATER as QIREADER_READ_LATER
 from qireader.cilent import QiReaderClient
 from twitter.api_endpoints import TWITTER_BOOKMARKS_PATH, TWITTER_LIKES_PATH
@@ -413,3 +414,54 @@ def probe_bilibili_credentials(fid: int) -> CredentialProbeResult:
         module,
         f'探针返回 code={payload.get("code")} message={payload.get("message")}',
     )
+
+
+def probe_netease_credentials() -> CredentialProbeResult:
+    module = 'netease'
+    # The account endpoint is the only reliable login check: recent-play and
+    # playlist calls also return 200 with empty data when MUSIC_U is stale.
+    try:
+        client = NeteaseClient()
+        payload = client.get_account()
+    except CookiesConfigError as exc:
+        raise click.ClickException(f'配置缺失: {exc}')
+    except ValueError as exc:
+        return CredentialProbeResult.invalid(module, str(exc))
+    except NeteaseClientError as exc:
+        if exc.status_code in {301, 401, 403}:
+            return CredentialProbeResult.invalid(
+                module,
+                'MUSIC_U 已过期或无效',
+            )
+        return CredentialProbeResult.unknown(module, str(exc))
+    except requests.RequestException as exc:
+        return CredentialProbeResult.unknown(module, f'验活请求失败: {exc}')
+
+    code = payload.get('code')
+    if code in {301, 401, 403}:
+        return CredentialProbeResult.invalid(module, 'MUSIC_U 已过期或无效')
+    if code != 200:
+        return CredentialProbeResult.unknown(
+            module,
+            f'探针返回 code={code} message={payload.get("message")}',
+        )
+    if _netease_identity(payload):
+        return CredentialProbeResult.valid(module)
+    return CredentialProbeResult.invalid(
+        module,
+        'MUSIC_U 未登录或已失效，请重新导出 cookies.txt',
+    )
+
+
+def _netease_identity(payload: dict) -> bool:
+    """Return whether either account envelope carries a user id."""
+    for key in ('account', 'profile'):
+        value = payload.get(key)
+        if not isinstance(value, dict):
+            continue
+        user_id = value.get('id')
+        if user_id is None:
+            user_id = value.get('userId')
+        if user_id is not None:
+            return True
+    return False

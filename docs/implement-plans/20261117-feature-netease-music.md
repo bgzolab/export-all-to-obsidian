@@ -51,7 +51,16 @@ design: docs/design/netease-music.md
   - **修正**: weapi RSA 只应反转一次；TASK-001 的 `weapi_encrypt` 曾重复反转导致上游返回空 200，已修正并更新已知向量。
 - **相关代码**: `NeteaseClient.get_account` 直接用 `session.post`，不落 raw；其余方法经 `export_runtime.http.post`。
 - **验证结果**: `tests/test_http_recorder.py` + `tests/test_netease.py` 22 项通过；ruff check/format 通过；用仓库根目录 `cookies.txt` 实测账号、歌单、详情、歌曲、最近播放、周榜/总榜均返回 200。
-| TASK-003 | Pending | 在 `src/app/credential_guard.py` 增加 `probe_netease_credentials`：账号 200 空对象判 invalid，301/401/403 判 invalid，非 JSON/非对象/请求异常判 unknown。 | `PYTHONPATH=src pytest tests/test_credential_guard.py -q`；覆盖 valid / empty / 301 / 401 / 非 JSON / 网络异常。 | |
+| TASK-003 | Completed | 在 `src/app/credential_guard.py` 增加 `probe_netease_credentials`：账号 200 空对象判 invalid，301/401/403 判 invalid，非 JSON/非对象/请求异常判 unknown。 | `PYTHONPATH=src pytest tests/test_credential_guard.py -q`；覆盖 valid / empty / 301 / 401 / 非 JSON / 网络异常。 | 2026-11-18 |
+
+#### TASK-003 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增网易云凭证探针，按账号接口判断登录态。
+- **逻辑变更**:
+  - **新增**: `probe_netease_credentials` 与 `_netease_identity`。
+  - **修改**: `tests/test_credential_guard.py` 覆盖 account/profile 两种 uid、空账号、业务/HTTP 301/401/403、业务错误、非 JSON、网络异常、缺域 Cookie、配置缺失。
+- **相关代码**: 探针只调用 `NeteaseClient.get_account`；`MUSIC_A_T`/`MUSIC_R_T` 等 Cookie 不作为判断依据。
+- **验证结果**: `tests/test_credential_guard.py` 66 项通过；ruff check/format 通过。
 
 ### 阶段 2：抓取流程与 CLI
 
