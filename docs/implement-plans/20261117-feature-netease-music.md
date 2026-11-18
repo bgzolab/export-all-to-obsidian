@@ -106,7 +106,16 @@ design: docs/design/netease-music.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-007 | Pending | 新增 `src/db/migrations/004_netease.sql`：4 张 `STRICT` 表和 4 个索引；更新 `tests/test_db_schema.py` 的 `user_version` 到 4；更新 `tests/test_projection_schema.py` 的表、索引、平台时间列集合。 | `PYTHONPATH=src pytest tests/test_db_schema.py tests/test_projection_schema.py -q`；断言 4 张表、4 个索引、JSON/STRICT/外键约束。 | |
+| TASK-007 | Completed | 新增 `src/db/migrations/004_netease.sql`：4 张 `STRICT` 表和 4 个索引；更新 `tests/test_db_schema.py` 的 `user_version` 到 4；更新 `tests/test_projection_schema.py` 的表、索引、平台时间列集合。 | `PYTHONPATH=src pytest tests/test_db_schema.py tests/test_projection_schema.py -q`；断言 4 张表、4 个索引、JSON/STRICT/外键约束。 | 2026-11-18 |
+
+#### TASK-007 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增网易云 4 张投影表与 4 个索引，迁移版本升到 4。
+- **逻辑变更**:
+  - **新增**: `src/db/migrations/004_netease.sql`；`test_projection_schema.py` 增加 JSON、关系外键与历史表不引用歌曲库的约束测试。
+  - **修改**: 两个 schema 测试的 `user_version` 断言 3 → 4；投影表/索引/平台时间列集合纳入网易云。
+- **相关代码**: `netease_playlist`、`netease_song`、`netease_playlist_song`、`netease_play_record`。
+- **验证结果**: `tests/test_db_schema.py` + `tests/test_projection_schema.py` 19 项通过；ruff check/format 通过。
 | TASK-008 | Pending | 新增 `src/db/projections/netease.py`：按固定顺序回放 4 类响应；歌单列表按 `request.meta.uid` 过滤；详情替换成员并插占位歌曲；歌曲详情 upsert；历史按 `(song_id, play_time)` upsert；实现 `playlist_state` 供导出器剪枝；在 `src/db/projections/__init__.py` 注册 `netease`。 | `PYTHONPATH=src pytest tests/test_projection_netease.py -q`；覆盖只保留自建歌单、成员替换、空歌单、占位、历史去重、301 回滚、坏辅助响应跳过、两次重建幂等。 | |
 | TASK-009 | Pending | 补 `db rebuild netease` 测试与 raw endpoint 测试：`SUPPORTED_PLATFORMS` 包含 `netease`；`rebuild_platform` 调用新解析器；6 个 endpoint 通过 `http.post` 记录。 | `PYTHONPATH=src pytest tests/test_cli_db.py tests/test_raw_platforms.py tests/test_projection_base.py -q`；断言重建命令、endpoint 名称和 raw 行。 | |
 

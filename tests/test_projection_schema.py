@@ -17,6 +17,10 @@ PROJECTION_TABLES = {
     'cnblog_bookmark',
     'cnblog_post',
     'github_star',
+    'netease_playlist',
+    'netease_song',
+    'netease_playlist_song',
+    'netease_play_record',
     'qireader_entry',
     'qireader_article',
     'twitter_tweet',
@@ -40,6 +44,10 @@ PROJECTION_INDEXES = {
     'idx_github_star_owner',
     'idx_github_star_full_name',
     'idx_github_star_starred_at',
+    'idx_netease_playlist_creator',
+    'idx_netease_playlist_special_type',
+    'idx_netease_playlist_song_song',
+    'idx_netease_play_record_play_time',
     'idx_qireader_entry_url',
     'idx_qireader_entry_timestamp',
     'idx_twitter_tweet_created_at',
@@ -63,6 +71,10 @@ PLATFORM_TIME_COLUMNS = {
     'cnblog_bookmark': {'date_added'},
     'cnblog_post': set(),
     'github_star': {'created_at', 'updated_at', 'pushed_at', 'starred_at'},
+    'netease_playlist': {'create_time', 'update_time', 'track_update_time'},
+    'netease_song': {'publish_time'},
+    'netease_playlist_song': set(),
+    'netease_play_record': {'play_time'},
     'qireader_entry': {'published_at', 'crawled_at', 'timestamp'},
     'qireader_article': set(),
     'twitter_tweet': {'created_at'},
@@ -120,7 +132,7 @@ def test_migration_creates_projection_tables_and_indexes():
 
     assert PROJECTION_TABLES <= _table_names(connection)
     assert PROJECTION_INDEXES <= _index_names(connection)
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
     connection.close()
 
 
@@ -267,7 +279,44 @@ def test_migrates_existing_layer1_database(tmp_path):
 
     connection = connect(db_path)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
     assert connection.execute('SELECT count(*) FROM sync_run').fetchone()[0] == 1
     assert PROJECTION_TABLES <= _table_names(connection)
+    connection.close()
+
+
+def test_netease_constraints_and_history_isolation():
+    connection = connect(':memory:')
+    response_id = _seed_response(connection)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            'INSERT INTO netease_playlist '
+            '(playlist_id, tags_json, response_id, db_created_at, db_updated_at) '
+            "VALUES (1, 'not-json', ?, 'now', 'now')",
+            (response_id,),
+        )
+    connection.rollback()
+
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            'INSERT INTO netease_playlist_song '
+            '(playlist_id, song_id, response_id, db_created_at, db_updated_at) '
+            "VALUES (999, 999, ?, 'now', 'now')",
+            (response_id,),
+        )
+    connection.rollback()
+
+    # History rows keep a song snapshot and must not require a netease_song row.
+    connection.execute(
+        'INSERT INTO netease_play_record '
+        '(song_id, play_time, song_json, response_id, db_created_at, db_updated_at) '
+        "VALUES (999, 1000, '{}', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+    assert (
+        connection.execute('SELECT count(*) FROM netease_play_record').fetchone()[0]
+        == 1
+    )
     connection.close()
