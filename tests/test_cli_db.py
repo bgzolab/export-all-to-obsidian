@@ -1526,7 +1526,9 @@ def test_v2ex_export_tipped_merges_new_and_known_topics(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter._ensure_topic_data',
-        lambda topic_id, client, force: calls.append((topic_id, force)),
+        lambda topic_id, client, force: (
+            calls.append((topic_id, force)) or (None, False)
+        ),
     )
 
     root = click.Context(click.Command('test'))
@@ -1780,6 +1782,58 @@ def test_cli_v2ex_tipped_stops_on_repeated_page_without_max_page(
     )
     assert run['operation'] == 'tipped'
     assert run['status'] == 'success'
+
+
+def test_cli_v2ex_tipped_aborts_scan_after_consecutive_failures(
+    monkeypatch,
+    tmp_path,
+):
+    """A quota-exhausted run stops instead of retrying every remaining topic."""
+    db_path = tmp_path / 'eto.db'
+    entries = [_balance_entry(i, f'2026-11-18 00:00:0{i} +08:00') for i in range(1, 13)]
+    pages = [BalancePage(1, entries, ['key-1'])]
+    topic_calls = []
+
+    def fake_balance(page, client=None):
+        return pages[0]
+
+    def fake_topic(topic_id):
+        topic_calls.append(topic_id)
+        if topic_id > 2:
+            return None
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                replies=0,
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    # Two successes reset the counter, then ten consecutive failures abort.
+    assert topic_calls == list(range(1, 13))
+    assert '连续 10 个主题抓取失败' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
 
 
 def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):

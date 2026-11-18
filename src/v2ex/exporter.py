@@ -20,6 +20,10 @@ from v2ex.replies import V2EX_MAX_REPLIES, fetch_all_replies
 from v2ex.tipped import ThanksEntry, get_balance_page
 from v2ex.topic import get_v2ex_topic_info
 
+# 连续这么多次主题抓取失败，基本可判定为配额耗尽或上游故障：每次失败已走满
+# 客户端重试退避，继续扫描只会对限流端点重复打请求，剩余主题留给下一轮收敛。
+V2EX_MAX_CONSECUTIVE_FAILURES = 10
+
 
 def _warn_reply_gap(topic_id: int, total: int, expected: int) -> None:
     """Report a short reply fetch, usually caused by deleted replies."""
@@ -34,13 +38,13 @@ def _ensure_topic_data(
     topic_id: int,
     client: V2exClient,
     force: bool,
-) -> TopicResult | None:
-    """Fetch a topic's missing detail/replies, returning None when nothing to render.
+) -> tuple[TopicResult | None, bool]:
+    """Fetch a topic's missing detail/replies.
 
-    Returns None in two cases: the topic is already projected under
-    ``--db-only`` (after repairing any reply gap), or fetching failed. Both
-    mean the caller can skip Markdown; failures are per-topic and marked
-    partial instead of aborting the batch.
+    Returns ``(topic, failed)``. A ``None`` topic with ``failed=False`` means
+    the topic is already projected under ``--db-only`` (after repairing any
+    reply gap), so the caller can skip Markdown; ``failed=True`` means the
+    fetch itself failed, which the caller may count to abort a doomed batch.
     """
     try:
         if is_db_only() and not force:
@@ -58,11 +62,11 @@ def _ensure_topic_data(
                         fetch_all_replies(topic_id, client),
                         expected,
                     )
-                return None
+                return None, False
         result = get_v2ex_topic_info(topic_id)
         if not (result and result.result):
             mark_run_partial()
-            return None
+            return None, True
         topic = result.result
         expected = min(topic.replies, V2EX_MAX_REPLIES)
         if (
@@ -82,11 +86,11 @@ def _ensure_topic_data(
                 fetch_all_replies(topic_id, client),
                 expected,
             )
-        return topic
+        return topic, False
     except Exception as exc:
         mark_run_partial()
         print(f'Skip v2ex topic {topic_id}: {exc}')
-        return None
+        return None, True
 
 
 def export(
@@ -109,7 +113,7 @@ def export(
         page += 1
         for topic_id in id_list:
             try:
-                topic = _ensure_topic_data(topic_id, client, force)
+                topic, _failed = _ensure_topic_data(topic_id, client, force)
                 if topic is None:
                     continue
                 filename = get_clean_filename(f'{topic_id}-{topic.title}')
@@ -210,5 +214,12 @@ def export_tipped(force: bool = False) -> None:
             topic_ids.append(topic_id)
 
     print(f'投币主题待检查: {len(topic_ids)} 个')
+    failures = 0
     for topic_id in topic_ids:
-        _ensure_topic_data(topic_id, client, force)
+        _topic, failed = _ensure_topic_data(topic_id, client, force)
+        failures = failures + 1 if failed else 0
+        if failures >= V2EX_MAX_CONSECUTIVE_FAILURES:
+            print(
+                f'连续 {failures} 个主题抓取失败，停止本轮扫描，剩余主题留给下一轮',
+            )
+            break

@@ -136,7 +136,10 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   tipped topic from `v2ex_thanks` and repairs missing details/replies, so earlier
   quota-truncated runs converge; `--force` disables the page stop and re-fetches the full
   balance history plus every topic. Balance pages are HTML and do not consume the API 2.0
-  quota; topic details/replies do.
+  quota; topic details/replies do. Ten consecutive topic fetch failures abort the rest of the
+  scan (the run is already `partial`): each failure has already burned the client retry
+  backoff, so continuing would only hammer the throttled endpoint; remaining topics converge
+  on a later run.
 - `twitter --bookmarks` (default incremental) starts at the top and stops when a whole page is
   already in `twitter_bookmark`; that run is `partial`. `--full` derives its resume cursor from
   the latest `sync_run.scope='full'` bookmark response, never page-stops, and is `partial` on

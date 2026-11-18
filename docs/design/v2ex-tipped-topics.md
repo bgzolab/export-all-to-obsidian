@@ -100,7 +100,7 @@ eto --db-only v2ex --tipped
 4. 没有 `max_page` 时，用 `transaction_keys` 与上一页比较；相同则停止，避免最后一页重复导致无限循环。
 5. 页数超过 `V2EX_MAX_BALANCE_PAGES` 时抛错。
 6. 翻页结束后再从当前投影读取所有已感谢主题 `tipped_topic_ids(connection)`，组装待检查主题：先按余额页出现顺序放 `new_entries` 的 topic_id，再追加投影中已有、但本次未出现的 topic_id（按 `MAX(thanked_at) DESC` 排序）。顺序不影响正确性，因为投影尚未在本次 run 内重建。
-7. 对每个 topic_id 调用 `_ensure_topic_data(topic_id, client, force)`：详情缺失则抓详情，回复不完整则抓回复，已完成则跳过。
+7. 对每个 topic_id 调用 `_ensure_topic_data(topic_id, client, force)`：详情缺失则抓详情，回复不完整则抓回复，已完成则跳过。连续 `V2EX_MAX_CONSECUTIVE_FAILURES = 10` 个主题抓取失败时停止本轮扫描，剩余主题留给下一轮。
 8. 由 `run_action` 在同一个 `sync_run` 内重建 `v2ex` 投影。
 
 关键点：**余额页停止翻页后必须继续扫描投影中的全部感谢主题**。否则第 1 页全部命中时，前面几轮因 API 配额未补齐的旧主题会被永久跳过。这是与收藏页剪枝不同的地方。
@@ -163,7 +163,7 @@ CREATE INDEX idx_v2ex_thanks_topic
 从 `src/v2ex/exporter.py` 中抽取：
 
 ```python
-def _ensure_topic_data(topic_id, client, force) -> Topic | None
+def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 ```
 
 它承载现有收藏路径中的以下逻辑：
@@ -171,15 +171,16 @@ def _ensure_topic_data(topic_id, client, force) -> Topic | None
 - `--db-only` 且未 `--force` 时，若 `v2ex_topic` 已知，按 `min(replies, 200)` 检查回复完整性；
 - 详情缺失时调用 `get_v2ex_topic_info`；
 - `--db-only` 下抓取不完整的回复；
-- 失败时 `mark_run_partial()` 并返回 `None`。
+- 失败时 `mark_run_partial()` 并返回 `(None, True)`；已入库跳过或成功返回第二项 `False`。
 
-收藏路径改为调用该 helper，Markdown 写入、索引和文件名逻辑保持不变。`export_tipped` 只调用 helper，不写 Markdown、不写索引。
+收藏路径改为调用该 helper，Markdown 写入、索引和文件名逻辑保持不变。`export_tipped` 只调用 helper，不写 Markdown、不写索引，并用第二项统计连续失败次数。
 
 ### 7. 错误处理
 
 - `/balance` 非 200：由 `raise_for_status()` 抛出，run 失败，不重建投影。
 - signin 页：抓取阶段抛 `RuntimeError`；投影阶段抛 `ValueError` 并整体回滚，避免清空已有感谢记录。
 - 单个主题详情 404/403/网络错误：`_ensure_topic_data` 标记 `partial`，跳过该主题，下一轮继续。
+- 连续 10 个主题抓取失败：`export_tipped` 停止本轮剩余扫描（run 已因上述失败标记为 `partial`）。客户端对 429 会走满 5 次重试退避，单个主题失败约 6 次请求、30 秒；不中止时 600+ 个主题会对着限流端点空转数小时。剩余主题在下一轮配额恢复后收敛。
 - 被删除的主题：保留 `v2ex_thanks` 行，主题详情持续缺失，run 保持 `partial`；不做删除检测。
 - API 配额 600 次/小时：首次补齐 515 个以上主题会跨多个小时窗口；余额页是 HTML，不占 API 2.0 配额，主题详情和回复占配额。
 - 回复上限沿用 `V2EX_MAX_REPLIES = 200`。
@@ -193,6 +194,8 @@ def _ensure_topic_data(topic_id, client, force) -> Topic | None
 - **DEC-005**：余额页停止翻页后仍扫描全部已感谢主题。页级剪枝只负责发现新感谢，不负责判断主题详情是否完整；如果不做全量主题扫描，会永久漏掉旧主题。
 - **DEC-006**：复用 `v2ex_topic` / `v2ex_reply`，不新建主题/回复实体表。同一主题被收藏和被感谢时只保留一份实体数据。
 - **DEC-007**：页级增量停止标记 run 为 `partial`，遵循仓库现有“整页已知即 partial”的约定；`--force` 全量扫描才可能是 `success`。
+- **DEC-008**：`content_kind` 只从 `感谢 <member> 的(回复|主题)` 这个固定前缀判定，不对整段描述做子串匹配。主题标题可能包含“的回复”，子串匹配会把主题感谢误判成回复感谢，而 `content_kind` 参与主键，误分类会随重建稳定复现。
+- **DEC-009**：连续 10 个主题抓取失败即中止本轮剩余扫描。失败已在客户端层走满 429 重试退避（约 6 次请求 / 30 秒每个主题），600+ 个主题从头扫到尾会让限流窗口长期无法恢复；run 本已 `partial`，剩余主题下轮收敛。
 
 ## 备选方案
 
@@ -216,9 +219,9 @@ def _ensure_topic_data(topic_id, client, force) -> Topic | None
 
 ## 验证方式
 
-- **TEST-001**：余额页解析 fixture 覆盖回复感谢、主题感谢、非感谢流水、无感谢页、重复末页、signin 页和 `max_page`。
+- **TEST-001**：余额页解析 fixture 覆盖回复感谢、主题感谢、标题含“的回复”的主题感谢、非感谢流水、无感谢页、重复末页、signin 页和 `max_page`。
 - **TEST-002**：投影重建覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚、`thanks_page_known` 和 `tipped_topic_ids`。
-- **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、`sync_run.operation='tipped'`。
+- **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、无 `max_page` 时的重复末页停止、连续 10 个主题抓取失败中止扫描、`sync_run.operation='tipped'`。
 - **TEST-004**：schema 测试覆盖 `v2ex_thanks` 表、索引、平台时间列和 `user_version = 4`。
 - **TEST-005**：`ruff check src tests`、`ruff format --check src tests` 通过。
 - **TEST-006**：真实环境 smoke（可选，注意配额）：运行 `eto --db-only v2ex --tipped`，确认页级剪枝生效、旧主题缺口继续补齐、无 Markdown 写入。
