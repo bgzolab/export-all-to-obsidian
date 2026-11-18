@@ -192,12 +192,16 @@ def test_fetch_all_replies_stops_at_reply_cap(monkeypatch):
     class FakeResponse:
         status_code = 200
 
+        def __init__(self, page):
+            self.page = page
+
         def json(self):
-            return {'result': [{'id': 1}]}
+            return {'result': [{'id': self.page}]}
 
     def fake_get(session, url, *, endpoint, **kwargs):
-        calls.append(kwargs['params']['p'])
-        return FakeResponse()
+        page = kwargs['params']['p']
+        calls.append(page)
+        return FakeResponse(page)
 
     monkeypatch.setattr('v2ex.replies.V2EX_MAX_REPLIES', 2)
     monkeypatch.setattr(
@@ -208,6 +212,73 @@ def test_fetch_all_replies_stops_at_reply_cap(monkeypatch):
 
     assert fetch_all_replies(1) == 2
     assert calls == [1, 2]
+
+
+def test_fetch_all_replies_stops_at_pagination_pages(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    pages = {
+        1: {'result': [{'id': 1}], 'pagination': {'pages': 3}},
+        2: {'result': [{'id': 2}], 'pagination': {'pages': 3}},
+        3: {'result': [{'id': 3}], 'pagination': {'pages': 3}},
+    }
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        page = kwargs['params']['p']
+        calls.append(page)
+        return FakeResponse(pages[page])
+
+    monkeypatch.setattr(
+        'v2ex.replies.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr('v2ex.replies.http.get', fake_get)
+
+    assert fetch_all_replies(1) == 3
+    assert calls == [1, 2, 3]
+
+
+def test_fetch_all_replies_stops_on_repeated_last_page(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    pages = {
+        1: {'result': [{'id': 1}]},
+        2: {'result': [{'id': 2}]},
+        3: {'result': [{'id': 2}]},
+    }
+
+    def fake_get(session, url, *, endpoint, **kwargs):
+        page = kwargs['params']['p']
+        calls.append(page)
+        return FakeResponse(pages[page])
+
+    monkeypatch.setattr(
+        'v2ex.replies.V2exClient',
+        lambda: SimpleNamespace(session=object()),
+    )
+    monkeypatch.setattr('v2ex.replies.http.get', fake_get)
+
+    # Page 3 repeats page 2, so its rows are not counted a second time.
+    assert fetch_all_replies(1) == 2
+    assert calls == [1, 2, 3]
 
 
 def test_replies_page_rejects_unexpected_result(monkeypatch):

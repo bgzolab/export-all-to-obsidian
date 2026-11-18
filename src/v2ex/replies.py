@@ -13,12 +13,17 @@ from v2ex.cilent import V2exClient
 V2EX_MAX_REPLIES = 200
 
 
-def get_replies_page(
+def get_replies_page_info(
     topic_id: int,
     page: int,
     client: V2exClient | None = None,
-) -> list[dict[str, Any]]:
-    """Fetch one reply page from the V2 API."""
+) -> tuple[list[dict[str, Any]], int | None]:
+    """Fetch one reply page plus its total page count when the API reports it.
+
+    V2EX returns the last page again for out-of-range ``p`` instead of an
+    empty list, so callers must stop using ``pages`` rather than waiting for
+    an empty page.
+    """
     client = client or V2exClient()
     response = http.get(
         client.session,
@@ -33,10 +38,31 @@ def get_replies_page(
         raise TypeError('unexpected replies payload')
     result = payload.get('result')
     if result is None:
-        return []
+        return [], _reply_pages(payload)
     if not isinstance(result, list):
         raise TypeError('unexpected replies result')
-    return result
+    return result, _reply_pages(payload)
+
+
+def get_replies_page(
+    topic_id: int,
+    page: int,
+    client: V2exClient | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch one reply page, keeping the historical list-only return value."""
+    replies, _pages = get_replies_page_info(topic_id, page, client)
+    return replies
+
+
+def _reply_pages(payload: dict[str, Any]) -> int | None:
+    """Read ``pagination.pages``; older responses may omit the block."""
+    pagination = payload.get('pagination')
+    if not isinstance(pagination, dict):
+        return None
+    pages = pagination.get('pages')
+    if isinstance(pages, int) and pages >= 0:
+        return pages
+    return None
 
 
 def fetch_all_replies(topic_id: int, client: V2exClient | None = None) -> int:
@@ -44,10 +70,19 @@ def fetch_all_replies(topic_id: int, client: V2exClient | None = None) -> int:
     client = client or V2exClient()
     page = 1
     total = 0
+    previous_ids: list[Any] | None = None
     while total < V2EX_MAX_REPLIES:
-        replies = get_replies_page(topic_id, page, client)
+        replies, pages = get_replies_page_info(topic_id, page, client)
         if not replies:
             break
+        current_ids = [reply.get('id') for reply in replies]
+        # Older payloads have no pagination block; the repeated last page is
+        # then the only reliable end marker.
+        if previous_ids is not None and current_ids == previous_ids:
+            break
+        previous_ids = current_ids
         total += len(replies)
+        if pages is not None and page >= pages:
+            break
         page += 1
     return total
