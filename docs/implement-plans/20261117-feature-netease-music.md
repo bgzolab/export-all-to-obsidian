@@ -144,7 +144,17 @@ design: docs/design/netease-music.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-010 | Pending | 更新 `docs/design/projection-layer.md`：增加网易云 4 张表、回放/删除顺序、1-3 张表预算的例外说明；新增 `docs/usages/netease.md`；更新 `docs/usages/README.md`、`docs/usages/db.md`、`README.md`、`AGENTS.md`。 | 人工核对文档中的表名、endpoint、命令和 raw 排行查询示例；`grep -R "netease" docs README.md AGENTS.md` 无遗漏。 | |
+| TASK-010 | Completed | 更新 `docs/design/projection-layer.md`：增加网易云 4 张表、回放/删除顺序、1-3 张表预算的例外说明；新增 `docs/usages/netease.md`；更新 `docs/usages/README.md`、`docs/usages/db.md`、`README.md`、`AGENTS.md`。 | 人工核对文档中的表名、endpoint、命令和 raw 排行查询示例；`grep -R "netease" docs README.md AGENTS.md` 无遗漏。 | 2026-11-18 |
+
+#### TASK-010 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 同步网易云的投影层设计、命令用法与项目内维护说明。
+- **逻辑变更**:
+  - **新增**: `docs/usages/netease.md`（参数、凭证、抓取范围、4 张表、raw 排行查询示例）。
+  - **修改**: `docs/design/projection-layer.md`（4 张表、预算例外、回放顺序、失败处理、风险）、`docs/usages/README.md`、`docs/usages/db.md`、`README.md`、`AGENTS.md`；`docs/design/netease-music.md` 状态改为已实现。
+  - **修正**: 文档里“`--force` 在 db-only 下无意义”的旧说法改为“关闭详情剪枝”。
+- **相关代码**: 无代码变更。
+- **验证结果**: 6 个 endpoint、4 张表在文档中均可检索；`grep -R "netease" docs README.md AGENTS.md` 覆盖完整。
 | TASK-011 | Pending | 全量验证：运行测试、lint、format；用有效 `MUSIC_U` 手工执行 `eto --db-only netease`，检查 4 张表和 raw 排行；连续执行两次 `eto db rebuild netease` 验证幂等。 | `PYTHONPATH=src pytest tests -q`；`ruff check src tests`；`ruff format --check src tests`；手工命令见 `docs/usages/netease.md`。 | |
 
 ## 涉及文件

@@ -1,15 +1,16 @@
 ---
-status: 设计中
+status: 已实现
 created: 2026-11-17
-modified: 2026-11-17
+modified: 2026-11-18
 tags: [feature, data]
 ---
 
 # 网易云音乐歌单与听歌历史入库设计
 
 - Issue: [#8](https://github.com/bgzolab/export-all-to-obsidian/issues/8)
-- Status: 设计中
+- Status: 已实现
 - Date: 2026-11-17
+- Implemented: 2026-11-18
 - Related: [projection-layer.md](projection-layer.md)、[raw-response-layer.md](raw-response-layer.md)、[incremental-pruning.md](incremental-pruning.md)
 
 ## 背景与目标
@@ -416,7 +417,8 @@ docs/usages/netease.md
 - **RISK-011**：详情剪枝依赖 `track_update_time` 和 `track_count`；歌曲元数据变化但歌单未更新时不会刷新，需要 `--force`。
 - **RISK-012**：`__csrf` 缺失时只读接口仍可用，但上游未来可能收紧；届时需要先访问首页获取 Cookie。
 - **RISK-013**：`request_meta` 是 raw request JSON 的新增字段；旧消费方需要忽略未知键。当前没有依赖固定键集合的代码。
-- **RISK-014**：当前本地 `cookies.txt` 的 `MUSIC_U` 未登录，端到端验证前必须重新导出。
+- **RISK-014**：`COOKIES` 环境变量可能仍指向旧的 cookies 文件；端到端验证时用
+  `--cookies-file cookies.txt` 显式指定刚导出的文件。
 
 ## 验证方式
 

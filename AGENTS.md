@@ -12,7 +12,8 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
 
 - Thin entry: `src/export_to_obsidian.py` -> `src/app/cli.py`
 - Platform modules (all registered in the CLI): `bangumi`, `bilibili`, `cnblog`,
-  `github`, `qireader`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in `src/<platform>/exporter.py`
+  `github`, `qireader`, `netease`, `twitter`, `v2ex`, `weibo`, `zhihu`, each orchestrated in
+  `src/<platform>/exporter.py`; `netease` is database-only and writes no Markdown.
 - Shared runtime: `src/export_runtime/` (index_writer, exporter_support, http) and
   `src/db/` (append-only SQLite raw response layer)
 - Common utilities: `src/utils/`, `src/entity/`
@@ -45,7 +46,7 @@ into Obsidian-friendly Markdown files. The CLI entry point is `eto`.
 
 ## Tech stack
 
-- Python >= 3.12, click (CLI), requests (HTTP)
+- Python >= 3.12, click (CLI), requests (HTTP), pycryptodome (NetEase weapi AES)
 - stdlib `sqlite3` for the append-only raw response database (no ORM, no Alembic)
 - beautifulsoup4 / html2text / markdownify (HTML to Markdown), python-frontmatter
 - Poetry packaging (pyproject.toml, poetry-core backend), `[tool.poetry.scripts] eto`
@@ -89,12 +90,15 @@ ruff format src tests                          # apply formatting
   `qireader(-t -o [--force])`, `v2ex(-o [--force])`,
   `twitter(-o [--force] [--max-pages] [--bookmarks] [--full])`, `zhihu(-c -o [--force])`,
   `weibo(-u -o [--force])`, `bilibili(-f -o [--force])`, `github(-t -o [--force])`,
-  `import-markdown(<path>)`, `db rebuild(<platform>)`.
+  `netease(-u [--force])`, `import-markdown(<path>)`, `db rebuild(<platform>)`.
 - `-o` is required unless `--db-only`; `-t` is required for bangumi/github unless
   `--db-only`. Missing values raise `UsageError`.
 - `twitter --bookmarks` requires `--db-only` and only ingests data (no bookmark Markdown in
   this phase); `--full` requires `--bookmarks`. Both invalid combinations raise `UsageError`.
   Bookmark mode uses a separate `count=1` Bookmarks probe instead of the Likes probe.
+- `netease` requires `--db-only` for the same reason (v1 writes no Markdown); `--uid` only
+  overrides/validates the uid auto-detected from the account endpoint, and `--force`
+  disables playlist-detail pruning.
 - `--force` is available on every export subcommand. Outside `--db-only` it overwrites
   existing Markdown; under `--db-only` it disables incremental pruning and fetches the full
   scope again. For `twitter --bookmarks` it implies `--full` and ignores the saved checkpoint.
@@ -105,8 +109,8 @@ ruff format src tests                          # apply formatting
 `TWITTER_CSRF_TOKEN`, `TWITTER_USER_ID`. `TWITTER_CSRF_TOKEN` / `TWITTER_USER_ID`
 fall back to deriving from the cookies.txt Cookie (`ct0` / `twid`). `COOKIES` holds the
 path to a Netscape-format `cookies.txt` shared by qireader, v2ex, zhihu, weibo,
-bilibili and twitter. `GITHUB_TOKEN` is used by the github module. Optional
-notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+bilibili, twitter and netease (the `music.163.com` `MUSIC_U` Cookie). `GITHUB_TOKEN` is used
+by the github module. Optional notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
 ## Incremental / output behavior
 
@@ -136,6 +140,12 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   top. Bookmark incremental responses never feed the full-run checkpoint. A cursor-only
   empty page whose bottom cursor repeats the request cursor marks the list end and keeps the
   run `success`.
+- `netease` always fetches every playlist-list page; it never page-stops. It prunes playlist
+  details only when `track_count` / `track_update_time` match the previous projection and
+  `detail_response_id` is set. `--force` bypasses that pruning; recent plays and both ranks are
+  fetched every run. HTTP 429 stops the remaining requests and marks the run `partial`.
+  `netease_play_record` is a rolling recent-play window (about 100 per run), so history grows
+  only from the first sync onward; it never inserts into `netease_song`, and ranks stay in raw.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
   `error` set) and non-200 responses are skipped and counted; auxiliary endpoints also skip
@@ -145,6 +155,11 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   points at the producing `sync_response`, not `sync_run`. Twitter replays likes before
   bookmarks; `twitter_tweet` is the shared entity, while `twitter_like` / `twitter_bookmark`
   hold provenance and independent pruning facts (delete relations before the entity).
+  NetEase replays playlists, details, songs, then recent plays; `netease.playlists.page` is
+  filtered by `request.meta.uid`, details replace `netease_playlist_song` members with
+  placeholder songs, and `netease_play_record` keeps song snapshots without referencing
+  `netease_song`. A playlist-list `code` of 301/401/403 rolls back the platform instead of
+  clearing it.
 - Main-entity business-level no-data payloads (`v2ex` missing/null `result`, bilibili
   `code != 0`, twitter errors-only, weibo `ok != 1`) are also skipped and counted; malformed
   top-level types still roll back.
@@ -176,11 +191,14 @@ Each platform has `tests/test_<platform>.py`; shared pieces are covered by
 `test_db_raw.py`, `test_http_recorder.py`, `test_import_markdown.py`,
 `test_cli_db.py`, `test_raw_platforms.py` and `test_raw_integration.py`.
 Projection coverage lives in `tests/test_projection_schema.py`, `test_projection_base.py`
-and one `test_projection_<platform>.py` per platform.
+and one `test_projection_<platform>.py` per platform. NetEase encryption has its own
+known-vector suite in `tests/test_netease_weapi.py`.
 
 ## Non-goals
 
 - No normalized cross-platform database model; projections are per platform.
 - No Twitter bookmark Markdown export yet; `--bookmarks` only ingests data.
+- No NetEase Markdown export yet and no NetEase play-rank projection; `netease` is
+  `--db-only` and ranks stay in the raw layer.
 - No deletion detection, multi-account support, message queue / async task system, web
   service or plugin framework yet.
