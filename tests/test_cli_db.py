@@ -1725,6 +1725,63 @@ def test_cli_v2ex_tipped_force_refetches_all_pages_and_topics(
     assert run['status'] == 'success'
 
 
+def test_cli_v2ex_tipped_stops_on_repeated_page_without_max_page(
+    monkeypatch,
+    tmp_path,
+):
+    """A page without `max_page` falls back to repeated-page detection."""
+    db_path = tmp_path / 'eto.db'
+    entry = _balance_entry(1, '2026-11-18 00:00:00 +08:00')
+    pages = [
+        BalancePage(None, [entry], ['key-1']),
+        BalancePage(None, [entry], ['key-1']),
+    ]
+    page_calls = []
+    topic_calls = []
+
+    def fake_balance(page, client=None):
+        page_calls.append(page)
+        return pages[page - 1]
+
+    def fake_topic(topic_id):
+        topic_calls.append(topic_id)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                replies=0,
+                title=f'Topic {topic_id}',
+                content='body',
+                created=0,
+                last_modified=0,
+                url=f'https://www.v2ex.com/t/{topic_id}',
+            )
+        )
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
+    monkeypatch.setattr('v2ex.exporter.get_v2ex_topic_info', fake_topic)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert page_calls == [1, 2]
+    assert '余额分页返回重复数据，停止' in result.output
+    # The repeated page repeats the same entry, so its topic is scanned once.
+    assert topic_calls == [1]
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['operation'] == 'tipped'
+    assert run['status'] == 'success'
+
+
 def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)
