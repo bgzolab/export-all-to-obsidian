@@ -14,9 +14,71 @@ from export_runtime.index_writer import IndexWriter
 from utils.file_utils import get_clean_filename
 from utils.template import WebPage
 from v2ex.cilent import V2exClient
+from v2ex.entity import TopicResult
 from v2ex.mytopic import get_fav_list_topic_id_page
 from v2ex.replies import V2EX_MAX_REPLIES, fetch_all_replies
 from v2ex.topic import get_v2ex_topic_info
+
+
+def _ensure_topic_data(
+    topic_id: int,
+    client: V2exClient,
+    force: bool,
+) -> TopicResult | None:
+    """Fetch a topic's missing detail/replies, returning None when nothing to render.
+
+    Returns None in two cases: the topic is already projected under
+    ``--db-only`` (after repairing any reply gap), or fetching failed. Both
+    mean the caller can skip Markdown; failures are per-topic and marked
+    partial instead of aborting the batch.
+    """
+    try:
+        if is_db_only() and not force:
+            connection = get_database()
+            reply_count = v2ex_projection.topic_reply_count(connection, topic_id)
+            if reply_count is not None:
+                expected = min(reply_count, V2EX_MAX_REPLIES)
+                if expected > 0 and not v2ex_projection.replies_complete(
+                    connection,
+                    topic_id,
+                    expected,
+                ):
+                    total = fetch_all_replies(topic_id, client)
+                    if total < expected:
+                        print(
+                            f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
+                            f'少于 expected={expected}，可能含已删除回复',
+                        )
+                return None
+        result = get_v2ex_topic_info(topic_id)
+        if not (result and result.result):
+            mark_run_partial()
+            return None
+        topic = result.result
+        expected = min(topic.replies, V2EX_MAX_REPLIES)
+        if (
+            is_db_only()
+            and expected > 0
+            and (
+                force
+                or not v2ex_projection.replies_complete(
+                    get_database(),
+                    topic_id,
+                    expected,
+                )
+            )
+        ):
+            total = fetch_all_replies(topic_id, client)
+            if total < expected:
+                print(
+                    f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
+                    f'少于 expected={expected}，可能含已删除回复',
+                )
+        return topic
+    except Exception as exc:
+        mark_run_partial()
+        print(f'Skip v2ex topic {topic_id}: {exc}')
+        return None
 
 
 def export(
@@ -39,50 +101,9 @@ def export(
         page += 1
         for topic_id in id_list:
             try:
-                if is_db_only() and not force:
-                    connection = get_database()
-                    reply_count = v2ex_projection.topic_reply_count(
-                        connection,
-                        topic_id,
-                    )
-                    if reply_count is not None:
-                        expected = min(reply_count, V2EX_MAX_REPLIES)
-                        if expected > 0 and not v2ex_projection.replies_complete(
-                            connection,
-                            topic_id,
-                            expected,
-                        ):
-                            total = fetch_all_replies(topic_id, client)
-                            if total < expected:
-                                print(
-                                    f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
-                                    f'少于 expected={expected}，可能含已删除回复',
-                                )
-                        continue
-                result = get_v2ex_topic_info(topic_id)
-                if not (result and result.result):
-                    mark_run_partial()
+                topic = _ensure_topic_data(topic_id, client, force)
+                if topic is None:
                     continue
-                topic = result.result
-                expected = min(topic.replies, V2EX_MAX_REPLIES)
-                if (
-                    is_db_only()
-                    and expected > 0
-                    and (
-                        force
-                        or not v2ex_projection.replies_complete(
-                            get_database(),
-                            topic_id,
-                            expected,
-                        )
-                    )
-                ):
-                    total = fetch_all_replies(topic_id, client)
-                    if total < expected:
-                        print(
-                            f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
-                            f'少于 expected={expected}，可能含已删除回复',
-                        )
                 filename = get_clean_filename(f'{topic_id}-{topic.title}')
                 if stop_if_output_exists(
                     output_dir,

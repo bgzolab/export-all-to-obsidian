@@ -85,8 +85,17 @@ design: docs/design/v2ex-tipped-topics.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-005 | Pending | 从 `src/v2ex/exporter.py` 的收藏路径抽取 `_ensure_topic_data(topic_id, client, force)`，收藏导出改为调用该 helper，保持原有 Markdown、索引和失败处理行为不变。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过，确认现有收藏剪枝测试无回归。 |      |
+| TASK-005 | Completed | 从 `src/v2ex/exporter.py` 的收藏路径抽取 `_ensure_topic_data(topic_id, client, force)`，收藏导出改为调用该 helper，保持原有 Markdown、索引和失败处理行为不变。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过，确认现有收藏剪枝测试无回归。 | 2026-11-18 |
 | TASK-006 | Pending | 在 `src/v2ex/exporter.py` 实现 `export_tipped(force=False)`：余额页循环、`max_page`/重复页/1000 页保护、`thanks_page_known` 停止并标记 `partial`、合并新主题与 `tipped_topic_ids`、逐主题调用 `_ensure_topic_data`。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k tipped` 通过。 |      |
+
+#### TASK-005 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 收藏导出中的详情/回复补抓逻辑提取为 `_ensure_topic_data`，行为保持不变。
+- **逻辑变更**:
+  - **新增**: `_ensure_topic_data` 统一处理已知主题的回复缺口、详情抓取、`--force` 重抓和单主题失败隔离。
+  - **修改**（及原因）: 收藏循环改为调用 helper；异常打印和 `mark_run_partial` 移入 helper，收藏侧的 Markdown/索引异常仍由外层捕获。
+- **相关代码**: `src/v2ex/exporter.py`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_cli_db.py -q -k v2ex`，10 项通过。
 | TASK-007 | Pending | 在 `src/app/cli.py` 为 `v2ex` 增加 `--tipped`，校验必须 `--db-only`，并用 `run_action('v2ex', 'tipped', None, ...)` 调用 `export_tipped`；不创建索引写入器。 | `PYTHONPATH=src pytest tests/test_cli_db.py -q -k v2ex` 通过；新增测试覆盖无 `--db-only` 时退出码非 0、`sync_run.operation='tipped'`、页级停止后仍补旧主题、`--force` 全量、无 Markdown 写入。 |      |
 
 ### 阶段 4：文档与收尾
