@@ -44,16 +44,6 @@ def get_replies_page_info(
     return result, _reply_pages(payload)
 
 
-def get_replies_page(
-    topic_id: int,
-    page: int,
-    client: V2exClient | None = None,
-) -> list[dict[str, Any]]:
-    """Fetch one reply page, keeping the historical list-only return value."""
-    replies, _pages = get_replies_page_info(topic_id, page, client)
-    return replies
-
-
 def _reply_pages(payload: dict[str, Any]) -> int | None:
     """Read ``pagination.pages``; older responses may omit the block."""
     pagination = payload.get('pagination')

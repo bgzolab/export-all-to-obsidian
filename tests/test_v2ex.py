@@ -11,7 +11,7 @@ from urllib3.util.retry import Retry
 
 from v2ex.cilent import V2exClient
 from v2ex.mytopic import get_fav_html_with_page, get_fav_list_topic_id_page
-from v2ex.replies import fetch_all_replies, get_replies_page
+from v2ex.replies import fetch_all_replies, get_replies_page_info
 from v2ex.tipped import get_balance_page, parse_balance_page
 
 
@@ -298,7 +298,7 @@ def test_replies_page_rejects_unexpected_result(monkeypatch):
     )
 
     with pytest.raises(TypeError, match='unexpected replies result'):
-        get_replies_page(1, 1)
+        get_replies_page_info(1, 1)
 
 
 BALANCE_HTML = """
