@@ -534,7 +534,7 @@ def test_db_only_v2ex_fetches_all_pages(monkeypatch, tmp_path):
         page_calls.append(page)
         return pages[page]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -584,7 +584,7 @@ def test_db_only_v2ex_stops_on_repeated_page(monkeypatch, tmp_path):
         page_calls.append(page)
         return pages[page]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -1131,7 +1131,7 @@ def test_db_only_v2ex_skips_known_topic(monkeypatch, tmp_path):
     def fake_page(page, client=None):
         return [1] if page == 1 else []
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(result=SimpleNamespace(replies=0))
 
@@ -1193,7 +1193,7 @@ def test_db_only_v2ex_refetches_incomplete_replies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1346,7 +1346,7 @@ def test_db_only_v2ex_skips_complete_replies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1410,7 +1410,7 @@ def test_db_only_v2ex_caps_expected_replies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1471,7 +1471,7 @@ def test_db_only_v2ex_refetches_below_capped_expected(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
     monkeypatch.setattr(
         'v2ex.exporter.fetch_all_replies',
@@ -1619,7 +1619,7 @@ def test_cli_v2ex_tipped_stops_on_known_page_and_repairs_old_topics(
         page_calls.append(page)
         return pages[page - 1]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -1685,7 +1685,7 @@ def test_cli_v2ex_tipped_force_refetches_all_pages_and_topics(
         page_calls.append(page)
         return pages[page - 1]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -1745,7 +1745,7 @@ def test_cli_v2ex_tipped_stops_on_repeated_page_without_max_page(
         page_calls.append(page)
         return pages[page - 1]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         return SimpleNamespace(
             result=SimpleNamespace(
@@ -1803,7 +1803,7 @@ def test_cli_v2ex_tipped_stops_on_page_without_flow_table(monkeypatch, tmp_path)
     monkeypatch.setattr('v2ex.exporter.get_balance_page', fake_balance)
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: topic_calls.append(topic_id),
+        lambda topic_id, client=None: topic_calls.append(topic_id),
     )
 
     result = CliRunner().invoke(
@@ -1835,7 +1835,7 @@ def test_cli_v2ex_tipped_aborts_scan_after_consecutive_failures(
     def fake_balance(page, client=None):
         return pages[0]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         topic_calls.append(topic_id)
         if topic_id > 2:
             return None
@@ -3006,7 +3006,7 @@ def test_v2ex_write_error_marks_partial_and_continues(monkeypatch, tmp_path):
     def fake_page(page, client=None):
         return pages[page]
 
-    def fake_topic(topic_id):
+    def fake_topic(topic_id, client=None):
         return SimpleNamespace(
             result=SimpleNamespace(
                 title=f'Topic {topic_id}',
@@ -3061,7 +3061,7 @@ def test_v2ex_null_topic_result_marks_partial(monkeypatch, tmp_path):
     monkeypatch.setattr('v2ex.exporter.get_fav_list_topic_id_page', fake_page)
     monkeypatch.setattr(
         'v2ex.exporter.get_v2ex_topic_info',
-        lambda topic_id: SimpleNamespace(result=None),
+        lambda topic_id, client=None: SimpleNamespace(result=None),
     )
 
     result = CliRunner().invoke(

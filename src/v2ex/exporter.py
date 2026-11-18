@@ -63,7 +63,7 @@ def _ensure_topic_data(
                         expected,
                     )
                 return None, False
-        result = get_v2ex_topic_info(topic_id)
+        result = get_v2ex_topic_info(topic_id, client)
         if not (result and result.result):
             mark_run_partial()
             return None, True

@@ -13,6 +13,7 @@ from v2ex.cilent import V2exClient
 from v2ex.mytopic import get_fav_html_with_page, get_fav_list_topic_id_page
 from v2ex.replies import fetch_all_replies, get_replies_page_info
 from v2ex.tipped import get_balance_page, parse_balance_page
+from v2ex.topic import get_v2ex_topic_info
 
 
 def _write_cookies_file(tmp_path, line):
@@ -470,6 +471,30 @@ def test_balance_page_reuses_client_and_records_page(monkeypatch):
 
     assert len(page.thanks) == 2
     assert calls == [('v2ex.balance.page', 1)]
+
+
+def test_topic_info_reuses_the_given_client(monkeypatch):
+    """A backfill builds one client, so details must not rebuild it per topic."""
+    session = object()
+    seen = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {'success': True, 'result': {'id': 1, 'title': 'Topic'}}
+
+    def fake_get(given_session, url, *, endpoint, **kwargs):
+        seen.append((given_session, endpoint))
+        return FakeResponse()
+
+    monkeypatch.setattr('v2ex.topic.V2exClient', lambda: pytest.fail('rebuilt client'))
+    monkeypatch.setattr('v2ex.topic.http.get', fake_get)
+
+    response = get_v2ex_topic_info(1, SimpleNamespace(session=session))
+
+    assert response.result.id == 1
+    assert seen == [(session, 'v2ex.topic.detail')]
 
 
 def test_balance_page_detects_signin_redirect(monkeypatch):
