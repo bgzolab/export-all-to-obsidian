@@ -180,7 +180,7 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 
 - `/balance` 非 200：由 `raise_for_status()` 抛出，run 失败，不重建投影。
 - signin 页：抓取阶段抛 `RuntimeError`；投影阶段抛 `ValueError` 并整体回滚，避免清空已有感谢记录。
-- 缺少 `table.data` 的余额页（维护页、风控页）：抓取阶段无法区分，交由 `has_table=False` 标记；`export_tipped` 打印警告、标记 `partial` 并结束翻页。raw 仍保留该页，修好解析后可 `eto db rebuild v2ex`。
+- 缺少 `table.data` 的余额页（维护页、风控页）：抓取阶段无法区分，交由 `has_table=False` 标记；`export_tipped` 打印警告、标记 `partial` 并结束翻页。raw 仍保留该页，修好解析后可 `eto db rebuild v2ex`。翻页中止后**主题扫描照常执行**：HTML 异常不代表 API 异常，继续扫描仍可能补齐详情/回复，失败量由连续失败中止兜底。
 - 单个主题详情 404/403/网络错误：`_ensure_topic_data` 标记 `partial`，跳过该主题，下一轮继续。
 - 连续 10 个主题抓取失败：`export_tipped` 停止本轮剩余扫描（run 已因上述失败标记为 `partial`）。客户端对 429 会走满 5 次重试退避，单个主题失败约 6 次请求、30 秒；不中止时 600+ 个主题会对着限流端点空转数小时。剩余主题在下一轮配额恢复后收敛。
 - 被删除的主题：保留 `v2ex_thanks` 行，主题详情持续缺失，run 保持 `partial`；不做删除检测。

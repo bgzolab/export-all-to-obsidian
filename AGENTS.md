@@ -140,7 +140,9 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   scan (the run is already `partial`): each failure has already burned the client retry
   backoff, so continuing would only hammer the throttled endpoint; remaining topics converge
   on a later run. The threshold does not distinguish 429 from permanently missing topics, so a
-  run of ten distinct deleted topics can end every scan at the same point.
+  run of ten distinct deleted topics can end every scan at the same point. A balance page
+  without the flow table stops paging (`partial`) but still scans the tipped topics: a broken
+  HTML page does not imply a broken API.
 - `twitter --bookmarks` (default incremental) starts at the top and stops when a whole page is
   already in `twitter_bookmark`; that run is `partial`. `--full` derives its resume cursor from
   the latest `sync_run.scope='full'` bookmark response, never page-stops, and is `partial` on
