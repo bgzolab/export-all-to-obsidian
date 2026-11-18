@@ -31,8 +31,17 @@ design: docs/design/v2ex-tipped-topics.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-001 | Pending | 在 `src/v2ex/api_endpoints.py` 增加 `V2EX_BALANCE`；新建 `src/v2ex/tipped.py`，实现 `ThanksEntry`、`BalancePage`、`parse_balance_page`、`get_balance_page`、`V2EX_MAX_BALANCE_PAGES`，使用 `v2ex.balance.page` endpoint，处理 signin、`max_page`、`transaction_keys`。 | `PYTHONPATH=src pytest tests/test_v2ex.py -q` 通过；新增解析测试覆盖回复感谢、主题感谢、非感谢行、空感谢页和 signin。 |      |
+| TASK-001 | Completed | 在 `src/v2ex/api_endpoints.py` 增加 `V2EX_BALANCE`；新建 `src/v2ex/tipped.py`，实现 `ThanksEntry`、`BalancePage`、`parse_balance_page`、`get_balance_page`、`V2EX_MAX_BALANCE_PAGES`，使用 `v2ex.balance.page` endpoint，处理 signin、`max_page`、`transaction_keys`。 | `PYTHONPATH=src pytest tests/test_v2ex.py -q` 通过；新增解析测试覆盖回复感谢、主题感谢、非感谢行、空感谢页和 signin。 | 2026-11-18 |
 | TASK-002 | Pending | 在 `tests/test_v2ex.py` 补充解析/抓取测试；在 `tests/test_raw_platforms.py` 增加 `v2ex.balance.page` endpoint 断言。 | `PYTHONPATH=src pytest tests/test_v2ex.py tests/test_raw_platforms.py -q` 通过。 |      |
+
+#### TASK-001 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增 V2EX 余额流水抓取与解析模块，可识别“发送谢意”的回复/主题记录。
+- **逻辑变更**:
+  - **新增**: `src/v2ex/tipped.py` 提供 `ThanksEntry`、`BalancePage`、`parse_balance_page`、`get_balance_page` 和 `V2EX_MAX_BALANCE_PAGES`；`V2EX_BALANCE` 端点常量；解析测试覆盖回复感谢、主题感谢、非感谢行、缺主题链接、空页、页数上限和 signin。
+  - **修改**（及原因）: 无既有逻辑改动；`api_endpoints.py` 仅追加余额页 URL。
+- **相关代码**: `src/v2ex/tipped.py`、`src/v2ex/api_endpoints.py`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_v2ex.py -q`，21 项通过。
 
 ### 阶段 2：迁移与投影
 
