@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import click
 import pytest
 import requests
 
@@ -262,6 +263,8 @@ class FakeNeteaseClient:
 
     def get_account(self):
         self.calls.append(('account',))
+        if isinstance(self.account, Exception):
+            raise self.account
         return self.account
 
     def list_playlists(self, uid, *, limit, offset):
@@ -563,3 +566,58 @@ def test_sync_stops_at_playlist_page_cap(monkeypatch, capsys):
     assert len(playlist_calls) == 20
     assert partial
     assert '页上限' in capsys.readouterr().out
+
+
+def test_sync_falls_back_to_profile_user_id(monkeypatch):
+    client = FakeNeteaseClient(
+        account={'code': 200, 'account': None, 'profile': {'userId': 77}},
+    )
+    exporter, _ = _install_exporter(monkeypatch, client)
+
+    exporter.sync()
+
+    assert client.calls[1] == ('playlists', 77, 1000, 0)
+
+
+def test_sync_uid_mismatch_raises_without_fetching(monkeypatch):
+    client = FakeNeteaseClient()
+    exporter, partial = _install_exporter(monkeypatch, client)
+
+    with pytest.raises(click.ClickException, match='不一致'):
+        exporter.sync(uid=7)
+
+    assert client.calls == [('account',)]
+    assert partial == []
+
+
+def test_sync_empty_account_raises_without_fetching(monkeypatch):
+    client = FakeNeteaseClient(
+        account={'code': 200, 'account': None, 'profile': None},
+    )
+    exporter, partial = _install_exporter(monkeypatch, client)
+
+    with pytest.raises(click.ClickException, match='无法识别'):
+        exporter.sync()
+
+    assert client.calls == [('account',)]
+    assert partial == []
+
+
+def test_sync_account_http_error_raises_click_exception(monkeypatch):
+    client = FakeNeteaseClient(
+        account=NeteaseClientError('HTTP 500', status_code=500),
+    )
+    exporter, _ = _install_exporter(monkeypatch, client)
+
+    with pytest.raises(click.ClickException, match='账号校验失败'):
+        exporter.sync()
+
+
+def test_sync_account_business_error_raises_click_exception(monkeypatch):
+    client = FakeNeteaseClient(
+        account={'code': 301, 'message': 'need login'},
+    )
+    exporter, _ = _install_exporter(monkeypatch, client)
+
+    with pytest.raises(click.ClickException, match='code=301'):
+        exporter.sync()

@@ -2690,3 +2690,106 @@ def test_cli_netease_defaults_uid_and_force(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert called == {'uid': None, 'force': False}
+
+
+def test_cli_netease_uid_mismatch_marks_run_failed(monkeypatch, tmp_path):
+    from netease import exporter as netease_exporter
+
+    class FakeClient:
+        def get_account(self):
+            return {
+                'code': 200,
+                'account': {'id': 42},
+                'profile': {'userId': 42},
+            }
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr(netease_exporter, 'NeteaseClient', lambda: FakeClient())
+    db_path = str(tmp_path / 'eto.db')
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease', '-u', '7'],
+    )
+
+    assert result.exit_code == 1
+    assert '不一致' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'failed'
+    assert 'ClickException' in run['error'] or '不一致' in run['error']
+
+
+def test_cli_netease_empty_account_marks_run_failed(monkeypatch, tmp_path):
+    from netease import exporter as netease_exporter
+
+    class FakeClient:
+        def get_account(self):
+            return {'code': 200, 'account': None, 'profile': None}
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr(netease_exporter, 'NeteaseClient', lambda: FakeClient())
+    db_path = str(tmp_path / 'eto.db')
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease'],
+    )
+
+    assert result.exit_code == 1
+    assert '无法识别' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'failed'
+
+
+def test_cli_netease_resource_failure_marks_run_partial(monkeypatch, tmp_path):
+    from netease import exporter as netease_exporter
+    from netease.client import NeteaseClientError
+
+    class FakeClient:
+        def get_account(self):
+            return {
+                'code': 200,
+                'account': {'id': 42},
+                'profile': {'userId': 42},
+            }
+
+        def list_playlists(self, uid, *, limit, offset):
+            return {'code': 200, 'playlist': [], 'more': False}
+
+        def get_recent_plays(self, *, limit):
+            raise NeteaseClientError('HTTP 500', status_code=500)
+
+        def get_play_rank(self, uid, kind, *, limit, offset=0):
+            return {'code': 200}
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr(netease_exporter, 'NeteaseClient', lambda: FakeClient())
+    monkeypatch.setattr(netease_exporter, '_playlist_states', dict)
+    db_path = str(tmp_path / 'eto.db')
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease'],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'

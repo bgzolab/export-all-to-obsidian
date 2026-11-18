@@ -89,7 +89,16 @@ design: docs/design/netease-music.md
   - **修改**: `src/app/cli.py` 导入 `probe_netease_credentials` 与 `netease.exporter.sync`；`tests/test_cli_db.py` 增加非 db-only 拒绝、uid/force 透传、run 行断言。
 - **相关代码**: `run_action('netease', 'sync', None, ...)`；v1 无 Markdown/索引输出。
 - **验证结果**: `tests/test_cli_db.py` + `tests/test_netease.py` 94 项通过；ruff check/format 通过。
-| TASK-006 | Pending | 补齐 exporter 与 CLI 测试：账号 uid 自动识别、`--uid` 不一致拒绝、空账号报错、单个歌单失败后继续、历史/排行失败不影响其他数据。 | `PYTHONPATH=src pytest tests/test_netease.py tests/test_cli_db.py -q`；断言失败路径 `sync_run.status='partial'` 或命令非零退出。 | |
+| TASK-006 | Completed | 补齐 exporter 与 CLI 测试：账号 uid 自动识别、`--uid` 不一致拒绝、空账号报错、单个歌单失败后继续、历史/排行失败不影响其他数据。 | `PYTHONPATH=src pytest tests/test_netease.py tests/test_cli_db.py -q`；断言失败路径 `sync_run.status='partial'` 或命令非零退出。 | 2026-11-18 |
+
+#### TASK-006 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 补齐账号校验失败、uid 不一致、空账号与 partial 传播的 exporter/CLI 测试。
+- **逻辑变更**:
+  - **新增**: `profile.userId` 回退、uid 不一致不发起数据请求、空账号报错、账号 HTTP/业务错误测试；CLI 层 uid 不一致/空账号 `failed`、资源失败 `partial` 测试。
+  - **修改**: `tests/test_netease.py` 的 fake 客户端支持账号异常；`tests/test_cli_db.py` 增加三条 CLI 失败路径。
+- **相关代码**: `netease.exporter.sync`、`app.cli.netease`、`app.context.run_action`。
+- **验证结果**: `tests/test_netease.py` + `tests/test_cli_db.py` 102 项通过；ruff check/format 通过。
 
 ### 阶段 3：迁移与投影
 
