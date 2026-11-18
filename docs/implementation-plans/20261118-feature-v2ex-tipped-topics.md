@@ -58,8 +58,17 @@ design: docs/design/v2ex-tipped-topics.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-003 | Pending | 新建 `src/db/migrations/004_v2ex_thanks.sql`，创建 `v2ex_thanks` 表、主键和 `idx_v2ex_thanks_topic` 索引；更新 `tests/test_projection_schema.py` 的表集合、索引集合、平台时间列和 `user_version = 4`。 | `PYTHONPATH=src pytest tests/test_projection_schema.py -q` 通过。 |      |
+| TASK-003 | Completed | 新建 `src/db/migrations/004_v2ex_thanks.sql`，创建 `v2ex_thanks` 表、主键和 `idx_v2ex_thanks_topic` 索引；更新 `tests/test_projection_schema.py` 的表集合、索引集合、平台时间列和 `user_version = 4`。 | `PYTHONPATH=src pytest tests/test_projection_schema.py -q` 通过。 | 2026-11-18 |
 | TASK-004 | Pending | 修改 `src/db/projections/v2ex.py`：增加 `THANKS_ENDPOINT`，把 `v2ex_thanks` 加入 `DELETE_ORDER`，回放 `v2ex.balance.page`，实现 `_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；signin 页抛出 `ValueError` 触发整体回滚。 | `PYTHONPATH=src pytest tests/test_projection_v2ex.py -q` 通过；新增测试覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚和两个 helper。 |      |
+
+#### TASK-003 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 新增 `v2ex_thanks` 迁移表及索引，迁移版本升至 4。
+- **逻辑变更**:
+  - **新增**: `src/db/migrations/004_v2ex_thanks.sql`，包含交易级主键、`content_kind` 约束和 `topic_id` 索引。
+  - **修改**（及原因）: `tests/test_projection_schema.py` 登记新表/索引/时间列和版本；`tests/test_db_schema.py` 的版本断言同步改为 4，否则迁移生效后既有 schema 测试会失败。
+- **相关代码**: `src/db/migrations/004_v2ex_thanks.sql`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_projection_schema.py tests/test_db_schema.py -q`，18 项通过。
 
 ### 阶段 3：导出器与 CLI
 
