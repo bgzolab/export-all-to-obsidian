@@ -1785,8 +1785,13 @@ def test_cli_v2ex_tipped_stops_on_repeated_page_without_max_page(
 
 
 def test_cli_v2ex_tipped_stops_on_page_without_flow_table(monkeypatch, tmp_path):
-    """A maintenance page must not look like a complete, empty history."""
+    """A maintenance page stops paging but the tipped scan still runs."""
     db_path = tmp_path / 'eto.db'
+    entries = [_balance_entry(i, '2026-11-01 00:00:00 +08:00') for i in (1, 2)]
+    connection = connect(db_path)
+    _seed_v2ex_thanks(connection, entries)
+    connection.close()
+
     pages = [BalancePage(None, [], [], has_table=False)]
     page_calls = []
     topic_calls = []
@@ -1813,7 +1818,7 @@ def test_cli_v2ex_tipped_stops_on_page_without_flow_table(monkeypatch, tmp_path)
 
     assert result.exit_code == 0, result.output
     assert page_calls == [1]
-    assert topic_calls == []
+    assert sorted(topic_calls) == [1, 2]
     assert '缺少流水表' in result.output
     run = _query_one(
         db_path,
