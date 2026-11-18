@@ -59,7 +59,16 @@ design: docs/design/v2ex-tipped-topics.md
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
 | TASK-003 | Completed | 新建 `src/db/migrations/004_v2ex_thanks.sql`，创建 `v2ex_thanks` 表、主键和 `idx_v2ex_thanks_topic` 索引；更新 `tests/test_projection_schema.py` 的表集合、索引集合、平台时间列和 `user_version = 4`。 | `PYTHONPATH=src pytest tests/test_projection_schema.py -q` 通过。 | 2026-11-18 |
-| TASK-004 | Pending | 修改 `src/db/projections/v2ex.py`：增加 `THANKS_ENDPOINT`，把 `v2ex_thanks` 加入 `DELETE_ORDER`，回放 `v2ex.balance.page`，实现 `_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；signin 页抛出 `ValueError` 触发整体回滚。 | `PYTHONPATH=src pytest tests/test_projection_v2ex.py -q` 通过；新增测试覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚和两个 helper。 |      |
+| TASK-004 | Completed | 修改 `src/db/projections/v2ex.py`：增加 `THANKS_ENDPOINT`，把 `v2ex_thanks` 加入 `DELETE_ORDER`，回放 `v2ex.balance.page`，实现 `_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；signin 页抛出 `ValueError` 触发整体回滚。 | `PYTHONPATH=src pytest tests/test_projection_v2ex.py -q` 通过；新增测试覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚和两个 helper。 | 2026-11-18 |
+
+#### TASK-004 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 余额页 raw 响应可投影到 `v2ex_thanks`，并提供页级已知判断和已感谢主题查询。
+- **逻辑变更**:
+  - **新增**: `THANKS_ENDPOINT`、`_upsert_thanks`、`thanks_page_known`、`tipped_topic_ids`；余额页 signin 检测触发整体回滚。
+  - **修改**（及原因）: `DELETE_ORDER` 加入 `v2ex_thanks`，全量重建时先清空旧投影；测试表集合同步。
+- **相关代码**: `src/db/projections/v2ex.py`、`tests/test_projection_v2ex.py`
+- **验证结果**: `PYTHONPATH=src .venv/bin/pytest tests/test_projection_v2ex.py -q`，15 项通过。
 
 #### TASK-003 执行记录
 - **状态**: 已完成（2026-11-18）

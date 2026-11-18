@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -8,11 +9,51 @@ from db.connection import connect
 from db.projections import ProjectionError, rebuild_platform
 from db.projections.v2ex import (
     replies_complete,
+    thanks_page_known,
+    tipped_topic_ids,
     topic_reply_count,
 )
 from tests.projection_helpers import business_rows, record_json, record_text
+from v2ex.tipped import parse_balance_page
 
-TABLES = ('v2ex_reply', 'v2ex_favorite', 'v2ex_topic')
+TABLES = ('v2ex_reply', 'v2ex_favorite', 'v2ex_topic', 'v2ex_thanks')
+
+THANKS_HTML = """
+<table class="data">
+    <tr>
+        <th>时间</th>
+        <th>类型</th>
+        <th>金额</th>
+        <th>余额</th>
+        <th>描述</th>
+    </tr>
+    <tr>
+        <td>2026-11-18 10:00:00 +08:00</td>
+        <td>发送谢意</td>
+        <td>-10.0</td>
+        <td>1234.50</td>
+        <td>感谢 <a href="/member/alice">alice</a> 的回复
+            <span class="fade">›</span>
+            <a href="/t/1">Topic one</a></td>
+    </tr>
+    <tr>
+        <td>2026-11-17 09:00:00 +08:00</td>
+        <td>发送谢意</td>
+        <td>-15.0</td>
+        <td>1244.50</td>
+        <td>感谢 <a href="/member/bob">bob</a> 的主题
+            <span class="fade">›</span>
+            <a href="/t/2">Topic two</a></td>
+    </tr>
+    <tr>
+        <td>2026-11-16 08:00:00 +08:00</td>
+        <td>每日登录奖励</td>
+        <td>19.0</td>
+        <td>1259.50</td>
+        <td>20261116 的每日登录奖励 19 铜币</td>
+    </tr>
+</table>
+"""
 
 FAV_HTML = """
 <a href="/t/1">one</a>
@@ -248,6 +289,123 @@ def test_projection_helpers_report_known_rows():
     assert replies_complete(connection, 1, 2) is True
     assert replies_complete(connection, 1, 3) is False
     assert replies_complete(connection, 99, 1) is False
+    connection.close()
+
+
+def test_rebuild_projects_thanks_transactions():
+    connection = connect(':memory:')
+    response_id = record_text(
+        connection,
+        'v2ex.balance.page',
+        THANKS_HTML,
+        request={'url': 'https://www.v2ex.com/balance', 'params': {'p': 1}},
+    )
+
+    result = rebuild_platform(connection, 'v2ex')
+
+    thanks = business_rows(connection, ('v2ex_thanks',))['v2ex_thanks']
+    assert result.responses == 1
+    assert result.rows == 2
+    assert [
+        (
+            row['thanked_at'],
+            row['topic_id'],
+            row['content_kind'],
+            row['member'],
+            row['amount'],
+            row['balance'],
+            row['topic_title'],
+        )
+        for row in thanks
+    ] == [
+        (
+            '2026-11-18 10:00:00 +08:00',
+            1,
+            'reply',
+            'alice',
+            -10.0,
+            1234.5,
+            'Topic one',
+        ),
+        (
+            '2026-11-17 09:00:00 +08:00',
+            2,
+            'topic',
+            'bob',
+            -15.0,
+            1244.5,
+            'Topic two',
+        ),
+    ]
+    assert all(row['response_id'] == response_id for row in thanks)
+    assert '感谢 alice 的回复' in thanks[0]['description']
+    connection.close()
+
+
+def test_duplicate_balance_pages_are_idempotent():
+    connection = connect(':memory:')
+    record_text(connection, 'v2ex.balance.page', THANKS_HTML)
+    record_text(connection, 'v2ex.balance.page', THANKS_HTML)
+
+    rebuild_platform(connection, 'v2ex')
+    first = business_rows(connection, ('v2ex_thanks',))['v2ex_thanks']
+    rebuild_platform(connection, 'v2ex')
+    second = business_rows(connection, ('v2ex_thanks',))['v2ex_thanks']
+
+    assert len(first) == 2
+    assert first == second
+    connection.close()
+
+
+def test_signin_balance_page_rolls_back_thanks():
+    connection = connect(':memory:')
+    record_text(connection, 'v2ex.balance.page', THANKS_HTML)
+    rebuild_platform(connection, 'v2ex')
+    before = business_rows(connection, TABLES)
+
+    record_text(
+        connection,
+        'v2ex.balance.page',
+        '<html><form action="/signin" method="post"></form></html>',
+    )
+
+    with pytest.raises(ProjectionError, match='signin'):
+        rebuild_platform(connection, 'v2ex')
+
+    assert business_rows(connection, TABLES) == before
+    connection.close()
+
+
+def test_thanks_helpers_report_known_rows():
+    connection = connect(':memory:')
+    record_text(connection, 'v2ex.balance.page', THANKS_HTML)
+    rebuild_platform(connection, 'v2ex')
+    page = parse_balance_page(THANKS_HTML)
+
+    assert thanks_page_known(connection, page.thanks) is True
+    assert thanks_page_known(connection, page.thanks[:1]) is True
+    assert thanks_page_known(connection, []) is False
+    assert thanks_page_known(connection, [replace(page.thanks[0], balance=1.0)]) is False
+    assert thanks_page_known(connection, [replace(page.thanks[0], member='other')]) is False
+    assert tipped_topic_ids(connection) == [1, 2]
+
+    record_text(
+        connection,
+        'v2ex.balance.page',
+        """
+        <table class="data">
+            <tr><td>2026-11-19 10:00:00 +08:00</td><td>发送谢意</td>
+                <td>-10.0</td><td>100.0</td>
+                <td>感谢 <a href="/member/carol">carol</a> 的主题
+                    <a href="/t/1">Topic one</a></td></tr>
+        </table>
+        """,
+    )
+    rebuild_platform(connection, 'v2ex')
+
+    # Same topic thanked as a topic also dedupes, and the newest transaction
+    # moves it to the front without duplicating the id.
+    assert tipped_topic_ids(connection) == [1, 2]
     connection.close()
 
 
