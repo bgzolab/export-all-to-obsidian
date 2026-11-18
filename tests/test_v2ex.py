@@ -394,6 +394,23 @@ def test_parse_balance_page_without_table_is_empty():
     assert page.max_page is None
 
 
+def test_parse_balance_page_requires_the_member_prefix():
+    """A description must start with the thanks prefix to be classified."""
+    page = parse_balance_page(
+        """
+        <table class="data">
+            <tr><td>2026-11-17 09:00:00 +08:00</td><td>发送谢意</td>
+                <td>-15.0</td><td>1244.5</td>
+                <td>备注 感谢 <a href="/member/bob">bob</a> 的回复
+                    <a href="/t/202">Topic</a></td></tr>
+        </table>
+        """
+    )
+
+    assert page.thanks == []
+    assert len(page.transaction_keys) == 1
+
+
 def test_parse_balance_page_keeps_topic_thanks_when_title_mentions_reply():
     """A topic title containing "的回复" must not flip the kind to reply."""
     page = parse_balance_page(

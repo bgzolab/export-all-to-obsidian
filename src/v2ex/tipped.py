@@ -142,7 +142,7 @@ def _parse_thanks_row(
     if match is None:
         return None
 
-    kind_match = _MEMBER_PATTERN.search(description)
+    kind_match = _MEMBER_PATTERN.match(description)
     if kind_match is None:
         return None
     content_kind = 'reply' if kind_match.group(2) == '回复' else 'topic'
