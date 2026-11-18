@@ -376,6 +376,18 @@ def test_signin_balance_page_rolls_back_thanks():
     connection.close()
 
 
+def test_balance_page_without_table_warns_during_rebuild(capsys):
+    connection = connect(':memory:')
+    record_text(
+        connection, 'v2ex.balance.page', '<html><body>maintenance</body></html>'
+    )
+
+    rebuild_platform(connection, 'v2ex')
+
+    assert '缺少流水表' in capsys.readouterr().out
+    connection.close()
+
+
 def test_thanks_helpers_report_known_rows():
     connection = connect(':memory:')
     record_text(connection, 'v2ex.balance.page', THANKS_HTML)

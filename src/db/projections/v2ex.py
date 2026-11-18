@@ -151,8 +151,13 @@ def _upsert_thanks(
     html = body.decode('utf-8', errors='replace')
     if is_signin_page(html):
         raise ValueError('signin page instead of balance')
+    page = parse_balance_page(html)
+    if not page.has_table or not page.transaction_keys:
+        # 重建侧也要可见：异常页会安静地回放成 0 行，和真正的空历史无法区分。
+        reason = '缺少流水表' if not page.has_table else '解析不出任何流水'
+        print(f'警告: 余额页响应 id={response_id} {reason}，HTML 结构可能变化')
     rows = 0
-    for entry in parse_balance_page(html).thanks:
+    for entry in page.thanks:
         rows += upsert(
             connection,
             'v2ex_thanks',
