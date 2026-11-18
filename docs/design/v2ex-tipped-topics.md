@@ -216,6 +216,7 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 - **RISK-006**：余额页只提供主题链接，不提供回复 ID；无法精确知道感谢的是哪条回复。
 - **RISK-007**：同一秒、同一成员、同一主题的多笔感谢理论上可能主键冲突；用 `balance` 纳入主键降低概率，仍非绝对唯一。
 - **RISK-008**：`v2ex_thanks` 使 V2EX 表数量超过 3 张，需要在 `projection-layer.md` 中明确记录例外，避免后续误判。
+- **RISK-009**：连续失败中止是通用阈值，不区分 429 与被删除主题（`get_v2ex_topic_info` 对非 200 一律返回 `None`）。若同一时段连续 10 个不同主题被删除，其后主题每轮都会在同一位置中止；概率很低（同一主题的多次感谢已按 `topic_id` 去重），需要时再为 429 单独判定。
 
 ## 验证方式
 

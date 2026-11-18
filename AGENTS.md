@@ -139,7 +139,8 @@ notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
   quota; topic details/replies do. Ten consecutive topic fetch failures abort the rest of the
   scan (the run is already `partial`): each failure has already burned the client retry
   backoff, so continuing would only hammer the throttled endpoint; remaining topics converge
-  on a later run.
+  on a later run. The threshold does not distinguish 429 from permanently missing topics, so a
+  run of ten distinct deleted topics can end every scan at the same point.
 - `twitter --bookmarks` (default incremental) starts at the top and stops when a whole page is
   already in `twitter_bookmark`; that run is `partial`. `--full` derives its resume cursor from
   the latest `sync_run.scope='full'` bookmark response, never page-stops, and is `partial` on
