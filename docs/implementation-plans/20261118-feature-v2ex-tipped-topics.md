@@ -142,7 +142,16 @@ design: docs/design/v2ex-tipped-topics.md
   - **修改**（及原因）: 原“v2ex 无整页已知停止”收窄为“v2ex favourites”，避免与 `--tipped` 行为冲突。
 - **相关代码**: `AGENTS.md`
 - **验证结果**: `grep -n "tipped\|v2ex_thanks" AGENTS.md` 命中 CLI 契约、增量和非目标条目。
-| TASK-010 | Pending | 更新 `README.md` 增加 `eto --db-only v2ex --tipped` 示例；更新 `docs/design/projection-layer.md` 增加 `v2ex_thanks`、`thanked_at` 时间列和 V2EX 4 张表的例外说明；更新 `docs/design/incremental-pruning.md` 增加投币页级停止 + 主题全量扫描的理由。 | 三份文档中均能检索到 `v2ex_thanks` 或 `--tipped`，且与设计文档一致。 |      |
+| TASK-010 | Completed | 更新 `README.md` 增加 `eto --db-only v2ex --tipped` 示例；更新 `docs/design/projection-layer.md` 增加 `v2ex_thanks`、`thanked_at` 时间列和 V2EX 4 张表的例外说明；更新 `docs/design/incremental-pruning.md` 增加投币页级停止 + 主题全量扫描的理由。 | 三份文档中均能检索到 `v2ex_thanks` 或 `--tipped`，且与设计文档一致。 | 2026-11-18 |
+
+#### TASK-010 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: README 与两份设计文档已同步投币落库的数据模型和增量语义。
+- **逻辑变更**:
+  - **新增**: README 的 `--tipped` 示例；`projection-layer.md` 的 `v2ex_thanks` 表、`thanked_at` 时间列、接口顺序和 4 表例外；`incremental-pruning.md` 的投币页级停止与全量主题扫描理由。
+  - **修改**（及原因）: 设计文档状态改为“已实现”；V2EX signin 回滚说明覆盖余额页。
+- **相关代码**: `README.md`、`docs/design/projection-layer.md`、`docs/design/incremental-pruning.md`、`docs/design/v2ex-tipped-topics.md`
+- **验证结果**: 三份文档均检索到 `v2ex_thanks` / `--tipped`，且与 `docs/design/v2ex-tipped-topics.md` 一致。
 | TASK-011 | Pending | 运行完整相关测试与 Ruff，更新本计划任务的 Status/Date，记录执行结果。 | `ruff check src tests`、`ruff format --check src tests`、`PYTHONPATH=src pytest tests/test_v2ex.py tests/test_projection_v2ex.py tests/test_projection_schema.py tests/test_cli_db.py tests/test_raw_platforms.py -q` 全部通过。 |      |
 
 ## 涉及文件

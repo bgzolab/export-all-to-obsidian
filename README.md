@@ -70,6 +70,12 @@ Ingest X bookmarks into the database (incremental by default, `--full` to resume
 eto --db-only twitter --bookmarks
 ```
 
+Ingest V2EX topics you sent thanks for (tipped) into the database:
+
+```shell
+eto --db-only v2ex --tipped
+```
+
 Rebuild a platform's projection from existing raw responses:
 
 ```shell

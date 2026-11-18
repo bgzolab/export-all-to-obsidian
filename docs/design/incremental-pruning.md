@@ -91,9 +91,10 @@ Stage 2 假设每个列表按平台时间稳定地新数据在前，且已有行
 | bangumi | likely updated_at desc (verify) | medium |
 
 Stage 2 已接入 github、bilibili、twitter、weibo、zhihu、cnblog、bangumi、qireader。
-v2ex 只在收藏页整页重复上一页时停止（越界分页，视为列表已枚举完），run 保持
-`success`；“整页已知”式停止仍暂缓：停止收藏页分页需要全局 replies pending gate，
-否则可能把未完成的回复抓取永久锁在更深页。
+v2ex 收藏页只在整页重复上一页时停止（越界分页，视为列表已枚举完），run 保持
+`success`；收藏的“整页已知”式停止仍暂缓：停止收藏页分页需要全局 replies pending gate，
+否则可能把未完成的回复抓取永久锁在更深页。`v2ex --tipped` 的余额页级停止不受此限制，
+见下。
 
 因为存在 medium-risk 平台，Stage 2 使用“整页已知”而不是“遇到第一个已知条目”：
 
@@ -119,6 +120,20 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
 - 只有 cursor、且 bottom cursor 与请求 cursor 相同的空页表示列表末尾，按 `success` 结束。
 - 点赞剪枝查 `twitter_like`，书签剪枝查 `twitter_bookmark`，两者互不污染。
 - 关系表 `twitter_bookmark` 是剪枝事实来源；`twitter_tweet` 仅保存共享 Tweet 内容。
+
+### V2EX 投币模式（--tipped）
+
+投币主题只入库，不参与 Markdown 导出：
+
+- 余额页按时间倒序且分页稳定；当整页 `发送谢意` 交易都已存在 `v2ex_thanks` 时停止
+  翻页，run 标记 `partial`，下次仍从第 1 页开始。
+- 页级停止只负责发现新感谢，不判断主题详情/回复是否完整。停止翻页后必须继续扫描
+  `tipped_topic_ids` 的全部主题；否则第 1 页全部命中时，上一轮因 600 次/小时 API
+  配额未补齐的旧主题会被永久跳过。这是与收藏页剪枝最关键的区别。
+- `--force` 关闭余额页和主题详情/回复剪枝，重抓完整余额页及全部主题。
+- 余额页没有 `max_page` 时，用 `transaction_keys` 与上一页比较检测重复末页，并用
+  1000 页上限兜底。
+- 余额页是 HTML，不占 V2EX API 2.0 配额；主题详情和回复占配额。
 
 ## 5. 与投影层、raw 层的交互
 
@@ -153,7 +168,8 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
   这类行需要删除检测或手工处理，均不在当前范围。cnblog 例外：pending 只统计“本轮
   未见过”的书签，已处理页里的缺口不会永久阻塞停止，只在运行末尾的缺口报告中出现。
 - V2EX 不可见回复导致的重复抓取由 200 条上限约束；空页 provenance marker 暂缓。
-- v2ex 的“整页已知”式页级停止暂缓，需要全局 replies pending gate；重复页停止已启用。
+- v2ex 收藏的“整页已知”式页级停止暂缓，需要全局 replies pending gate；重复页停止已启用。
+  v2ex --tipped 的余额页级停止不受此限制，因为停止后仍会全量扫描投币主题。
 - Qireader tag membership 未建模，使用全局 entry id。
 - 不做多账号。
 
@@ -170,6 +186,8 @@ cnblog 只要求“本轮未见过”的 pending 为 0：已处理页里的缺�
   - cnblog 只对“本轮未见过”的书签要求 pending 为 0；页级停止 run 为 `partial`。
   - V2EX 回复中断后重抓；达到 200 条上限后跳过；低于 capped expected 时重抓。
   - V2EX 收藏页整页重复上一页时停止分页，run 保持 `success`。
+  - v2ex --tipped 整页已知时停止余额翻页并标记 `partial`，但仍补齐历史投币主题；
+    `--force` 重抓完整余额页和全部主题。
   - weibo/qireader/cnblog 缺少身份字段的条目不再发起注定无效的请求。
 
 ## 9. 非目标

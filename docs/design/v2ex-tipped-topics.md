@@ -1,5 +1,5 @@
 ---
-status: 设计中
+status: 已实现
 created: 2026-11-18
 modified: 2026-11-18
 tags: [feature]
