@@ -181,6 +181,7 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 - `/balance` 非 200：由 `raise_for_status()` 抛出，run 失败，不重建投影。
 - signin 页：抓取阶段抛 `RuntimeError`；投影阶段抛 `ValueError` 并整体回滚，避免清空已有感谢记录。
 - 缺少 `table.data` 的余额页（维护页、风控页）：抓取阶段无法区分，交由 `has_table=False` 标记；`export_tipped` 打印警告、标记 `partial` 并结束翻页。raw 仍保留该页，修好解析后可 `eto db rebuild v2ex`。翻页中止后**主题扫描照常执行**：HTML 异常不代表 API 异常，继续扫描仍可能补齐详情/回复，失败量由连续失败中止兜底。
+- 有 `table.data` 但第 1 页解析出 0 条流水：只打印警告（可能是新账号的空历史，也可能是行结构变化），run 状态不变；后续页仍按 `max_page`/重复页规则翻完。
 - 单个主题详情 404/403/网络错误：`_ensure_topic_data` 标记 `partial`，跳过该主题，下一轮继续。
 - 连续 10 个主题抓取失败：`export_tipped` 停止本轮剩余扫描（run 已因上述失败标记为 `partial`）。客户端对 429 会走满 5 次重试退避，单个主题失败约 6 次请求、30 秒；不中止时 600+ 个主题会对着限流端点空转数小时。剩余主题在下一轮配额恢复后收敛。
 - 被删除的主题：保留 `v2ex_thanks` 行，主题详情持续缺失，run 保持 `partial`；不做删除检测。
@@ -224,7 +225,7 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 
 - **TEST-001**：余额页解析 fixture 覆盖回复感谢、主题感谢、标题含“的回复”的主题感谢、非前缀描述、非感谢流水、无感谢页、无流水表页、重复末页、signin 页和 `max_page`。
 - **TEST-002**：投影重建覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚、`thanks_page_known` 和 `tipped_topic_ids`。
-- **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、无 `max_page` 时的重复末页停止、无流水表页中止、连续 10 个主题抓取失败中止扫描（含回复抓取异常计数）、`sync_run.operation='tipped'`。
+- **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、无 `max_page` 时的重复末页停止、无流水表页中止后仍扫描主题、第 1 页零流水告警、连续 10 个主题抓取失败中止扫描（含回复抓取异常计数）、`sync_run.operation='tipped'`。
 - **TEST-004**：schema 测试覆盖 `v2ex_thanks` 表、索引、平台时间列和 `user_version = 4`。
 - **TEST-005**：`ruff check src tests`、`ruff format --check src tests` 通过。
 - **TEST-006**：真实环境 smoke（可选，注意配额）：运行 `eto --db-only v2ex --tipped`，确认页级剪枝生效、旧主题缺口继续补齐、无 Markdown 写入。

@@ -185,6 +185,12 @@ def export_tipped(force: bool = False) -> None:
             break
         if max_page is None:
             max_page = balance_page.max_page
+        if page == 1 and not balance_page.transaction_keys:
+            # 表在但一行流水都解析不出来：新账号为空历史，老账号则多半是行
+            # 结构变了。两种情况都只告警，不改变 success 的判定基础。
+            print(
+                '警告: 余额页第 1 页解析不到任何流水，可能为空历史或 HTML 行结构变化',
+            )
         new_entries.extend(balance_page.thanks)
 
         if (

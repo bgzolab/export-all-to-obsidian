@@ -1827,6 +1827,35 @@ def test_cli_v2ex_tipped_stops_on_page_without_flow_table(monkeypatch, tmp_path)
     assert run['status'] == 'partial'
 
 
+def test_cli_v2ex_tipped_warns_on_empty_first_page(monkeypatch, tmp_path):
+    """A table that yields no rows may be an empty history or broken markup."""
+    db_path = tmp_path / 'eto.db'
+    pages = [BalancePage(1, [], [])]
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_balance_page',
+        lambda page, client=None: pages[page - 1],
+    )
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '解析不到任何流水' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'success'
+
+
 def test_cli_v2ex_tipped_aborts_scan_after_consecutive_failures(
     monkeypatch,
     tmp_path,
