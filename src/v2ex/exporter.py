@@ -21,6 +21,15 @@ from v2ex.tipped import ThanksEntry, get_balance_page
 from v2ex.topic import get_v2ex_topic_info
 
 
+def _warn_reply_gap(topic_id: int, total: int, expected: int) -> None:
+    """Report a short reply fetch, usually caused by deleted replies."""
+    if total < expected:
+        print(
+            f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
+            f'少于 expected={expected}，可能含已删除回复',
+        )
+
+
 def _ensure_topic_data(
     topic_id: int,
     client: V2exClient,
@@ -44,12 +53,11 @@ def _ensure_topic_data(
                     topic_id,
                     expected,
                 ):
-                    total = fetch_all_replies(topic_id, client)
-                    if total < expected:
-                        print(
-                            f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
-                            f'少于 expected={expected}，可能含已删除回复',
-                        )
+                    _warn_reply_gap(
+                        topic_id,
+                        fetch_all_replies(topic_id, client),
+                        expected,
+                    )
                 return None
         result = get_v2ex_topic_info(topic_id)
         if not (result and result.result):
@@ -69,12 +77,11 @@ def _ensure_topic_data(
                 )
             )
         ):
-            total = fetch_all_replies(topic_id, client)
-            if total < expected:
-                print(
-                    f'警告: v2ex topic {topic_id} 抓到 {total} 条回复，'
-                    f'少于 expected={expected}，可能含已删除回复',
-                )
+            _warn_reply_gap(
+                topic_id,
+                fetch_all_replies(topic_id, client),
+                expected,
+            )
         return topic
     except Exception as exc:
         mark_run_partial()
