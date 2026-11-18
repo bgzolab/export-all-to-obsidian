@@ -17,6 +17,7 @@ from v2ex.cilent import V2exClient
 from v2ex.entity import TopicResult
 from v2ex.mytopic import get_fav_list_topic_id_page
 from v2ex.replies import V2EX_MAX_REPLIES, fetch_all_replies
+from v2ex.tipped import ThanksEntry, get_balance_page
 from v2ex.topic import get_v2ex_topic_info
 
 
@@ -147,3 +148,60 @@ def export(
                 print(f'Skip v2ex topic {topic_id}: {exc}')
                 continue
     index_writer.flush('v2ex', '导出完成index')
+
+
+def export_tipped(force: bool = False) -> None:
+    """Ingest topics discovered from sent-thanks transactions, DB only.
+
+    Paging stops early when a whole balance page is already projected, but the
+    topic scan below always includes previously tipped topics: earlier runs may
+    have been cut short by the API quota, and only a full scan repairs them.
+    """
+    client = V2exClient()
+    connection = get_database()
+    new_entries: list[ThanksEntry] = []
+    previous_keys: list[str] | None = None
+    max_page: int | None = None
+    page = 1
+
+    while True:
+        balance_page = get_balance_page(page, client)
+        if max_page is None:
+            max_page = balance_page.max_page
+        new_entries.extend(balance_page.thanks)
+
+        if (
+            not force
+            and balance_page.thanks
+            and v2ex_projection.thanks_page_known(
+                connection,
+                balance_page.thanks,
+            )
+        ):
+            mark_run_partial()
+            print('余额页已全部入库，停止翻页')
+            break
+        if max_page is not None and page >= max_page:
+            break
+        if balance_page.transaction_keys == previous_keys:
+            print('余额分页返回重复数据，停止')
+            break
+        previous_keys = balance_page.transaction_keys
+        page += 1
+
+    topic_ids: list[int] = []
+    seen: set[int] = set()
+    for entry in new_entries:
+        if entry.topic_id not in seen:
+            seen.add(entry.topic_id)
+            topic_ids.append(entry.topic_id)
+    # Existing tipped topics keep their recency order and are appended after
+    # this run's discoveries, so their pending detail/reply gaps still retry.
+    for topic_id in v2ex_projection.tipped_topic_ids(connection):
+        if topic_id not in seen:
+            seen.add(topic_id)
+            topic_ids.append(topic_id)
+
+    print(f'投币主题待检查: {len(topic_ids)} 个')
+    for topic_id in topic_ids:
+        _ensure_topic_data(topic_id, client, force)

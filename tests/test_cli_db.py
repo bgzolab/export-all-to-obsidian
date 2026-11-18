@@ -4,6 +4,7 @@ import json
 import sqlite3
 from types import SimpleNamespace
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -12,6 +13,8 @@ from db.connection import connect
 from db.projections import rebuild_platform
 from export_to_obsidian import eto
 from tests.projection_helpers import record_json, record_missing, record_text
+from v2ex.exporter import export_tipped
+from v2ex.tipped import BalancePage, ThanksEntry
 
 BANGUMI_COLLECTION = {
     'subject_id': 1,
@@ -1483,6 +1486,56 @@ def test_db_only_v2ex_refetches_below_capped_expected(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert topic_calls == []
     assert replies_calls == [1]
+
+
+def test_v2ex_export_tipped_merges_new_and_known_topics(monkeypatch, tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    response_id = record_text(connection, 'test.seed', '')
+    connection.execute(
+        'INSERT INTO v2ex_thanks '
+        '(thanked_at, topic_id, content_kind, member, amount, balance, '
+        'topic_title, description, response_id, db_created_at, db_updated_at) '
+        "VALUES ('2026-11-01 00:00:00 +08:00', 3, 'topic', 'carol', -10.0, "
+        "900.0, 'Old', '感谢 carol 的主题', ?, 'now', 'now')",
+        (response_id,),
+    )
+    connection.commit()
+
+    def entry(topic_id):
+        return ThanksEntry(
+            thanked_at=f'2026-11-{18 - topic_id} 00:00:00 +08:00',
+            topic_id=topic_id,
+            content_kind='reply',
+            member=f'member{topic_id}',
+            amount=-10.0,
+            balance=1000.0,
+            topic_title=f'Topic {topic_id}',
+            description=f'感谢 member{topic_id} 的回复',
+        )
+
+    pages = {
+        1: BalancePage(2, [entry(1)], ['key-1']),
+        2: BalancePage(2, [entry(2)], ['key-2']),
+    }
+    calls = []
+
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_balance_page',
+        lambda page, client=None: pages[page],
+    )
+    monkeypatch.setattr(
+        'v2ex.exporter._ensure_topic_data',
+        lambda topic_id, client, force: calls.append((topic_id, force)),
+    )
+
+    root = click.Context(click.Command('test'))
+    root.obj = {'db_only': True, 'database': connection, 'run_partial': False}
+    with root:
+        export_tipped()
+
+    assert calls == [(1, False), (2, False), (3, False)]
+    connection.close()
 
 
 def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
