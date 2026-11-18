@@ -40,7 +40,17 @@ design: docs/design/netease-music.md
   - **修改**: `pyproject.toml` 增加 `pycryptodome (>=3.23.0,<5.0.0)`，`poetry.lock` 由 `poetry lock` 重新生成。
 - **相关代码**: `netease.weapi.weapi_encrypt` 是客户端唯一的加密入口；RSA 仅做模幂，未引入 RSA 库。
 - **验证结果**: `poetry lock` 成功；`tests/test_netease_weapi.py` 6 项通过；ruff check/format 通过。
-| TASK-002 | Pending | 扩展 `export_runtime.http` 的可选 `request_meta`，写入 `sync_response.request.meta`；新增 `src/netease/api_endpoints.py`、`src/netease/client.py`，实现账号、歌单列表、歌单详情、歌曲详情、最近播放、周榜/总榜请求；账号请求不写 raw，其余走 `http.post`。 | `PYTHONPATH=src pytest tests/test_http_recorder.py tests/test_netease.py -q`；测试断言 endpoint、`data` 表单、`request_meta` 和账号不落 raw。 | |
+| TASK-002 | Completed | 扩展 `export_runtime.http` 的可选 `request_meta`，写入 `sync_response.request.meta`；新增 `src/netease/api_endpoints.py`、`src/netease/client.py`，实现账号、歌单列表、歌单详情、歌曲详情、最近播放、周榜/总榜请求；账号请求不写 raw，其余走 `http.post`。 | `PYTHONPATH=src pytest tests/test_http_recorder.py tests/test_netease.py -q`；测试断言 endpoint、`data` 表单、`request_meta` 和账号不落 raw。 | 2026-11-18 |
+
+#### TASK-002 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: raw request 支持 `meta`，网易云客户端可发出账号与 6 类数据请求。
+- **逻辑变更**:
+  - **新增**: `src/netease/api_endpoints.py`（路径、endpoint 名、排行 type 映射）、`src/netease/client.py`（Cookie/Session、7 个方法、`NeteaseClientError`）、`tests/test_netease.py`。
+  - **修改**: `src/export_runtime/http.py` 增加可选 `request_meta`，仅在传入时写入 `request.meta`，不改变已有平台的 request JSON；`tests/test_http_recorder.py` 覆盖 meta。
+  - **修正**: weapi RSA 只应反转一次；TASK-001 的 `weapi_encrypt` 曾重复反转导致上游返回空 200，已修正并更新已知向量。
+- **相关代码**: `NeteaseClient.get_account` 直接用 `session.post`，不落 raw；其余方法经 `export_runtime.http.post`。
+- **验证结果**: `tests/test_http_recorder.py` + `tests/test_netease.py` 22 项通过；ruff check/format 通过；用仓库根目录 `cookies.txt` 实测账号、歌单、详情、歌曲、最近播放、周榜/总榜均返回 200。
 | TASK-003 | Pending | 在 `src/app/credential_guard.py` 增加 `probe_netease_credentials`：账号 200 空对象判 invalid，301/401/403 判 invalid，非 JSON/非对象/请求异常判 unknown。 | `PYTHONPATH=src pytest tests/test_credential_guard.py -q`；覆盖 valid / empty / 301 / 401 / 非 JSON / 网络异常。 | |
 
 ### 阶段 2：抓取流程与 CLI

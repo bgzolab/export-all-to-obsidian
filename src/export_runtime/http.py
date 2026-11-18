@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Mapping
 from contextlib import suppress
 from typing import Any
 
@@ -30,6 +31,7 @@ def get(
     endpoint: str,
     database: sqlite3.Connection | None = None,
     run_id: int | None = None,
+    request_meta: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> requests.Response:
     """GET a URL and record the raw response when a sync run is active."""
@@ -40,6 +42,7 @@ def get(
         endpoint=endpoint,
         database=database,
         run_id=run_id,
+        request_meta=request_meta,
         **kwargs,
     )
 
@@ -51,6 +54,7 @@ def post(
     endpoint: str,
     database: sqlite3.Connection | None = None,
     run_id: int | None = None,
+    request_meta: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> requests.Response:
     """POST a URL and record the raw response when a sync run is active."""
@@ -61,6 +65,7 @@ def post(
         endpoint=endpoint,
         database=database,
         run_id=run_id,
+        request_meta=request_meta,
         **kwargs,
     )
 
@@ -73,15 +78,21 @@ def request(
     endpoint: str,
     database: sqlite3.Connection | None = None,
     run_id: int | None = None,
+    request_meta: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> requests.Response:
-    """Send a request and persist its raw response before returning it."""
+    """Send a request and persist its raw response before returning it.
+
+    ``request_meta`` records non-HTTP request context (for example the uid a
+    playlist list was fetched for) under ``request.meta``. It is omitted from
+    the JSON when not supplied, so existing raw request shapes stay unchanged.
+    """
     if database is None and run_id is None:
         database, run_id = _active_run()
     elif (database is None) != (run_id is None):
         raise ValueError('database and run_id must be provided together')
 
-    request_info = _request_info(session, method, url, kwargs)
+    request_info = _request_info(session, method, url, kwargs, request_meta)
     if database is None or run_id is None:
         return _send(session, method, url, kwargs)
 
@@ -129,16 +140,20 @@ def _request_info(
     method: str,
     url: str,
     kwargs: dict[str, Any],
+    request_meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     headers = dict(getattr(session, 'headers', {}) or {})
     headers.update(kwargs.get('headers') or {})
-    return {
+    info: dict[str, Any] = {
         'method': method.upper(),
         'url': url,
         'params': kwargs.get('params'),
         'headers': _redact_headers(headers),
         'body': _request_body(kwargs),
     }
+    if request_meta:
+        info['meta'] = dict(request_meta)
+    return info
 
 
 def _send(
