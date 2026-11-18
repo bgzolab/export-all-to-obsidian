@@ -30,7 +30,16 @@ design: docs/design/netease-music.md
 
 | Task     | Status  | Description | Verification Steps | Date |
 | -------- | ------- | ----------- | ------------------ | ---- |
-| TASK-001 | Pending | 在 `pyproject.toml` 增加 `pycryptodome` 并更新 `poetry.lock`；新增 `src/netease/__init__.py`、`src/netease/weapi.py`，实现 `aes_cbc_base64`、`rsa_encrypt`、`weapi_encrypt(payload, secret=None)`。 | `poetry lock`；`PYTHONPATH=src pytest tests/test_netease_weapi.py -q`；`ruff check src/netease tests/test_netease_weapi.py`；`ruff format --check src/netease tests/test_netease_weapi.py`。 | |
+| TASK-001 | Completed | 在 `pyproject.toml` 增加 `pycryptodome` 并更新 `poetry.lock`；新增 `src/netease/__init__.py`、`src/netease/weapi.py`，实现 `aes_cbc_base64`、`rsa_encrypt`、`weapi_encrypt(payload, secret=None)`。 | `poetry lock`；`PYTHONPATH=src pytest tests/test_netease_weapi.py -q`；`ruff check src/netease tests/test_netease_weapi.py`；`ruff format --check src/netease tests/test_netease_weapi.py`。 | 2026-11-18 |
+
+#### TASK-001 执行记录
+- **状态**: 已完成（2026-11-18）
+- **变更摘要**: 引入 `pycryptodome` 并实现 weapi 双层 AES + RSA 加密。
+- **逻辑变更**:
+  - **新增**: `src/netease/__init__.py`、`src/netease/weapi.py`（`aes_cbc_base64`、`rsa_encrypt`、`generate_secret`、`weapi_encrypt`）、`tests/test_netease_weapi.py`。
+  - **修改**: `pyproject.toml` 增加 `pycryptodome (>=3.23.0,<5.0.0)`，`poetry.lock` 由 `poetry lock` 重新生成。
+- **相关代码**: `netease.weapi.weapi_encrypt` 是客户端唯一的加密入口；RSA 仅做模幂，未引入 RSA 库。
+- **验证结果**: `poetry lock` 成功；`tests/test_netease_weapi.py` 6 项通过；ruff check/format 通过。
 | TASK-002 | Pending | 扩展 `export_runtime.http` 的可选 `request_meta`，写入 `sync_response.request.meta`；新增 `src/netease/api_endpoints.py`、`src/netease/client.py`，实现账号、歌单列表、歌单详情、歌曲详情、最近播放、周榜/总榜请求；账号请求不写 raw，其余走 `http.post`。 | `PYTHONPATH=src pytest tests/test_http_recorder.py tests/test_netease.py -q`；测试断言 endpoint、`data` 表单、`request_meta` 和账号不落 raw。 | |
 | TASK-003 | Pending | 在 `src/app/credential_guard.py` 增加 `probe_netease_credentials`：账号 200 空对象判 invalid，301/401/403 判 invalid，非 JSON/非对象/请求异常判 unknown。 | `PYTHONPATH=src pytest tests/test_credential_guard.py -q`；覆盖 valid / empty / 301 / 401 / 非 JSON / 网络异常。 | |
 
