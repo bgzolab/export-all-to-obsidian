@@ -1874,6 +1874,64 @@ def test_cli_v2ex_tipped_aborts_scan_after_consecutive_failures(
     assert run['status'] == 'partial'
 
 
+def _seed_v2ex_topics(connection, topic_ids, replies=5):
+    response_id = record_text(connection, 'test.seed', '')
+    for topic_id in topic_ids:
+        connection.execute(
+            'INSERT INTO v2ex_topic '
+            '(topic_id, replies, response_id, db_created_at, db_updated_at) '
+            "VALUES (?, ?, ?, 'now', 'now')",
+            (topic_id, replies, response_id),
+        )
+    connection.commit()
+
+
+def test_cli_v2ex_tipped_counts_reply_exceptions_as_failures(
+    monkeypatch,
+    tmp_path,
+):
+    """Reply fetch exceptions feed the consecutive-failure abort counter."""
+    db_path = tmp_path / 'eto.db'
+    entries = [_balance_entry(i, f'2026-11-18 00:00:0{i} +08:00') for i in range(1, 13)]
+    connection = connect(db_path)
+    _seed_v2ex_thanks(connection, entries)
+    _seed_v2ex_topics(connection, [entry.topic_id for entry in entries])
+    connection.close()
+
+    pages = [BalancePage(1, [], ['key-1'])]
+    reply_calls = []
+
+    def fake_replies(topic_id, client=None):
+        reply_calls.append(topic_id)
+        raise RuntimeError('429 quota exhausted')
+
+    monkeypatch.setattr(
+        'app.cli.probe_v2ex_credentials',
+        lambda: CredentialProbeResult.valid('v2ex'),
+    )
+    monkeypatch.setattr('v2ex.exporter.V2exClient', lambda: object())
+    monkeypatch.setattr(
+        'v2ex.exporter.get_balance_page',
+        lambda page, client=None: pages[0],
+    )
+    monkeypatch.setattr('v2ex.exporter.fetch_all_replies', fake_replies)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), '--db-only', 'v2ex', '--tipped'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert len(reply_calls) == 10
+    assert 'Skip v2ex topic' in result.output
+    assert '连续 10 个主题抓取失败' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
 def test_db_only_cnblog_skips_known_body(monkeypatch, tmp_path):
     db_path = tmp_path / 'eto.db'
     connection = connect(db_path)
