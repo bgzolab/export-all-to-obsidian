@@ -144,9 +144,10 @@ def _parse_thanks_row(
 
     Such rows are invisible to ``thanks_page_known``: it only sees parseable
     thanks, so a page can still count as fully known while it holds ignored
-    rows. Page-level pruning therefore covers the parseable subset only; the
-    catalogue of ignored rows stays visible in raw, and a parser regression is
-    caught by the empty-page warning instead.
+    rows. Page-level pruning therefore covers the parseable subset only, and
+    the ignored rows stay visible in raw. The empty-page warning in
+    ``export_tipped`` catches a fully unparsable first page, not a partial
+    regression where the other transaction types still parse.
     """
     description_cell = cells[4]
     description = texts[4]
