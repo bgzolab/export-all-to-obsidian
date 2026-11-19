@@ -360,6 +360,7 @@ CREATE INDEX idx_netease_play_record_play_time
 | 歌单列表 HTTP/JSON/code 错误 | 标记 `partial`，停止歌单抓取，继续历史/排行 |
 | 单个歌单详情失败 | 标记 `partial`，打印歌单 id，继续下一个歌单；剪枝状态保持上次成功详情 |
 | 歌单详情 `trackIds` 条目全部非法 | 标记 `partial`，打印歌单 id，不请求歌曲；已有成员保留 |
+| 歌单详情缺少 `trackCount` / `trackUpdateTime` | 标记 `partial`，打印歌单 id，仍抓取歌曲；剪枝状态不更新 |
 | 单批歌曲详情失败 | 标记 `partial`，打印批次，继续下一批 |
 | 历史请求失败 | 标记 `partial`，继续排行 |
 | 排行请求失败 | 标记 `partial`，不阻塞其他数据 |

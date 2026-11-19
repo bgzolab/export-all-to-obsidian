@@ -82,6 +82,8 @@ raw endpoint：
   用 `--force` 刷新。
 - 成功批次未返回的歌曲（下架）记为不可用，不再阻塞剪枝；歌曲重新上架后需要 `--force`
   才会重试元数据。
+- 详情响应缺少可用的 `trackCount` / `trackUpdateTime` 时标记 `partial`，剪枝状态不更新；
+  下一次运行会再次尝试。
 - 404/429/5xx 或业务 `code != 200` 会把本次 run 标记为 `partial`；HTTP 429 会停止
   本轮后续请求，下一次运行继续补。
 - 排行不投影，查询需要先用 Python 解压 raw body：

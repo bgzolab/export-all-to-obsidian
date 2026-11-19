@@ -329,6 +329,8 @@ def _detail(playlist_id, song_ids):
         'code': 200,
         'playlist': {
             'id': playlist_id,
+            'trackCount': len(song_ids),
+            'trackUpdateTime': 1,
             'trackIds': [{'id': song_id} for song_id in song_ids],
         },
     }
@@ -591,6 +593,23 @@ def test_sync_all_malformed_track_ids_marks_partial(monkeypatch):
 
     assert not [call for call in client.calls if call[0] == 'songs']
     assert partial
+
+
+def test_sync_detail_without_prune_metadata_marks_partial(monkeypatch, capsys):
+    detail = _detail(7, [1])
+    detail['playlist'].pop('trackCount')
+    detail['playlist'].pop('trackUpdateTime')
+    client = FakeNeteaseClient(
+        pages=[{'code': 200, 'playlist': [_playlist(7)], 'more': False}],
+        details={7: detail},
+    )
+    exporter, partial = _install_exporter(monkeypatch, client)
+
+    exporter.sync()
+
+    assert ('songs', [1]) in client.calls
+    assert partial
+    assert 'trackCount' in capsys.readouterr().out
 
 
 def test_sync_rate_limit_stops_remaining_requests(monkeypatch, capsys):

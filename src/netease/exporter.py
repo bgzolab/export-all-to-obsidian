@@ -175,6 +175,17 @@ def _sync_playlist_details(
             mark_run_partial()
             print(f'歌单详情 {playlist_id} 缺少 trackIds，跳过')
             continue
+        if (
+            _whole_number(body.get('trackCount')) is None
+            or _whole_number(body.get('trackUpdateTime')) is None
+        ):
+            # The projection cannot store pruning state without both fields,
+            # so this playlist would be refetched on every run.
+            mark_run_partial()
+            print(
+                f'歌单详情 {playlist_id} 缺少 trackCount/trackUpdateTime，'
+                '剪枝状态无法更新'
+            )
 
         song_ids_for_playlist = _track_ids(track_items)
         if track_items and not song_ids_for_playlist:
