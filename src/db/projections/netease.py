@@ -52,7 +52,9 @@ def playlist_state(
     map. A playlist without ``detail_response_id`` is absent, and so is one
     that still has member songs without metadata: placeholder rows point at
     the detail response as their provenance, so a failed song batch keeps the
-    playlist pending and retries on the next run.
+    playlist pending and retries on the next run. Songs that a successful
+    batch reported as unavailable are marked ``metadata_missing`` and do not
+    block pruning.
     """
     rows = connection.execute(
         'SELECT p.playlist_id, p.track_count, p.track_update_time '
@@ -63,7 +65,8 @@ def playlist_state(
         'LEFT JOIN netease_song AS s ON s.song_id = ps.song_id '
         'LEFT JOIN sync_response AS r ON r.id = s.response_id '
         'WHERE ps.playlist_id = p.playlist_id '
-        "AND COALESCE(r.endpoint, '') != ?)",
+        "AND COALESCE(r.endpoint, '') != ? "
+        'AND COALESCE(s.metadata_missing, 0) = 0)',
         (SONGS_ENDPOINT,),
     )
     return {
@@ -352,11 +355,13 @@ def _upsert_songs(
         raise SkipResponse('missing songs list')
 
     rows = 0
+    returned: set[int] = set()
     for song in songs:
         song_id = song.get('id') if isinstance(song, dict) else None
         if not isinstance(song_id, int):
             skip_response(result, SONGS_ENDPOINT, response, 'song missing id')
             continue
+        returned.add(song_id)
         rows += upsert(
             connection,
             'netease_song',
@@ -375,11 +380,32 @@ def _upsert_songs(
                 ),
                 'pop': _integer(song.get('pop')),
                 'version': _integer(song.get('version')),
+                'metadata_missing': 0,
             },
             response['id'],
             now,
         )
+    for song_id in _requested_song_ids(response) - returned:
+        _mark_song_missing(connection, song_id, now)
     return rows
+
+
+def _mark_song_missing(
+    connection: sqlite3.Connection,
+    song_id: int,
+    now: str,
+) -> None:
+    """Record that a successful batch did not return metadata for a song.
+
+    Only placeholder rows are marked, so a hydrated row is never downgraded by
+    an unrelated batch that omitted it.
+    """
+    connection.execute(
+        'UPDATE netease_song SET metadata_missing = 1, db_updated_at = ? '
+        'WHERE song_id = ? AND metadata_missing = 0 '
+        'AND response_id IN (SELECT id FROM sync_response WHERE endpoint = ?)',
+        (now, song_id, DETAIL_ENDPOINT),
+    )
 
 
 def _upsert_recent(
@@ -451,6 +477,17 @@ def _request_uid(response: dict[str, Any]) -> int | None:
         return None
     uid = meta.get('uid')
     return uid if isinstance(uid, int) else None
+
+
+def _requested_song_ids(response: dict[str, Any]) -> set[int]:
+    """Return the ids a song batch asked for, as recorded in request meta."""
+    meta = request_payload(response).get('meta')
+    if not isinstance(meta, dict):
+        return set()
+    song_ids = meta.get('song_ids')
+    if not isinstance(song_ids, list):
+        return set()
+    return {song_id for song_id in song_ids if isinstance(song_id, int)}
 
 
 def _creator_id(playlist: dict[str, Any]) -> int | None:

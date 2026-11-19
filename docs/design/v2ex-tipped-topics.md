@@ -249,6 +249,6 @@ def _ensure_topic_data(topic_id, client, force) -> tuple[Topic | None, bool]
 - **TEST-001**：余额页解析 fixture 覆盖回复感谢、主题感谢、标题含“的回复”的主题感谢、非前缀描述、非感谢流水、无感谢页、无流水表页、重复末页、signin 页和 `max_page`。
 - **TEST-002**：投影重建覆盖两种 `content_kind`、字段落库、重复页幂等、signin 回滚、`thanks_page_known` 和 `tipped_topic_ids`。
 - **TEST-003**：CLI 覆盖 `--tipped` 必须配合 `--db-only`、新主题抓取、已知页停止后仍补旧主题、`--force` 全量、无 `max_page` 时的重复末页停止、无流水表页中止后仍扫描主题、第 1 页零流水告警、连续 10 个主题抓取失败中止扫描（含回复抓取异常计数）、`sync_run.operation='tipped'`。
-- **TEST-004**：schema 测试覆盖 `v2ex_thanks` 表、索引、平台时间列和 `user_version = 5`。
+- **TEST-004**：schema 测试覆盖 `v2ex_thanks` 表、索引、平台时间列和 `user_version = 6`。
 - **TEST-005**：`ruff check src tests`、`ruff format --check src tests` 通过。
 - **TEST-006**：真实环境 smoke（可选，注意配额）：运行 `eto --db-only v2ex --tipped`，确认页级剪枝生效、旧主题缺口继续补齐、无 Markdown 写入。

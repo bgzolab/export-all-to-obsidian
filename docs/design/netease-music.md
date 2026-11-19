@@ -49,7 +49,7 @@ Issue #8 给出的是 `https://music.163.com/#/user/songs/rank?id=xxx`，也就�
   - 自建歌单列表、歌单详情、歌曲详情分批抓取。
   - 最近播放抓取与历史投影表。
   - 周榜/总榜抓取与 raw 记录。
-  - 迁移 `005_netease.sql`、投影解析器、凭证探针、CLI、测试与文档。
+  - 迁移 `005_netease.sql` / `006_netease_song_metadata_missing.sql`、投影解析器、凭证探针、CLI、测试与文档。
 - 不包含：
   - Markdown、索引、`--output-only`。
   - 排行投影表。
@@ -216,6 +216,7 @@ CREATE TABLE netease_song (
     trans_names_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(trans_names_json)),
     pop INTEGER NOT NULL DEFAULT 0,
     version INTEGER NOT NULL DEFAULT 0,
+    metadata_missing INTEGER NOT NULL DEFAULT 0 CHECK (metadata_missing IN (0, 1)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
     db_created_at TEXT NOT NULL,
     db_updated_at TEXT NOT NULL
@@ -252,6 +253,8 @@ CREATE INDEX idx_netease_play_record_play_time
     ON netease_play_record(play_time);
 ```
 
+后续 `006_netease_song_metadata_missing.sql` 为 `netease_song` 增加 `metadata_missing` 列。
+
 字段约定：
 
 - `netease_playlist.response_id` 指向歌单列表响应；`detail_response_id` 指向成功抓到 `trackIds` 的详情响应，只用于剪枝，不覆盖主溯源列。
@@ -259,6 +262,7 @@ CREATE INDEX idx_netease_play_record_play_time
 - `netease_playlist` 只保存自建歌单；`creator_id` 来自 `creator.userId`，缺失时回退到 `userId`。
 - `netease_playlist_song.position` 是 `trackIds` 中的 0-based 顺序；同一歌单里重复的 song id 只保留第一次出现的位置。
 - `netease_song` 的 `artists_json`、`album_json`、`alias_json`、`trans_names_json` 来自 `ar/al/alia/tns`；旧式报文回退到 `artists/album/alias/transNames`。
+- `netease_song.metadata_missing` 表示成功批次请求过但未返回该歌曲（下架/不可用）；这类歌曲不阻塞歌单剪枝，歌曲重新上架后需要 `--force` 才会重试元数据。
 - `netease_play_record` 不设 `song_id -> netease_song` 外键；`song_json` 保存完整歌曲快照，保证历史不依赖歌曲库是否仍有该行。
 - 排行不建表。`netease.play.rank.week` / `netease.play.rank.all` 的响应只留在 raw 层。
 
@@ -292,6 +296,7 @@ CREATE INDEX idx_netease_play_record_play_time
 - 成员插入前，对每个 `song_id` 执行 `INSERT ... ON CONFLICT(song_id) DO NOTHING`，写入 `name=''` 等默认值。
 - 这样 `netease_playlist_song` 的外键始终成立；后续 `netease.songs.detail` 用正常 upsert 补全字段。
 - 占位插入不能覆盖已有的完整歌曲行，因此必须使用 `DO NOTHING`，不能复用普通 upsert。
+- 成功批次请求过但未返回的歌曲标记 `metadata_missing=1`；占位行保留以维持外键，但不再让歌单 pending。已充实的歌曲行不会被后续批次降级。
 
 历史：
 
@@ -317,7 +322,7 @@ CREATE INDEX idx_netease_play_record_play_time
 - 歌单列表每次完整抓取，不用本地投影做页级停止。
 - 歌单详情按 `track_count`、`track_update_time`、`detail_response_id` 判断是否未变更：
   - 三者都存在且与当前列表一致，并且所有成员歌曲都已投影出 `netease.songs.detail`
-    元数据（没有占位行）时跳过详情和歌曲请求。
+    元数据（没有占位行；成功批次确认不可用的歌曲除外）时跳过详情和歌曲请求。
   - `--force` 跳过该判断。
   - 新歌单、track 数变化、更新时间变化、上次详情失败（`detail_response_id IS NULL`）、
     歌曲批次失败留下占位行，都会重新抓取。
@@ -370,6 +375,7 @@ src/netease/
     client.py             # Cookie、Session、账号/歌单/歌曲/历史/排行请求
     exporter.py           # 抓取编排、剪枝、partial 标记
 src/db/migrations/005_netease.sql
+src/db/migrations/006_netease_song_metadata_missing.sql
 src/db/projections/netease.py
 docs/usages/netease.md
 ```
@@ -421,12 +427,14 @@ docs/usages/netease.md
 - **RISK-013**：`request_meta` 是 raw request JSON 的新增字段；旧消费方需要忽略未知键。当前没有依赖固定键集合的代码。
 - **RISK-014**：`COOKIES` 环境变量可能仍指向旧的 cookies 文件；端到端验证时用
   `--cookies-file cookies.txt` 显式指定刚导出的文件。
+- **RISK-015**：成功批次未返回的歌曲（下架/不可用）标记 `metadata_missing` 后不再重试；
+  歌曲重新上架且歌单元数据未变化时，需要 `--force` 才会刷新该歌曲。
 
 ## 验证方式
 
 - **TEST-001**：weapi 加密对固定 payload + 固定 secret 生成已知 `params` / `encSecKey`；并用 AES 解密两层验证明文 round-trip。
 - **TEST-002**：客户端对账号、歌单列表、歌单详情、歌曲详情、最近播放、周榜/总榜发出正确的 endpoint、加密表单和 `request_meta`；账号请求不写 raw，数据请求写 raw。
-- **TEST-003**：迁移后 `user_version=5`，存在 4 张网易云投影表和 4 个索引；JSON / STRICT / 外键约束生效。
+- **TEST-003**：迁移后 `user_version=6`，存在 4 张网易云投影表和 4 个索引；JSON / STRICT / 外键约束生效。
 - **TEST-004**：投影只保留 `meta.uid` 对应的自建歌单；歌曲按详情 upsert；成员按详情替换；缺失歌曲生成占位；历史按 `(song_id, play_time)` 去重。
 - **TEST-005**：同一份 raw 连续重建两次，除 `db_created_at` / `db_updated_at` 外逐列相等。
 - **TEST-006**：歌单列表 301 在重建时回滚；辅助响应坏 JSON 跳过并计数；历史单条缺 `playTime` 跳过并计数。

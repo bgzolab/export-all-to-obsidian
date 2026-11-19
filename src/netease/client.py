@@ -101,6 +101,7 @@ class NeteaseClient:
             api_endpoints.ENDPOINT_SONGS_DETAIL,
             api_endpoints.SONG_DETAIL_PATH,
             payload,
+            request_meta={'song_ids': song_ids},
         )
 
     def get_recent_plays(self, *, limit: int = 100) -> dict[str, Any]:

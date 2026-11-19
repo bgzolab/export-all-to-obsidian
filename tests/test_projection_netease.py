@@ -167,6 +167,57 @@ def test_rebuild_coerces_fractional_numbers(monkeypatch):
     connection.close()
 
 
+def test_rebuild_marks_songs_omitted_by_successful_batch(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(connection, [_playlist(7, track_count=2, track_update_time=5)])
+    _record_detail(connection, 7, [1, 2])
+    record_json(
+        connection,
+        'netease.songs.detail',
+        {'code': 200, 'songs': [_song(1, 'one')]},
+        request={'meta': {'song_ids': [1, 2]}},
+    )
+    rebuild_platform(connection, 'netease')
+
+    flags = {
+        row['song_id']: row['metadata_missing']
+        for row in connection.execute(
+            'SELECT song_id, metadata_missing FROM netease_song'
+        )
+    }
+    # Song 2 was requested successfully but not returned (unavailable); it
+    # must not keep the playlist pending forever.
+    assert flags == {1: 0, 2: 1}
+    assert playlist_state(connection) == {7: (2, 5)}
+    connection.close()
+
+
+def test_rebuild_keeps_hydrated_song_when_later_batch_omits_it(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(connection, [_playlist(7, track_count=1, track_update_time=5)])
+    _record_detail(connection, 7, [1])
+    record_json(
+        connection,
+        'netease.songs.detail',
+        {'code': 200, 'songs': [_song(1, 'one')]},
+        request={'meta': {'song_ids': [1]}},
+    )
+    record_json(
+        connection,
+        'netease.songs.detail',
+        {'code': 200, 'songs': []},
+        request={'meta': {'song_ids': [1]}},
+    )
+    rebuild_platform(connection, 'netease')
+
+    row = connection.execute(
+        'SELECT metadata_missing FROM netease_song WHERE song_id = 1'
+    ).fetchone()
+    assert row['metadata_missing'] == 0
+    assert playlist_state(connection) == {7: (1, 5)}
+    connection.close()
+
+
 def test_rebuild_replaces_members_and_keeps_placeholders(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7)])

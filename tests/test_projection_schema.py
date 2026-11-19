@@ -135,7 +135,7 @@ def test_migration_creates_projection_tables_and_indexes():
 
     assert PROJECTION_TABLES <= _table_names(connection)
     assert PROJECTION_INDEXES <= _index_names(connection)
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 5
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 6
     connection.close()
 
 
@@ -282,7 +282,7 @@ def test_migrates_existing_layer1_database(tmp_path):
 
     connection = connect(db_path)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 5
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 6
     assert connection.execute('SELECT count(*) FROM sync_run').fetchone()[0] == 1
     assert PROJECTION_TABLES <= _table_names(connection)
     connection.close()
@@ -307,6 +307,26 @@ def test_netease_constraints_and_history_isolation():
             '(playlist_id, song_id, response_id, db_created_at, db_updated_at) '
             "VALUES (999, 999, ?, 'now', 'now')",
             (response_id,),
+        )
+    connection.rollback()
+
+    # Songs default to "metadata present"; a successful batch that omits an id
+    # may mark it unavailable, but only with the 0/1 flag.
+    connection.execute(
+        'INSERT INTO netease_song '
+        '(song_id, response_id, db_created_at, db_updated_at) '
+        "VALUES (1, ?, 'now', 'now')",
+        (response_id,),
+    )
+    assert (
+        connection.execute(
+            'SELECT metadata_missing FROM netease_song WHERE song_id = 1'
+        ).fetchone()[0]
+        == 0
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            'UPDATE netease_song SET metadata_missing = 2 WHERE song_id = 1'
         )
     connection.rollback()
 

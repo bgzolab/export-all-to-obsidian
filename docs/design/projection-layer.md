@@ -147,7 +147,8 @@ db_updated_at TEXT NOT NULL
 迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引；解析器已覆盖全部平台。
 后续 `003_twitter_sources.sql` 新增 `twitter_like`、`twitter_bookmark` 两张来源关系表，
 `004_v2ex_thanks.sql` 新增 V2EX 投币流水表 `v2ex_thanks`，
-`005_netease.sql` 新增 4 张网易云表。
+`005_netease.sql` 新增 4 张网易云表，`006_netease_song_metadata_missing.sql` 给
+`netease_song` 增加 `metadata_missing` 列。
 
 ### 3.1 Bangumi（pilot）
 
@@ -780,6 +781,8 @@ CREATE INDEX idx_zhihu_collection_item_content
   不删除旧成员；`trackIds: []` 表示空歌单。
 - 成员插入前用 `INSERT ... ON CONFLICT DO NOTHING` 补占位 `netease_song` 行，保证外键
   成立且不会覆盖已有的完整歌曲行；随后 `netease.songs.detail` 正常 upsert 补全。
+- 成功批次请求过但未返回的歌曲标记 `metadata_missing=1`，占位行保留但不再让歌单 pending；
+  已充实的歌曲行不会被后续批次降级，下架歌曲不会导致歌单永久重抓。
 - `netease_play_record` 是独立日志：只存歌曲快照 `song_json`，不引用 `netease_song`，
   按 `(song_id, play_time)` 去重。上游最近播放是滚动窗口，历史从首次同步开始累积。
 - 排行只有聚合计数，没有逐次播放时间，因此不进投影，查询用 raw 层。
@@ -839,6 +842,7 @@ CREATE TABLE netease_song (
     trans_names_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(trans_names_json)),
     pop INTEGER NOT NULL DEFAULT 0,
     version INTEGER NOT NULL DEFAULT 0,
+    metadata_missing INTEGER NOT NULL DEFAULT 0 CHECK (metadata_missing IN (0, 1)),
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
     db_created_at TEXT NOT NULL,
     db_updated_at TEXT NOT NULL
@@ -1060,8 +1064,9 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 1. `002_projection_layer.sql`：一次创建 17 张表、索引，全部使用 `STRICT`。
    后续 `003_twitter_sources.sql` 新增 Twitter 点赞/书签关系表并回填历史点赞；
    `004_v2ex_thanks.sql` 新增 V2EX 投币流水表；
-   `005_netease.sql` 新增网易云 4 张表。
-2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 5）；增加建表、JSON 约束、
+   `005_netease.sql` 新增网易云 4 张表；
+   `006_netease_song_metadata_missing.sql` 增加网易云歌曲缺失标记列。
+2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 6）；增加建表、JSON 约束、
    外键约束测试。
 3. pilot：Bangumi 解析器 + `rebuild_platform` + 幂等测试。
 4. CLI：`eto --db data/eto.db db rebuild bangumi`，输出处理响应数和行数。
@@ -1096,7 +1101,8 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 - v1 不删除，取消收藏/取消点赞的旧行会保留到删除策略实现。
 - 网易云最近播放是滚动窗口，投影只能从首次同步开始累积；两次运行之间被窗口挤出的
   记录无法补回。歌单详情剪枝依赖 `track_count` / `track_update_time`，且要求成员歌曲
-  元数据已全部投影；歌曲元数据单独变化时需要 `--force` 刷新。
+  元数据已全部投影（成功批次确认不可用的歌曲除外）；歌曲元数据单独变化时需要
+  `--force` 刷新。
 - 网易云排行只在 raw 层，`sync_response.body` 是 zlib 压缩的，SQL 端不能直接
   `json_extract`，查询要先用 Python 解压。
 - 单账号假设；换账号同步会混入同一张表，直到多账号迁移完成。

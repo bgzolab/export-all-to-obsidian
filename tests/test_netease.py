@@ -143,6 +143,7 @@ def test_song_details_serialize_ids_as_json(client, monkeypatch):
     assert calls[0]['url'] == api_endpoints.BASE_URL + api_endpoints.SONG_DETAIL_PATH
     assert calls[0]['endpoint'] == 'netease.songs.detail'
     assert json.loads(calls[0]['payload']['c']) == [{'id': 1}, {'id': 2}, {'id': 3}]
+    assert calls[0]['meta'] == {'song_ids': [1, 2, 3]}
 
 
 def test_recent_plays_payload(client, monkeypatch):
