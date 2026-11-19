@@ -1,16 +1,17 @@
 ---
 status: 已实现
 created: 2026-11-17
-modified: 2026-11-18
+modified: 2026-11-19
 tags: [feature, data]
 ---
 
 # 网易云音乐歌单与听歌历史入库设计
 
 - Issue: [#8](https://github.com/bgzolab/export-all-to-obsidian/issues/8)
+- PR: [#29](https://github.com/bgzolab/export-all-to-obsidian/pull/29)
 - Status: 已实现
 - Date: 2026-11-17
-- Implemented: 2026-11-18
+- Implemented: 2026-11-19
 - Related: [projection-layer.md](projection-layer.md)、[raw-response-layer.md](raw-response-layer.md)、[incremental-pruning.md](incremental-pruning.md)
 
 ## 背景与目标
@@ -74,8 +75,8 @@ Issue #8 给出的是 `https://music.163.com/#/user/songs/rank?id=xxx`，也就�
 
 - 2026-11-17 用仓库根目录 `cookies.txt` 做只读探测，公开歌单、歌单详情、歌曲详情接口均可用，weapi 加密路径正确。
 - 一个 `trackCount=1273` 的大型歌单，`playlist.trackIds` 返回 1273 条，`playlist.tracks` 只返回 6 条完整歌曲对象。因此歌曲详情必须用 `trackIds` 再调 `/weapi/v3/song/detail` 分批补全。
-- 当前 `cookies.txt` 中的 `MUSIC_U` 未通过登录态校验：账号接口返回空的 `account` / `profile`，最近播放返回 `total=0`。实现后的端到端验证需要重新登录 `music.163.com` 并导出 Cookie。
-- 2026-11-19 重新登录后完成真实全量同步：34 个自建歌单、4365 首歌曲、5332 条成员关系、300 条最近播放；最近播放接口忽略 `limit=100` 返回 300 条，排行接口忽略 `limit=1000` 返回前 100 条。
+- 2026-11-17 的 `cookies.txt` 中 `MUSIC_U` 未通过登录态校验：账号接口返回空的 `account` / `profile`，最近播放返回 `total=0`；当时无法完成端到端验证。
+- 2026-11-19 重新登录后完成真实全量同步：34 个自建歌单、4365 首歌曲、5332 条成员关系，首次写入 300 条最近播放；`db rebuild netease` 回放幂等，随后一次增量运行 34/34 歌单详情被剪枝。最近播放接口忽略 `limit=100` 返回 300 条，排行接口忽略 `limit=1000` 返回前 100 条。
 
 ### 鉴权
 
@@ -140,6 +141,7 @@ client.get_play_rank(uid, 'all', limit=1000)
 说明：
 
 - `creator_id(p)` 取 `p.creator.userId`，缺失时回退到 `p.userId`；只保留等于当前 uid 的歌单。“我喜欢的音乐”是 `specialType=5`、creator 为自己的歌单，因此包含在内。
+- 同一 run 内按歌单 id 去重，保留分页中最后一次出现的快照；翻页期间列表可能位移，重复条目不应重复请求详情。
 - 歌单列表每页 1000 条；`MAX_PLAYLIST_PAGES=20` 是防御性上限，超过时打印提示并标记 `partial`。
 - 歌曲详情每批 500 个 id，低于上游单批 1000 的上限，减少单次响应体积。
 - 历史固定请求 100 条（上游实际返回最近 300 条）；排行固定请求 1000 条（上游实际返回前 100 条），`type=0` 为全部时间，`type=1` 为最近一周。
@@ -273,7 +275,7 @@ CREATE INDEX idx_netease_play_record_play_time
 
 ### 投影与重建
 
-`src/db/projections/netease.py` 实现 `rebuild(connection)`。
+`src/db/projections/netease.py` 实现 `rebuild(connection)`，复用 `db.raw.iter_responses` 与 `db.projections._upsert` 的 `upsert` / `update_aux`，按响应 `(fetched_at, id)` 顺序回放。平台在 `src/db/projections/__init__.py` 的 `SUPPORTED_PLATFORMS` 注册，`eto db rebuild netease` 与 `--db-only` 共用 `rebuild_platform` 入口。
 
 删除顺序：
 
@@ -453,3 +455,5 @@ docs/usages/netease.md
 - **TEST-007**：CLI 在非 `--db-only` 下报 `UsageError`；`--uid` 不一致报错；`--force` 跳过详情剪枝。
 - **TEST-008**：`PYTHONPATH=src pytest tests -q`、`ruff check src tests`、`ruff format --check src tests` 全部通过。
 - **TEST-009**：用有效 `MUSIC_U` 手工执行 `eto --db-only netease`，检查 4 张表、raw 中的排行响应，再执行两次 `eto db rebuild netease` 验证幂等。
+
+测试文件：`tests/test_netease_weapi.py`、`tests/test_netease.py`、`tests/test_projection_netease.py`，以及共享的 `tests/test_http_recorder.py`、`tests/test_credential_guard.py`、`tests/test_db_schema.py`、`tests/test_projection_schema.py`、`tests/test_projection_base.py`、`tests/test_cli_db.py`、`tests/test_raw_platforms.py`。
