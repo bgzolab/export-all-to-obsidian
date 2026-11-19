@@ -222,11 +222,8 @@ def _upsert_playlists(
     rows = 0
     for playlist in page:
         if not isinstance(playlist, dict):
-            raise ProjectionError(
-                PLAYLISTS_ENDPOINT,
-                response['id'],
-                'invalid playlist item',
-            )
+            skip_response(result, PLAYLISTS_ENDPOINT, response, 'invalid playlist item')
+            continue
         playlist_id = playlist.get('id')
         if not isinstance(playlist_id, int):
             # One dirty list item must not make every later rebuild fail.
