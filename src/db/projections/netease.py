@@ -49,17 +49,22 @@ def playlist_state(
     """Return pruning state for playlists whose songs are fully projected.
 
     The exporter compares ``trackCount`` / ``trackUpdateTime`` against this
-    map. A playlist without ``detail_response_id`` is absent, and so is one
-    that still has member songs without metadata: placeholder rows point at
-    the detail response as their provenance, so a failed song batch keeps the
-    playlist pending and retries on the next run. Songs that a successful
-    batch reported as unavailable are marked ``metadata_missing`` and do not
-    block pruning.
+    map. The values come from the last successful detail response, not from
+    the newest list page: a list that changed while its detail fetch failed
+    must not look prunable. A playlist without ``detail_response_id`` or
+    without stored detail metadata is absent, and so is one that still has
+    member songs without metadata: placeholder rows point at the detail
+    response as their provenance, so a failed song batch keeps the playlist
+    pending and retries on the next run. Songs that a successful batch
+    reported as unavailable are marked ``metadata_missing`` and do not block
+    pruning.
     """
     rows = connection.execute(
-        'SELECT p.playlist_id, p.track_count, p.track_update_time '
+        'SELECT p.playlist_id, p.detail_track_count, p.detail_track_update_time '
         'FROM netease_playlist AS p '
         'WHERE p.detail_response_id IS NOT NULL '
+        'AND p.detail_track_count IS NOT NULL '
+        'AND p.detail_track_update_time IS NOT NULL '
         'AND NOT EXISTS ('
         'SELECT 1 FROM netease_playlist_song AS ps '
         'LEFT JOIN netease_song AS s ON s.song_id = ps.song_id '
@@ -71,8 +76,8 @@ def playlist_state(
     )
     return {
         int(row['playlist_id']): (
-            int(row['track_count']),
-            int(row['track_update_time']),
+            int(row['detail_track_count']),
+            int(row['detail_track_update_time']),
         )
         for row in rows
     }
@@ -327,11 +332,19 @@ def _replace_members(
             response['id'],
             now,
         )
+    detail_values = {}
+    detail_track_count = _optional_integer(body.get('trackCount'))
+    detail_track_update_time = _optional_integer(body.get('trackUpdateTime'))
+    if detail_track_count is not None and detail_track_update_time is not None:
+        detail_values = {
+            'detail_track_count': detail_track_count,
+            'detail_track_update_time': detail_track_update_time,
+        }
     rows += update_aux(
         connection,
         'netease_playlist',
         {'playlist_id': playlist_id},
-        {},
+        detail_values,
         'detail_response_id',
         response['id'],
         now,
@@ -503,6 +516,15 @@ def _integer(value: Any) -> int:
     if isinstance(value, float):
         return int(value)
     return 0
+
+
+def _optional_integer(value: Any) -> int | None:
+    """Coerce an optional upstream number, keeping a missing value as NULL."""
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None
 
 
 def _member_ids(track_items: list[Any]) -> tuple[list[tuple[int, int]], int]:

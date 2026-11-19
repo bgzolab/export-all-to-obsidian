@@ -73,7 +73,12 @@ PLATFORM_TIME_COLUMNS = {
     'cnblog_bookmark': {'date_added'},
     'cnblog_post': set(),
     'github_star': {'created_at', 'updated_at', 'pushed_at', 'starred_at'},
-    'netease_playlist': {'create_time', 'update_time', 'track_update_time'},
+    'netease_playlist': {
+        'create_time',
+        'update_time',
+        'track_update_time',
+        'detail_track_update_time',
+    },
     'netease_song': {'publish_time'},
     'netease_playlist_song': set(),
     'netease_play_record': {'play_time'},
@@ -135,7 +140,7 @@ def test_migration_creates_projection_tables_and_indexes():
 
     assert PROJECTION_TABLES <= _table_names(connection)
     assert PROJECTION_INDEXES <= _index_names(connection)
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 6
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 7
     connection.close()
 
 
@@ -282,7 +287,7 @@ def test_migrates_existing_layer1_database(tmp_path):
 
     connection = connect(db_path)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 6
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 7
     assert connection.execute('SELECT count(*) FROM sync_run').fetchone()[0] == 1
     assert PROJECTION_TABLES <= _table_names(connection)
     connection.close()
@@ -291,6 +296,11 @@ def test_migrates_existing_layer1_database(tmp_path):
 def test_netease_constraints_and_history_isolation():
     connection = connect(':memory:')
     response_id = _seed_response(connection)
+
+    columns = {
+        row['name'] for row in connection.execute('PRAGMA table_info(netease_playlist)')
+    }
+    assert {'detail_track_count', 'detail_track_update_time'} <= columns
 
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(

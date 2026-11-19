@@ -47,9 +47,9 @@ eto --cookies-file ./cookies.txt --db-only netease
 4. 最近播放，上游返回最近约 300 条（`limit` 参数未生效）。
 5. 周榜和总榜，各请求 1000 条（上游实际返回前 100 条）；只写入 raw 层，不建投影表。
 
-歌单详情默认剪枝：上次详情的 `track_count`、`track_update_time` 与本次列表一致，
-已有 `detail_response_id`，且所有成员歌曲都已补全元数据时，跳过详情和歌曲请求。
-`--force` 绕过该判断。
+歌单详情默认剪枝：上次成功详情的 `detail_track_count`、`detail_track_update_time` 与本次
+列表一致，已有 `detail_response_id`，且所有成员歌曲都已补全元数据时，跳过详情和歌曲请求。
+详情重试失败时剪枝状态保持上次成功值，下一次运行继续补。`--force` 绕过该判断。
 
 ## 数据表
 

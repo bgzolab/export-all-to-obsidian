@@ -148,7 +148,8 @@ db_updated_at TEXT NOT NULL
 后续 `003_twitter_sources.sql` 新增 `twitter_like`、`twitter_bookmark` 两张来源关系表，
 `004_v2ex_thanks.sql` 新增 V2EX 投币流水表 `v2ex_thanks`，
 `005_netease.sql` 新增 4 张网易云表，`006_netease_song_metadata_missing.sql` 给
-`netease_song` 增加 `metadata_missing` 列。
+`netease_song` 增加 `metadata_missing` 列，`007_netease_detail_state.sql` 给
+`netease_playlist` 增加最近成功详情的剪枝状态列。
 
 ### 3.1 Bangumi（pilot）
 
@@ -774,8 +775,11 @@ CREATE INDEX idx_zhihu_collection_item_content
 
 - `user/playlist` 同时返回自建和订阅歌单；当前 uid 不在 body 里，从 raw request 的
   `meta.uid` 读取，只保留 `creator.userId == uid` 的歌单（包含“我喜欢的音乐”）。
-- `netease_playlist` 的元数据只来自列表响应；详情响应只负责成员和 `detail_response_id`，
-  避免详情较少的字段覆盖列表字段。
+- `netease_playlist` 的元数据只来自列表响应；详情响应只负责成员、`detail_response_id`
+  和 `detail_track_count` / `detail_track_update_time` 剪枝状态，避免详情较少的字段
+  覆盖列表字段。
+- `playlist_state` 使用最近成功详情的 `detail_track_count` / `detail_track_update_time`，
+  而不是列表值；列表变化后详情重试失败时，旧状态保留，下一次运行仍会重抓。
 - `netease.playlist.detail` 按 `trackIds` 全量替换成员：先校验，再删除旧成员，按 0-based
   顺序插入；重复 song id 只保留第一次出现的位置。`trackIds` 缺失或非法时跳过该响应，
   不删除旧成员；`trackIds: []` 表示空歌单。
@@ -818,6 +822,8 @@ CREATE TABLE netease_playlist (
     ordered INTEGER NOT NULL DEFAULT 0 CHECK (ordered IN (0, 1)),
     tags_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags_json)),
     detail_response_id INTEGER REFERENCES sync_response(id),
+    detail_track_count INTEGER,
+    detail_track_update_time INTEGER,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
     db_created_at TEXT NOT NULL,
     db_updated_at TEXT NOT NULL
@@ -1065,8 +1071,9 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
    后续 `003_twitter_sources.sql` 新增 Twitter 点赞/书签关系表并回填历史点赞；
    `004_v2ex_thanks.sql` 新增 V2EX 投币流水表；
    `005_netease.sql` 新增网易云 4 张表；
-   `006_netease_song_metadata_missing.sql` 增加网易云歌曲缺失标记列。
-2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 6）；增加建表、JSON 约束、
+   `006_netease_song_metadata_missing.sql` 增加网易云歌曲缺失标记列；
+   `007_netease_detail_state.sql` 增加网易云详情剪枝状态列。
+2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 7）；增加建表、JSON 约束、
    外键约束测试。
 3. pilot：Bangumi 解析器 + `rebuild_platform` + 幂等测试。
 4. CLI：`eto --db data/eto.db db rebuild bangumi`，输出处理响应数和行数。

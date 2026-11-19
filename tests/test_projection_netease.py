@@ -55,17 +55,26 @@ def _record_page(connection, playlists, *, uid=UID):
     )
 
 
-def _record_detail(connection, playlist_id, song_ids):
+def _record_detail(
+    connection,
+    playlist_id,
+    song_ids,
+    *,
+    track_count=None,
+    track_update_time=None,
+):
+    playlist = {
+        'id': playlist_id,
+        'trackIds': [{'id': song_id} for song_id in song_ids],
+    }
+    if track_count is not None:
+        playlist['trackCount'] = track_count
+    if track_update_time is not None:
+        playlist['trackUpdateTime'] = track_update_time
     return record_json(
         connection,
         'netease.playlist.detail',
-        {
-            'code': 200,
-            'playlist': {
-                'id': playlist_id,
-                'trackIds': [{'id': song_id} for song_id in song_ids],
-            },
-        },
+        {'code': 200, 'playlist': playlist},
     )
 
 
@@ -170,7 +179,7 @@ def test_rebuild_coerces_fractional_numbers(monkeypatch):
 def test_rebuild_marks_songs_omitted_by_successful_batch(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7, track_count=2, track_update_time=5)])
-    _record_detail(connection, 7, [1, 2])
+    _record_detail(connection, 7, [1, 2], track_count=2, track_update_time=5)
     record_json(
         connection,
         'netease.songs.detail',
@@ -195,7 +204,7 @@ def test_rebuild_marks_songs_omitted_by_successful_batch(monkeypatch):
 def test_rebuild_keeps_hydrated_song_when_later_batch_omits_it(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7, track_count=1, track_update_time=5)])
-    _record_detail(connection, 7, [1])
+    _record_detail(connection, 7, [1], track_count=1, track_update_time=5)
     record_json(
         connection,
         'netease.songs.detail',
@@ -440,7 +449,7 @@ def test_playlist_state_tracks_detail_and_update_fields(monkeypatch):
 
     assert playlist_state(connection) == {}
 
-    _record_detail(connection, 7, [])
+    _record_detail(connection, 7, [], track_count=5, track_update_time=123)
     rebuild_platform(connection, 'netease')
 
     assert playlist_state(connection) == {7: (5, 123)}
@@ -450,7 +459,7 @@ def test_playlist_state_tracks_detail_and_update_fields(monkeypatch):
 def test_playlist_state_requires_song_metadata(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7, track_count=2, track_update_time=123)])
-    _record_detail(connection, 7, [1, 2])
+    _record_detail(connection, 7, [1, 2], track_count=2, track_update_time=123)
     _record_songs(connection, [_song(1, 'one')])
     rebuild_platform(connection, 'netease')
 
@@ -461,6 +470,41 @@ def test_playlist_state_requires_song_metadata(monkeypatch):
     rebuild_platform(connection, 'netease')
 
     assert playlist_state(connection) == {7: (2, 123)}
+    connection.close()
+
+
+def test_playlist_state_ignores_list_change_after_failed_detail(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(connection, [_playlist(7, track_count=5, track_update_time=1)])
+    _record_detail(connection, 7, [1, 2], track_count=5, track_update_time=1)
+    _record_songs(connection, [_song(1, 'one'), _song(2, 'two')])
+    rebuild_platform(connection, 'netease')
+    assert playlist_state(connection) == {7: (5, 1)}
+
+    _record_page(connection, [_playlist(7, track_count=6, track_update_time=2)])
+    record_json(
+        connection,
+        'netease.playlist.detail',
+        {'code': 500, 'message': 'detail failed'},
+    )
+    rebuild_platform(connection, 'netease')
+
+    # The failed retry must not promote the newer list values to pruning
+    # state, otherwise the next run would never fetch the missing members.
+    assert playlist_state(connection) == {7: (5, 1)}
+    members = [
+        row['song_id']
+        for row in connection.execute(
+            'SELECT song_id FROM netease_playlist_song ORDER BY position'
+        )
+    ]
+    assert members == [1, 2]
+
+    _record_detail(connection, 7, [1, 2, 3], track_count=6, track_update_time=2)
+    _record_songs(connection, [_song(3, 'three')])
+    rebuild_platform(connection, 'netease')
+
+    assert playlist_state(connection) == {7: (6, 2)}
     connection.close()
 
 
@@ -515,6 +559,8 @@ def test_rebuild_drops_malformed_track_ids_entries(monkeypatch):
             'code': 200,
             'playlist': {
                 'id': 7,
+                'trackCount': 2,
+                'trackUpdateTime': 5,
                 'trackIds': [{'id': 1}, {'bad': 2}, 'oops', {'id': 2}],
             },
         },

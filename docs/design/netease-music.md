@@ -49,7 +49,7 @@ Issue #8 给出的是 `https://music.163.com/#/user/songs/rank?id=xxx`，也就�
   - 自建歌单列表、歌单详情、歌曲详情分批抓取。
   - 最近播放抓取与历史投影表。
   - 周榜/总榜抓取与 raw 记录。
-  - 迁移 `005_netease.sql` / `006_netease_song_metadata_missing.sql`、投影解析器、凭证探针、CLI、测试与文档。
+  - 迁移 `005_netease.sql` / `006_netease_song_metadata_missing.sql` / `007_netease_detail_state.sql`、投影解析器、凭证探针、CLI、测试与文档。
 - 不包含：
   - Markdown、索引、`--output-only`。
   - 排行投影表。
@@ -193,6 +193,8 @@ CREATE TABLE netease_playlist (
     ordered INTEGER NOT NULL DEFAULT 0 CHECK (ordered IN (0, 1)),
     tags_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags_json)),
     detail_response_id INTEGER REFERENCES sync_response(id),
+    detail_track_count INTEGER,
+    detail_track_update_time INTEGER,
     response_id INTEGER NOT NULL REFERENCES sync_response(id),
     db_created_at TEXT NOT NULL,
     db_updated_at TEXT NOT NULL
@@ -254,11 +256,13 @@ CREATE INDEX idx_netease_play_record_play_time
     ON netease_play_record(play_time);
 ```
 
-后续 `006_netease_song_metadata_missing.sql` 为 `netease_song` 增加 `metadata_missing` 列。
+后续 `006_netease_song_metadata_missing.sql` 为 `netease_song` 增加 `metadata_missing` 列；
+`007_netease_detail_state.sql` 为 `netease_playlist` 增加最近成功详情的剪枝状态列。
 
 字段约定：
 
 - `netease_playlist.response_id` 指向歌单列表响应；`detail_response_id` 指向成功抓到 `trackIds` 的详情响应，只用于剪枝，不覆盖主溯源列。
+- `detail_track_count` / `detail_track_update_time` 保存最近一次成功详情的 `trackCount` / `trackUpdateTime`。剪枝只与这两个值比较，详情重试失败时不会被新的列表值覆盖；因此列表变化后详情失败，下一轮仍会重抓。迁移前已有的行在重建前缺少这两个值，首次运行会按 pending 处理一次。
 - 平台时间按原类型保留：歌单 `create_time` / `update_time` / `track_update_time`，歌曲 `publish_time`，历史 `play_time`，全部是毫秒 epoch 的 `INTEGER`。
 - `netease_playlist` 只保存自建歌单；`creator_id` 来自 `creator.userId`，缺失时回退到 `userId`。
 - `netease_playlist_song.position` 是 `trackIds` 中的 0-based 顺序；同一歌单里重复的 song id 只保留第一次出现的位置。
@@ -321,12 +325,13 @@ CREATE INDEX idx_netease_play_record_play_time
 ### 增量与剪枝
 
 - 歌单列表每次完整抓取，不用本地投影做页级停止。
-- 歌单详情按 `track_count`、`track_update_time`、`detail_response_id` 判断是否未变更：
+- 歌单详情按最近一次成功详情的 `detail_track_count`、`detail_track_update_time`、`detail_response_id` 判断是否未变更：
   - 三者都存在且与当前列表一致，并且所有成员歌曲都已投影出 `netease.songs.detail`
     元数据（没有占位行；成功批次确认不可用的歌曲除外）时跳过详情和歌曲请求。
   - `--force` 跳过该判断。
-  - 新歌单、track 数变化、更新时间变化、上次详情失败（`detail_response_id IS NULL`）、
-    歌曲批次失败留下占位行，都会重新抓取。
+  - 新歌单、track 数变化、更新时间变化、上次详情失败（`detail_response_id IS NULL`
+    或缺少详情剪枝状态）、歌曲批次失败留下占位行，都会重新抓取；详情重试失败时旧状态
+    保持不变，下一轮继续重试。
 - 历史每次请求 100 条，上游实际返回最近 300 条；没有本地游标，重复记录由主键去重。
 - 排行每次抓取周榜和总榜各一次；不投影。
 - 不做删除检测：取消收藏、删除歌单、从歌单移除歌曲后，旧投影行保留到未来的删除策略实现。
@@ -353,7 +358,7 @@ CREATE INDEX idx_netease_play_record_play_time
 | 账号 200 空对象 | 报错并结束，不抓任何数据 |
 | `--uid` 与账号不一致 | `ClickException`，不抓任何数据 |
 | 歌单列表 HTTP/JSON/code 错误 | 标记 `partial`，停止歌单抓取，继续历史/排行 |
-| 单个歌单详情失败 | 标记 `partial`，打印歌单 id，继续下一个歌单 |
+| 单个歌单详情失败 | 标记 `partial`，打印歌单 id，继续下一个歌单；剪枝状态保持上次成功详情 |
 | 歌单详情 `trackIds` 条目全部非法 | 标记 `partial`，打印歌单 id，不请求歌曲；已有成员保留 |
 | 单批歌曲详情失败 | 标记 `partial`，打印批次，继续下一批 |
 | 历史请求失败 | 标记 `partial`，继续排行 |
@@ -381,6 +386,7 @@ src/netease/
     exporter.py           # 抓取编排、剪枝、partial 标记
 src/db/migrations/005_netease.sql
 src/db/migrations/006_netease_song_metadata_missing.sql
+src/db/migrations/007_netease_detail_state.sql
 src/db/projections/netease.py
 docs/usages/netease.md
 ```
@@ -392,7 +398,7 @@ docs/usages/netease.md
 - **DEC-003**：只抓 creator 为自己的歌单，包含“我喜欢的音乐”，排除订阅歌单。理由：用户明确选择“仅自己创建”，同时红心歌曲是歌曲库的重要组成部分。
 - **DEC-004**：uid 默认从账号接口自动识别，`--uid` 仅作覆盖；不一致时拒绝。理由：减少手工参数，同时避免导出别人账号的公开数据。
 - **DEC-005**：weapi 用 `pycryptodome`，不手写 AES，也不引入本地 Node 服务。理由：AES 是唯一需要的加密原语，`pycryptodome` 体积小、实现成熟；自建 Node 服务会增加运行时常驻进程和 Cookie 暴露面。
-- **DEC-006**：歌单元数据来自歌单列表响应，详情响应只负责成员和 `detail_response_id`。理由：列表字段完整，详情字段较少；混用两套 upsert 会把列表字段覆盖成默认值。
+- **DEC-006**：歌单元数据来自歌单列表响应，详情响应只负责成员、`detail_response_id` 和 `detail_track_count` / `detail_track_update_time` 剪枝状态。理由：列表字段完整，详情字段较少；混用两套 upsert 会把列表字段覆盖成默认值，而剪枝状态又必须来自成功详情，不能来自列表。
 - **DEC-007**：成员按 `trackIds` 建，所有待抓歌单的歌曲 id 去重后按 500 一批补全；不使用 `playlist.tracks`。理由：实测 1273 首歌单只返回 6 个完整对象，`tracks` 不足以建库；跨歌单共用的歌曲只请求一次。
 - **DEC-008**：成员插入前先插占位歌曲，占位用 `DO NOTHING`。理由：既保证外键成立，又不会用空字段覆盖已有的完整歌曲行。
 - **DEC-009**：每条详情响应替换整个歌单成员。理由：歌单顺序和成员会变化，逐条 upsert 无法删除已移除的歌曲。
@@ -427,7 +433,7 @@ docs/usages/netease.md
 - **RISK-008**：`pycryptodome` 是新增运行时依赖，需要更新 `poetry.lock`。
 - **RISK-009**：排行只在 raw 层，`sync_response.body` 是 zlib 压缩的；SQL 客户端不能直接 `json_extract`，必须用 Python 解压。
 - **RISK-010**：历史 raw 持续增长，`db rebuild netease` 的回放时间会随运行次数增加。
-- **RISK-011**：详情剪枝依赖 `track_update_time` 和 `track_count`；歌曲元数据变化但歌单未更新时不会刷新，需要 `--force`。
+- **RISK-011**：详情剪枝依赖 `detail_track_update_time` 和 `detail_track_count`；歌曲元数据变化但歌单未更新时不会刷新，需要 `--force`。
 - **RISK-012**：`__csrf` 缺失时只读接口仍可用，但上游未来可能收紧；届时需要先访问首页获取 Cookie。
 - **RISK-013**：`request_meta` 是 raw request JSON 的新增字段；旧消费方需要忽略未知键。当前没有依赖固定键集合的代码。
 - **RISK-014**：`COOKIES` 环境变量可能仍指向旧的 cookies 文件；端到端验证时用
@@ -439,7 +445,7 @@ docs/usages/netease.md
 
 - **TEST-001**：weapi 加密对固定 payload + 固定 secret 生成已知 `params` / `encSecKey`；并用 AES 解密两层验证明文 round-trip。
 - **TEST-002**：客户端对账号、歌单列表、歌单详情、歌曲详情、最近播放、周榜/总榜发出正确的 endpoint、加密表单和 `request_meta`；账号请求不写 raw，数据请求写 raw。
-- **TEST-003**：迁移后 `user_version=6`，存在 4 张网易云投影表和 4 个索引；JSON / STRICT / 外键约束生效。
+- **TEST-003**：迁移后 `user_version=7`，存在 4 张网易云投影表、4 个索引和详情剪枝状态列；JSON / STRICT / 外键约束生效。
 - **TEST-004**：投影只保留 `meta.uid` 对应的自建歌单；歌曲按详情 upsert；成员按详情替换；缺失歌曲生成占位；历史按 `(song_id, play_time)` 去重。
 - **TEST-005**：同一份 raw 连续重建两次，除 `db_created_at` / `db_updated_at` 外逐列相等。
 - **TEST-006**：歌单列表 301 在重建时回滚；辅助响应坏 JSON 跳过并计数；历史单条缺 `playTime` 跳过并计数。
