@@ -144,6 +144,9 @@ def _sync_playlist_details(
     states: dict[int, tuple[int, int]],
     force: bool,
 ) -> None:
+    # Track ids are collected across playlists so a song shared by several
+    # playlists is requested once per run instead of once per playlist.
+    song_ids: dict[int, None] = {}
     for playlist in playlists:
         playlist_id = playlist.get('id')
         if not isinstance(playlist_id, int):
@@ -173,14 +176,19 @@ def _sync_playlist_details(
             print(f'歌单详情 {playlist_id} 缺少 trackIds，跳过')
             continue
 
-        song_ids = _track_ids(track_items)
-        for batch in _chunks(song_ids, SONG_DETAIL_BATCH_SIZE):
-            songs = _request(
-                f'歌曲详情 {playlist_id} ({batch[0]}-{batch[-1]})',
-                lambda batch=batch: client.get_song_details(batch),
-            )
-            if songs is not None:
-                _check_code(songs, f'歌曲详情 {playlist_id}')
+        song_ids.update(dict.fromkeys(_track_ids(track_items)))
+
+    _fetch_song_details(client, list(song_ids))
+
+
+def _fetch_song_details(client: NeteaseClient, song_ids: list[int]) -> None:
+    for batch in _chunks(song_ids, SONG_DETAIL_BATCH_SIZE):
+        songs = _request(
+            f'歌曲详情 ({batch[0]}-{batch[-1]})',
+            lambda batch=batch: client.get_song_details(batch),
+        )
+        if songs is not None:
+            _check_code(songs, '歌曲详情')
 
 
 def _fetch_recent_plays(client: NeteaseClient) -> None:

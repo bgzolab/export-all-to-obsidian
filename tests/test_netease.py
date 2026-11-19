@@ -362,8 +362,8 @@ def test_sync_fetches_own_playlists_details_history_and_ranks(monkeypatch):
         'playlists',
         'playlists',
         'detail',
-        'songs',
         'detail',
+        'songs',
         'recent',
         'rank',
         'rank',
@@ -371,11 +371,30 @@ def test_sync_fetches_own_playlists_details_history_and_ranks(monkeypatch):
     assert client.calls[1] == ('playlists', 42, 1000, 0)
     assert client.calls[2] == ('playlists', 42, 1000, 1000)
     assert client.calls[3] == ('detail', 7)
-    assert client.calls[4] == ('songs', [1, 2, 3])
-    assert client.calls[5] == ('detail', 8)
+    assert client.calls[4] == ('detail', 8)
+    assert client.calls[5] == ('songs', [1, 2, 3])
     assert client.calls[6] == ('recent', 100)
     assert client.calls[7] == ('rank', 'week', 42, 1000, 0)
     assert client.calls[8] == ('rank', 'all', 42, 1000, 0)
+    assert partial == []
+
+
+def test_sync_fetches_shared_songs_once(monkeypatch):
+    client = FakeNeteaseClient(
+        pages=[
+            {
+                'code': 200,
+                'playlist': [_playlist(7), _playlist(8)],
+                'more': False,
+            }
+        ],
+        details={7: _detail(7, [1, 2]), 8: _detail(8, [2, 3])},
+    )
+    exporter, partial = _install_exporter(monkeypatch, client)
+
+    exporter.sync()
+
+    assert [call[1] for call in client.calls if call[0] == 'songs'] == [[1, 2, 3]]
     assert partial == []
 
 
