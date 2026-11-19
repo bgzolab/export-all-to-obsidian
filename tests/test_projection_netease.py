@@ -144,6 +144,29 @@ def test_rebuild_skips_playlist_items_without_id(monkeypatch):
     connection.close()
 
 
+def test_rebuild_coerces_fractional_numbers(monkeypatch):
+    connection = connect(':memory:')
+    playlist = _playlist(7)
+    playlist.update({'trackCount': 2.0, 'playCount': 10.5})
+    _record_page(connection, [playlist])
+    _record_detail(connection, 7, [1])
+    song = _song(1, 'one')
+    song.update({'pop': 97.5, 'dt': 180000.9})
+    _record_songs(connection, [song])
+
+    rebuild_platform(connection, 'netease')
+
+    playlist_row = connection.execute(
+        'SELECT track_count, play_count FROM netease_playlist'
+    ).fetchone()
+    assert (playlist_row['track_count'], playlist_row['play_count']) == (2, 10)
+    song_row = connection.execute(
+        'SELECT pop, duration FROM netease_song WHERE song_id = 1'
+    ).fetchone()
+    assert (song_row['pop'], song_row['duration']) == (97, 180000)
+    connection.close()
+
+
 def test_rebuild_replaces_members_and_keeps_placeholders(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7)])

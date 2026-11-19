@@ -242,15 +242,15 @@ def _upsert_playlists(
                 'description': playlist.get('description') or '',
                 'creator_id': creator_id,
                 'creator_json': json_or_null(playlist.get('creator')),
-                'track_count': playlist.get('trackCount') or 0,
-                'play_count': playlist.get('playCount') or 0,
-                'subscribed_count': playlist.get('subscribedCount') or 0,
-                'create_time': playlist.get('createTime') or 0,
-                'update_time': playlist.get('updateTime') or 0,
-                'track_update_time': playlist.get('trackUpdateTime') or 0,
-                'special_type': playlist.get('specialType') or 0,
+                'track_count': _integer(playlist.get('trackCount')),
+                'play_count': _integer(playlist.get('playCount')),
+                'subscribed_count': _integer(playlist.get('subscribedCount')),
+                'create_time': _integer(playlist.get('createTime')),
+                'update_time': _integer(playlist.get('updateTime')),
+                'track_update_time': _integer(playlist.get('trackUpdateTime')),
+                'special_type': _integer(playlist.get('specialType')),
                 'subscribed': int(bool(playlist.get('subscribed'))),
-                'privacy': playlist.get('privacy') or 0,
+                'privacy': _integer(playlist.get('privacy')),
                 'ordered': int(bool(playlist.get('ordered'))),
                 'tags_json': json_dumps(playlist.get('tags') or []),
             },
@@ -359,16 +359,16 @@ def _upsert_songs(
                 'name': song.get('name') or '',
                 'artists_json': json_dumps(_song_artists(song)),
                 'album_json': json_dumps(song.get('al') or song.get('album') or {}),
-                'duration': song.get('dt') or song.get('duration') or 0,
-                'publish_time': song.get('publishTime') or 0,
-                'fee': song.get('fee') or 0,
-                'mv': song.get('mv') or 0,
+                'duration': _integer(song.get('dt') or song.get('duration')),
+                'publish_time': _integer(song.get('publishTime')),
+                'fee': _integer(song.get('fee')),
+                'mv': _integer(song.get('mv')),
                 'alias_json': json_dumps(song.get('alia') or song.get('alias') or []),
                 'trans_names_json': json_dumps(
                     song.get('tns') or song.get('transNames') or []
                 ),
-                'pop': song.get('pop') or 0,
-                'version': song.get('version') or 0,
+                'pop': _integer(song.get('pop')),
+                'version': _integer(song.get('version')),
             },
             response['id'],
             now,
@@ -453,6 +453,15 @@ def _creator_id(playlist: dict[str, Any]) -> int | None:
         return creator['userId']
     user_id = playlist.get('userId')
     return user_id if isinstance(user_id, int) else None
+
+
+def _integer(value: Any) -> int:
+    """Coerce upstream numbers so STRICT INTEGER columns accept the value."""
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return 0
 
 
 def _member_ids(track_items: list[Any]) -> list[tuple[int, int]] | None:
