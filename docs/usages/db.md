@@ -27,6 +27,7 @@ eto [全局参数] db rebuild PLATFORM
 | `qireader` | `qireader_entry`、`qireader_article` |
 | `cnblog` | `cnblog_bookmark`、`cnblog_post` |
 | `twitter` | `twitter_tweet`、`twitter_like`、`twitter_bookmark` |
+| `netease` | `netease_playlist`、`netease_song`、`netease_playlist_song`、`netease_play_record` |
 
 ## 行为
 
@@ -47,6 +48,12 @@ Twitter 先回放 `twitter.likes.page`，再回放 `twitter.bookmarks.page`；`t
 V2EX 收藏页或余额页的 signin 表单会让整个 `v2ex` 投影回滚（不会清空已有收藏/感谢行），
 处置步骤见 [v2ex.md](./v2ex.md)。
 
+网易云先回放 `netease.playlists.page`、`netease.playlist.detail`、
+`netease.songs.detail`，最后回放 `netease.play.recent`。歌单列表按 raw request 的
+`meta.uid` 只保留自建歌单；详情按 `trackIds` 替换成员；排行响应不参与投影。
+歌单列表的 301/401/403 会让整个平台回滚（避免登录失败清空歌单），其余 `code != 200`
+按业务无数据跳过。
+
 成功后输出处理的响应数和写入行数；有跳过的错误响应时额外输出“跳过 N 条错误响应”，
 辅助列找不到唯一主行时输出“辅助未命中 N 条”。
 投影表的 `response_id` 指向产生该行最新主数据的 `sync_response.id`，不是 `sync_run.id`。
@@ -65,6 +72,7 @@ raw 层默认只增不改；确认该响应确实可以废弃后再手动处理�
 ```shell
 eto --db ./data/eto.db db rebuild bangumi
 eto --db ./data/eto.db db rebuild v2ex
+eto --db ./data/eto.db db rebuild netease
 ```
 
 [返回命令索引](./README.md)

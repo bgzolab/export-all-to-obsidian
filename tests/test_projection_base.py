@@ -166,9 +166,42 @@ def test_update_aux_uses_the_last_response_in_replay_order():
 def test_unsupported_platform_raises():
     connection = connect(':memory:')
     assert 'bangumi' in SUPPORTED_PLATFORMS
+    assert 'netease' in SUPPORTED_PLATFORMS
 
     with pytest.raises(ValueError, match='Unsupported platform'):
         rebuild_platform(connection, 'unknown')
+    connection.close()
+
+
+def test_netease_platform_rebuilds_own_playlist():
+    connection = connect(':memory:')
+    assert 'netease' in SUPPORTED_PLATFORMS
+    record_json(
+        connection,
+        'netease.playlists.page',
+        {
+            'code': 200,
+            'playlist': [
+                {
+                    'id': 7,
+                    'name': 'mine',
+                    'creator': {'userId': 42},
+                    'trackCount': 0,
+                    'trackUpdateTime': 1,
+                }
+            ],
+            'more': False,
+        },
+        request={'meta': {'uid': 42}},
+    )
+
+    result = rebuild_platform(connection, 'netease')
+
+    assert result.responses == 1
+    assert (
+        connection.execute('SELECT playlist_id FROM netease_playlist').fetchone()[0]
+        == 7
+    )
     connection.close()
 
 

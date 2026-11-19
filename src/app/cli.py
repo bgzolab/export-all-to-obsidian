@@ -15,6 +15,7 @@ from app.credential_guard import (
     probe_bangumi_credentials,
     probe_bilibili_credentials,
     probe_cnblog_credentials,
+    probe_netease_credentials,
     probe_qireader_credentials,
     probe_twitter_bookmarks_credentials,
     probe_twitter_credentials,
@@ -30,6 +31,7 @@ from cnblog.exporter import export as export_cnblog
 from db.import_markdown import import_markdown
 from db.projections import SUPPORTED_PLATFORMS, rebuild_platform
 from github.exporter import export as export_github
+from netease.exporter import sync as sync_netease
 from qireader.exporter import export as export_qireader
 from twitter.exporter import TWITTER_MAX_PAGES, ingest_bookmarks
 from twitter.exporter import export as export_twitter
@@ -366,6 +368,33 @@ def github(template: str | None, output: str | None, force: bool) -> None:
             get_index_writer(),
             force,
             get_output_prefix(),
+        ),
+    )
+
+
+@eto.command()
+@click.option(
+    '--uid',
+    '-u',
+    required=False,
+    type=int,
+    help='用户 ID；默认从登录账号自动识别',
+)
+@click.option('--force', required=False, is_flag=True, help='忽略详情剪枝并重新抓取')
+def netease(uid: int | None, force: bool) -> None:
+    """把网易云歌单与听歌记录写入数据库。"""
+    # v1 has no Markdown/index output; running without --db-only would silently
+    # do nothing visible, so reject the combination instead.
+    if not is_db_only():
+        raise click.UsageError('netease requires --db-only')
+    run_with_credential_guard(
+        'netease',
+        probe_netease_credentials,
+        lambda: run_action(
+            'netease',
+            'sync',
+            None,
+            lambda: sync_netease(uid=uid, force=force),
         ),
     )
 

@@ -21,6 +21,7 @@ Now this tool had supported following modules:
 7. twitter
 8. weibo
 9. zhihu
+10. netease (database only: playlists and listening history)
 
 ## Quick start
 
@@ -68,6 +69,12 @@ Ingest X bookmarks into the database (incremental by default, `--full` to resume
 
 ```shell
 eto --db-only twitter --bookmarks
+```
+
+Ingest NetEase playlists and recent listening history (database only):
+
+```shell
+eto --cookies-file ./cookies.txt --db-only netease
 ```
 
 Ingest V2EX topics you sent thanks for (tipped) into the database:

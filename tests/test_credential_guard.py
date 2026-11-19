@@ -627,3 +627,124 @@ def test_cli_twitter_rejects_max_pages_zero(monkeypatch):
 
     assert result.exit_code != 0
     assert 'Invalid value' in result.output
+
+
+def _fake_netease_probe(monkeypatch, payload=None, error=None):
+    import app.credential_guard as guard
+
+    class FakeClient:
+        def get_account(self):
+            if error is not None:
+                raise error
+            return payload
+
+    monkeypatch.setattr(guard, 'NeteaseClient', lambda: FakeClient())
+    return guard
+
+
+def test_probe_netease_valid_from_account_id(monkeypatch):
+    guard = _fake_netease_probe(
+        monkeypatch,
+        payload={'code': 200, 'account': {'id': 42}, 'profile': None},
+    )
+
+    assert guard.probe_netease_credentials().status == 'valid'
+
+
+def test_probe_netease_valid_from_profile_user_id(monkeypatch):
+    guard = _fake_netease_probe(
+        monkeypatch,
+        payload={'code': 200, 'account': None, 'profile': {'userId': 42}},
+    )
+
+    assert guard.probe_netease_credentials().status == 'valid'
+
+
+@pytest.mark.parametrize(
+    'payload',
+    [
+        {'code': 200, 'account': None, 'profile': None},
+        {'code': 200},
+    ],
+)
+def test_probe_netease_empty_account_invalid(monkeypatch, payload):
+    guard = _fake_netease_probe(monkeypatch, payload=payload)
+    result = guard.probe_netease_credentials()
+
+    assert result.status == 'invalid'
+    assert 'MUSIC_U' in result.reason
+
+
+@pytest.mark.parametrize('code', [301, 401, 403])
+def test_probe_netease_business_auth_code_invalid(monkeypatch, code):
+    guard = _fake_netease_probe(monkeypatch, payload={'code': code})
+    result = guard.probe_netease_credentials()
+
+    assert result.status == 'invalid'
+    assert '已过期' in result.reason
+
+
+def test_probe_netease_business_error_unknown(monkeypatch):
+    guard = _fake_netease_probe(
+        monkeypatch,
+        payload={'code': 500, 'message': 'internal'},
+    )
+    result = guard.probe_netease_credentials()
+
+    assert result.status == 'unknown'
+    assert 'code=500' in result.reason
+
+
+@pytest.mark.parametrize('status_code', [301, 401, 403])
+def test_probe_netease_http_auth_status_invalid(monkeypatch, status_code):
+    from netease.client import NeteaseClientError
+
+    guard = _fake_netease_probe(
+        monkeypatch,
+        error=NeteaseClientError(
+            f'HTTP {status_code}',
+            status_code=status_code,
+        ),
+    )
+    result = guard.probe_netease_credentials()
+
+    assert result.status == 'invalid'
+
+
+def test_probe_netease_non_json_unknown(monkeypatch):
+    from netease.client import NeteaseClientError
+
+    guard = _fake_netease_probe(
+        monkeypatch,
+        error=NeteaseClientError('响应解析失败: Expecting value', status_code=200),
+    )
+    result = guard.probe_netease_credentials()
+
+    assert result.status == 'unknown'
+    assert '响应解析失败' in result.reason
+
+
+def test_probe_netease_missing_domain_cookie_invalid(monkeypatch):
+    guard = _fake_netease_probe(
+        monkeypatch,
+        error=ValueError('No cookies found for domain'),
+    )
+    result = guard.probe_netease_credentials()
+
+    assert result.status == 'invalid'
+    assert 'No cookies found' in result.reason
+
+
+def test_probe_netease_config_error_raises_click_exception(monkeypatch):
+    import click
+
+    import app.credential_guard as guard
+    from app.cookies import CookiesConfigError
+
+    def boom():
+        raise CookiesConfigError('Cookies file not found: /no/such/cookies.txt')
+
+    monkeypatch.setattr(guard, 'NeteaseClient', boom)
+
+    with pytest.raises(click.ClickException, match='配置缺失'):
+        guard.probe_netease_credentials()

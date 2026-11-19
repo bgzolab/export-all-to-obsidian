@@ -10,6 +10,7 @@ from db.projections import (
     bilibili,
     cnblog,
     github,
+    netease,
     qireader,
     twitter,
     v2ex,
@@ -28,6 +29,7 @@ _PLATFORMS: dict[str, ModuleType] = {
     'qireader': qireader,
     'cnblog': cnblog,
     'twitter': twitter,
+    'netease': netease,
 }
 
 SUPPORTED_PLATFORMS = tuple(_PLATFORMS)

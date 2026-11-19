@@ -3109,3 +3109,209 @@ def test_v2ex_null_topic_result_marks_partial(monkeypatch, tmp_path):
         'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
     )
     assert run['status'] == 'partial'
+
+
+def test_cli_netease_requires_db_only(tmp_path):
+    result = CliRunner().invoke(
+        eto,
+        ['--db', str(tmp_path / 'eto.db'), 'netease'],
+    )
+
+    assert result.exit_code == 2
+    assert 'netease requires --db-only' in result.output
+
+
+def test_cli_netease_passes_uid_and_force(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    called = {}
+
+    def fake_sync(uid=None, force=False):
+        called.update(uid=uid, force=force)
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr('app.cli.sync_netease', fake_sync)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease', '-u', '42', '--force'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert called == {'uid': 42, 'force': True}
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['platform'] == 'netease'
+    assert run['operation'] == 'sync'
+    assert run['scope'] is None
+    assert run['status'] == 'success'
+
+
+def test_cli_netease_defaults_uid_and_force(monkeypatch, tmp_path):
+    db_path = str(tmp_path / 'eto.db')
+    called = {}
+
+    def fake_sync(uid=None, force=False):
+        called.update(uid=uid, force=force)
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr('app.cli.sync_netease', fake_sync)
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease'],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert called == {'uid': None, 'force': False}
+
+
+def test_cli_netease_uid_mismatch_marks_run_failed(monkeypatch, tmp_path):
+    from netease import exporter as netease_exporter
+
+    class FakeClient:
+        def get_account(self):
+            return {
+                'code': 200,
+                'account': {'id': 42},
+                'profile': {'userId': 42},
+            }
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr(netease_exporter, 'NeteaseClient', lambda: FakeClient())
+    db_path = str(tmp_path / 'eto.db')
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease', '-u', '7'],
+    )
+
+    assert result.exit_code == 1
+    assert '不一致' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'failed'
+    assert 'ClickException' in run['error'] or '不一致' in run['error']
+
+
+def test_cli_netease_empty_account_marks_run_failed(monkeypatch, tmp_path):
+    from netease import exporter as netease_exporter
+
+    class FakeClient:
+        def get_account(self):
+            return {'code': 200, 'account': None, 'profile': None}
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr(netease_exporter, 'NeteaseClient', lambda: FakeClient())
+    db_path = str(tmp_path / 'eto.db')
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease'],
+    )
+
+    assert result.exit_code == 1
+    assert '无法识别' in result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'failed'
+
+
+def test_cli_netease_resource_failure_marks_run_partial(monkeypatch, tmp_path):
+    from netease import exporter as netease_exporter
+    from netease.client import NeteaseClientError
+
+    class FakeClient:
+        def get_account(self):
+            return {
+                'code': 200,
+                'account': {'id': 42},
+                'profile': {'userId': 42},
+            }
+
+        def list_playlists(self, uid, *, limit, offset):
+            return {'code': 200, 'playlist': [], 'more': False}
+
+        def get_recent_plays(self, *, limit):
+            raise NeteaseClientError('HTTP 500', status_code=500)
+
+        def get_play_rank(self, uid, kind, *, limit, offset=0):
+            return {'code': 200}
+
+    monkeypatch.setattr(
+        'app.cli.probe_netease_credentials',
+        lambda: CredentialProbeResult.valid('netease'),
+    )
+    monkeypatch.setattr(netease_exporter, 'NeteaseClient', lambda: FakeClient())
+    monkeypatch.setattr(netease_exporter, '_playlist_states', dict)
+    db_path = str(tmp_path / 'eto.db')
+
+    result = CliRunner().invoke(
+        eto,
+        ['--db', db_path, '--db-only', 'netease'],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = _query_one(
+        db_path,
+        'SELECT * FROM sync_run ORDER BY id DESC LIMIT 1',
+    )
+    assert run['status'] == 'partial'
+
+
+def test_db_rebuild_netease_is_idempotent(tmp_path):
+    db_path = tmp_path / 'eto.db'
+    connection = connect(db_path)
+    record_json(
+        connection,
+        'netease.playlists.page',
+        {
+            'code': 200,
+            'playlist': [
+                {
+                    'id': 7,
+                    'name': 'mine',
+                    'creator': {'userId': 42},
+                    'trackCount': 0,
+                    'trackUpdateTime': 1,
+                }
+            ],
+            'more': False,
+        },
+        request={'meta': {'uid': 42}},
+    )
+    connection.close()
+
+    first = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), 'db', 'rebuild', 'netease'],
+    )
+    second = CliRunner().invoke(
+        eto,
+        ['--db', str(db_path), 'db', 'rebuild', 'netease'],
+    )
+
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+    assert '重建完成: 1 个响应，1 行' in second.output
+    row = _query_one(db_path, 'SELECT * FROM netease_playlist')
+    assert row['playlist_id'] == 7
+    count = _query_one(db_path, 'SELECT count(*) AS n FROM netease_playlist')
+    assert count['n'] == 1

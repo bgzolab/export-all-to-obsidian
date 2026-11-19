@@ -83,7 +83,30 @@ def test_post_records_json_body(tmp_path):
     row = connection.execute('SELECT * FROM sync_response').fetchone()
     request_info = json.loads(row['request'])
     assert request_info['body'] == {'type': 3}
+    assert 'meta' not in request_info
     assert row['status_code'] == 202
+    connection.close()
+
+
+def test_post_records_request_meta(tmp_path):
+    connection = connect(tmp_path / 'eto.db')
+    run_id = start_run(connection, 'netease', 'sync')
+    session = FakeSession()
+
+    http.post(
+        session,
+        'https://music.163.com/weapi/user/playlist',
+        endpoint='netease.playlists.page',
+        database=connection,
+        run_id=run_id,
+        data={'params': 'p', 'encSecKey': 'k'},
+        request_meta={'uid': 42},
+    )
+
+    row = connection.execute('SELECT * FROM sync_response').fetchone()
+    request_info = json.loads(row['request'])
+    assert request_info['meta'] == {'uid': 42}
+    assert request_info['body'] == {'params': 'p', 'encSecKey': 'k'}
     connection.close()
 
 

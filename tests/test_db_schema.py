@@ -39,7 +39,7 @@ def test_connect_creates_raw_tables_and_indexes(tmp_path):
         'idx_sync_response_lookup',
         'idx_sync_response_sha256',
     } <= indexes
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 7
     assert connection.execute('PRAGMA foreign_keys').fetchone()[0] == 1
 
     columns = {row['name'] for row in connection.execute('PRAGMA table_info(sync_run)')}
@@ -53,7 +53,7 @@ def test_connect_is_idempotent(tmp_path):
     migrate(connection)
     migrate(connection)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 7
     connection.close()
 
 
@@ -87,7 +87,7 @@ def test_migration_backfills_existing_tweets_as_likes(tmp_path):
 
     connection = connect(db_path)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 7
     like = connection.execute('SELECT * FROM twitter_like').fetchone()
     assert like['tweet_id'] == '111'
     assert like['response_id'] == 1

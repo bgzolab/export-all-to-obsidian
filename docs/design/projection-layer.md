@@ -11,8 +11,8 @@
 从 raw 层解析出平台实体，落成可查询、可导出、可幂等重建的投影表。投影层是 Markdown
 导出的主要数据源；raw 层只负责保存、灾难恢复和全量重放。
 
-本层不做统一模型，一般不为一个平台建立超过三张表（V2EX 投币流水是记录在案的有意
-例外，见 3.7），不引入 ORM。
+本层不做统一模型，一般不为一个平台建立超过三张表（V2EX 投币流水见 3.7、网易云历史
+日志见 3.10 是有意例外），不引入 ORM。
 
 非目标：
 
@@ -24,7 +24,7 @@
 
 ## 2. 核心约定
 
-1. 一张表对应一个实体，不是一次响应。每平台 1-3 张表。
+1. 一张表对应一个实体，不是一次响应。每平台 1-3 张表（网易云历史日志例外，见 3.10）。
 2. 表名使用 `<platform>_<entity>`，例如 `bangumi_collection`、`zhihu_collection_item`。
 3. 业务自然键做主键；关系表用复合主键；不使用自增 id 做业务主键。
 4. 顶层标量字段落列；对象/数组字段落 `*_json` 列，并用
@@ -117,6 +117,10 @@ db_updated_at TEXT NOT NULL
 | `cnblog_bookmark` | `date_added` |
 | `cnblog_post` | 无 |
 | `github_star` | `created_at`, `updated_at`, `pushed_at`, `starred_at` |
+| `netease_playlist` | `create_time`, `update_time`, `track_update_time` |
+| `netease_song` | `publish_time` |
+| `netease_playlist_song` | 无 |
+| `netease_play_record` | `play_time` |
 | `qireader_entry` | `published_at`, `crawled_at`, `timestamp` |
 | `qireader_article` | 无 |
 | `twitter_tweet` | `created_at` |
@@ -140,9 +144,12 @@ db_updated_at TEXT NOT NULL
 
 ## 3. 平台表
 
-迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引；解析器已覆盖全部九个平台。
+迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引；解析器已覆盖全部平台。
 后续 `003_twitter_sources.sql` 新增 `twitter_like`、`twitter_bookmark` 两张来源关系表，
-`004_v2ex_thanks.sql` 新增 V2EX 投币流水表 `v2ex_thanks`。
+`004_v2ex_thanks.sql` 新增 V2EX 投币流水表 `v2ex_thanks`，
+`005_netease.sql` 新增 4 张网易云表，`006_netease_song_metadata_missing.sql` 给
+`netease_song` 增加 `metadata_missing` 列，`007_netease_detail_state.sql` 给
+`netease_playlist` 增加最近成功详情的剪枝状态列。
 
 ### 3.1 Bangumi（pilot）
 
@@ -580,7 +587,7 @@ CREATE TABLE twitter_bookmark (
 
 V2EX 因此是 4 张表，是“每平台 1-3 张表”预算的有意例外：投币流水是独立来源关系，
 既不能塞进收藏、主题或回复表，也需要交易级字段支持页级增量判断。例外只适用于
-`v2ex_thanks`，其他平台仍保持 1-3 张表。
+`v2ex_thanks` 与网易云历史表（见 3.10），其他平台仍保持 1-3 张表。
 
 ```sql
 CREATE TABLE v2ex_topic (
@@ -753,6 +760,131 @@ CREATE INDEX idx_zhihu_collection_item_content
     ON zhihu_collection_item(content_id);
 ```
 
+### 3.10 网易云音乐
+
+来源接口：
+
+- `netease.playlists.page` -> `netease_playlist`
+- `netease.playlist.detail` -> `netease_playlist_song`（辅助更新 `detail_response_id`）
+- `netease.songs.detail` -> `netease_song`
+- `netease.play.recent` -> `netease_play_record`
+
+排行 `netease.play.rank.week` / `netease.play.rank.all` 只留在 raw 层，不建投影。
+
+说明：
+
+- `user/playlist` 同时返回自建和订阅歌单；当前 uid 不在 body 里，从 raw request 的
+  `meta.uid` 读取，只保留 `creator.userId == uid` 的歌单（包含“我喜欢的音乐”）。
+- `netease_playlist` 的元数据只来自列表响应；详情响应只负责成员、`detail_response_id`
+  和 `detail_track_count` / `detail_track_update_time` 剪枝状态，避免详情较少的字段
+  覆盖列表字段。
+- `playlist_state` 使用最近成功详情的 `detail_track_count` / `detail_track_update_time`，
+  而不是列表值；列表变化后详情重试失败时，旧状态保留，下一次运行仍会重抓。
+- `netease.playlist.detail` 按 `trackIds` 全量替换成员：先校验，再删除旧成员，按 0-based
+  顺序插入；重复 song id 只保留第一次出现的位置。`trackIds` 缺失或非法时跳过该响应，
+  不删除旧成员；`trackIds: []` 表示空歌单。
+- 成员插入前用 `INSERT ... ON CONFLICT DO NOTHING` 补占位 `netease_song` 行，保证外键
+  成立且不会覆盖已有的完整歌曲行；随后 `netease.songs.detail` 正常 upsert 补全。
+- 成功批次请求过但未返回的歌曲标记 `metadata_missing=1`，占位行保留但不再让歌单 pending；
+  已充实的歌曲行不会被后续批次降级，下架歌曲不会导致歌单永久重抓。
+- `netease_play_record` 是独立日志：只存歌曲快照 `song_json`，不引用 `netease_song`，
+  按 `(song_id, play_time)` 去重。上游最近播放是滚动窗口，历史从首次同步开始累积。
+- 排行只有聚合计数，没有逐次播放时间，因此不进投影，查询用 raw 层。
+- `netease` 只支持 `--db-only`，不生成 Markdown。
+
+为什么是 4 张表（预算例外）：
+
+1. 歌单、歌曲、成员关系是多对多，必须分开存成员和位置。
+2. 历史需要逐次 `play_time`，且用户明确要求历史/排行不能污染歌曲库；把历史写进
+   `netease_song` 会丢失播放事件并按歌曲覆盖。
+3. 排行只有 `playCount` / `score`，没有事件时间，单独建表价值低，留在 raw 层即可。
+
+代价是比 3 张表预算多一张；换来历史与歌曲库的隔离，以及“成员关系可替换、历史只增”
+两条独立边界。
+
+```sql
+CREATE TABLE netease_playlist (
+    playlist_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    cover_img_url TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    creator_id INTEGER NOT NULL DEFAULT 0,
+    creator_json TEXT CHECK (json_valid(creator_json)),
+    track_count INTEGER NOT NULL DEFAULT 0,
+    play_count INTEGER NOT NULL DEFAULT 0,
+    subscribed_count INTEGER NOT NULL DEFAULT 0,
+    create_time INTEGER NOT NULL DEFAULT 0,
+    update_time INTEGER NOT NULL DEFAULT 0,
+    track_update_time INTEGER NOT NULL DEFAULT 0,
+    special_type INTEGER NOT NULL DEFAULT 0,
+    subscribed INTEGER NOT NULL DEFAULT 0 CHECK (subscribed IN (0, 1)),
+    privacy INTEGER NOT NULL DEFAULT 0,
+    ordered INTEGER NOT NULL DEFAULT 0 CHECK (ordered IN (0, 1)),
+    tags_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags_json)),
+    detail_response_id INTEGER REFERENCES sync_response(id),
+    detail_track_count INTEGER,
+    detail_track_update_time INTEGER,
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
+) STRICT;
+
+CREATE INDEX idx_netease_playlist_creator
+    ON netease_playlist(creator_id);
+
+CREATE INDEX idx_netease_playlist_special_type
+    ON netease_playlist(special_type);
+
+CREATE TABLE netease_song (
+    song_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    artists_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(artists_json)),
+    album_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(album_json)),
+    duration INTEGER NOT NULL DEFAULT 0,
+    publish_time INTEGER NOT NULL DEFAULT 0,
+    fee INTEGER NOT NULL DEFAULT 0,
+    mv INTEGER NOT NULL DEFAULT 0,
+    alias_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(alias_json)),
+    trans_names_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(trans_names_json)),
+    pop INTEGER NOT NULL DEFAULT 0,
+    version INTEGER NOT NULL DEFAULT 0,
+    metadata_missing INTEGER NOT NULL DEFAULT 0 CHECK (metadata_missing IN (0, 1)),
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE netease_playlist_song (
+    playlist_id INTEGER NOT NULL REFERENCES netease_playlist(playlist_id),
+    song_id INTEGER NOT NULL REFERENCES netease_song(song_id),
+    position INTEGER NOT NULL DEFAULT 0,
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL,
+    PRIMARY KEY (playlist_id, song_id)
+) STRICT;
+
+CREATE INDEX idx_netease_playlist_song_song
+    ON netease_playlist_song(song_id);
+
+-- 历史是独立日志：只存歌曲快照，不引用 netease_song，避免污染歌曲库。
+CREATE TABLE netease_play_record (
+    song_id INTEGER NOT NULL,
+    play_time INTEGER NOT NULL,
+    resource_type TEXT NOT NULL DEFAULT 'SONG',
+    banned INTEGER NOT NULL DEFAULT 0 CHECK (banned IN (0, 1)),
+    device_json TEXT CHECK (json_valid(device_json)),
+    song_json TEXT NOT NULL CHECK (json_valid(song_json)),
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL,
+    PRIMARY KEY (song_id, play_time)
+) STRICT;
+
+CREATE INDEX idx_netease_play_record_play_time
+    ON netease_play_record(play_time);
+```
+
 ## 4. 重建
 
 实现放在 `src/db/projections/`：
@@ -786,6 +918,7 @@ rebuild_platform(conn, platform):
 | bilibili | `bilibili.favlist.page` |
 | cnblog | `cnblog.bookmarks.page` -> `cnblog.post.body` |
 | github | `github.stars.list` -> `github.repo.readme` |
+| netease | `netease.playlists.page` -> `netease.playlist.detail` -> `netease.songs.detail` -> `netease.play.recent` |
 | qireader | `qireader.readlater.page` -> `qireader.article` |
 | twitter | `twitter.likes.page` -> `twitter.bookmarks.page` |
 | v2ex | `v2ex.fav.page` -> `v2ex.balance.page` -> `v2ex.topic.detail` -> `v2ex.topic.replies.page` |
@@ -846,6 +979,11 @@ WHERE <natural key> = ?;
   行会持续阻塞 rebuild，需要按 `docs/usages/db.md` 的坏行处置步骤手动废弃。
 - 列表页的 `data` / `entries` 值为 `null` 时按空页处理；键缺失仍视为响应结构错误并回滚。
   这是有意区分：`null` 是合法的空页，缺键通常意味着上游返回了非预期负载。
+- 网易云 `netease.playlists.page` 的 301/401/403 视为登录失效，抛 `ProjectionError`
+  整体回滚，避免用登录失败响应清空歌单；其他 `code != 200` 按业务无数据处理。
+  `playlist` 键缺失、非列表，或 raw request 缺少 `meta.uid` 时也整体回滚。
+- 网易云详情/歌曲/历史的 200 非 JSON、缺业务字段、单条无效记录跳过并计数；
+  详情 `trackIds` 缺失或含非法条目时保留旧成员，不把坏响应当成空歌单。
 - 不静默跳过单条坏响应：跳过的错误响应数量必须出现在命令输出里。
 - 命令输出失败接口、`sync_response.id` 和原因。
 
@@ -870,8 +1008,8 @@ eto --db-only v2ex
 - 平台还没有投影解析器时：raw 照常入库，打印“projection not implemented”，退出 0。
 - 投影失败：标记当前 run 为 `partial`，命令返回非零；raw 已保存，可重新执行
   `eto db rebuild <platform>`。
-- `--force`、`--prefix` 在 db-only 下无意义，忽略；`--index-file` 与 `--db-only`
-  同时出现直接报错。
+- `--prefix` 在 db-only 下无意义；`--force` 关闭详情剪枝，重新抓取已存在的详情/辅助数据。
+  `--index-file` 与 `--db-only` 同时出现直接报错。
 - `--max-pages` 等抓取范围参数仍然有效。
 
 CLI 契约：
@@ -931,8 +1069,11 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 
 1. `002_projection_layer.sql`：一次创建 17 张表、索引，全部使用 `STRICT`。
    后续 `003_twitter_sources.sql` 新增 Twitter 点赞/书签关系表并回填历史点赞；
-   `004_v2ex_thanks.sql` 新增 V2EX 投币流水表。
-2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言到 2；增加建表、JSON 约束、
+   `004_v2ex_thanks.sql` 新增 V2EX 投币流水表；
+   `005_netease.sql` 新增网易云 4 张表；
+   `006_netease_song_metadata_missing.sql` 增加网易云歌曲缺失标记列；
+   `007_netease_detail_state.sql` 增加网易云详情剪枝状态列。
+2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 7）；增加建表、JSON 约束、
    外键约束测试。
 3. pilot：Bangumi 解析器 + `rebuild_platform` + 幂等测试。
 4. CLI：`eto --db data/eto.db db rebuild bangumi`，输出处理响应数和行数。
@@ -965,4 +1106,10 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 - bangumi / bilibili / zhihu / weibo 的 exporter 分页仍依赖空页终止；`--db-only`
   下需要后续补统一的页数上限，避免上游重复返回末页时无限抓取。
 - v1 不删除，取消收藏/取消点赞的旧行会保留到删除策略实现。
+- 网易云最近播放是滚动窗口，投影只能从首次同步开始累积；两次运行之间被窗口挤出的
+  记录无法补回。歌单详情剪枝依赖 `track_count` / `track_update_time`，且要求成员歌曲
+  元数据已全部投影（成功批次确认不可用的歌曲除外）；歌曲元数据单独变化时需要
+  `--force` 刷新。
+- 网易云排行只在 raw 层，`sync_response.body` 是 zlib 压缩的，SQL 端不能直接
+  `json_extract`，查询要先用 Python 解压。
 - 单账号假设；换账号同步会混入同一张表，直到多账号迁移完成。
