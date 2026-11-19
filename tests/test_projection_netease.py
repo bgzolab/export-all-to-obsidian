@@ -533,7 +533,7 @@ def test_rebuild_drops_malformed_track_ids_entries(monkeypatch):
     # playlist converges instead of being refetched forever.
     assert members == [1, 2]
     assert playlist_state(connection) == {7: (2, 5)}
-    assert result.skipped == 0
+    assert result.skipped == 2
     connection.close()
 
 

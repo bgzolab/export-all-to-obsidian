@@ -291,13 +291,14 @@ def _replace_members(
         raise SkipResponse('missing trackIds')
 
     members, invalid = _member_ids(track_items)
+    if track_items and not members:
+        raise SkipResponse('no valid trackIds entries')
     if invalid:
+        result.skipped += invalid
         print(
             '投影忽略无效 trackIds 条目: '
             f'{DETAIL_ENDPOINT} (id={response["id"]}): {invalid} 条'
         )
-    if track_items and not members:
-        raise SkipResponse('no valid trackIds entries')
 
     exists = connection.execute(
         'SELECT 1 FROM netease_playlist WHERE playlist_id = ?',
