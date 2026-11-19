@@ -3,7 +3,7 @@
 Instructions for OpenCode. This file is the source of truth for internals; `README.md` is the
 user-facing overview and `docs/usages/` is the per-command usage reference. All are kept in
 sync manually. Issue-specific design notes may live in `docs/design/`; implementation plans
-live in `docs/implementation-plans/`.
+live in `docs/implement-plans/`.
 
 ## Project overview
 
@@ -197,7 +197,7 @@ by the github module. Optional notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CH
 ## Workflow: planning & execution
 
 - Before planning a new feature, read this file (and `README.md` plus `docs/usages/` for the user-facing contract).
-- Write plans into `docs/implementation-plans/`; tasks must be atomic (with file paths and
+- Write plans into `docs/implement-plans/`; tasks must be atomic (with file paths and
   verification steps), status one of `Completed / In progress / Planned / Deprecated / On Hold`.
 - Execute plans TASK by TASK, only advancing after verification passes; update the plan's
   execution records when done; update this file if architecture/tech-stack changes.
