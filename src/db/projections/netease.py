@@ -46,15 +46,25 @@ AUTH_FAILURE_CODES = {301, 401, 403}
 def playlist_state(
     connection: sqlite3.Connection,
 ) -> dict[int, tuple[int, int]]:
-    """Return pruning state for playlists that already have a detail response.
+    """Return pruning state for playlists whose songs are fully projected.
 
     The exporter compares ``trackCount`` / ``trackUpdateTime`` against this
-    map. A playlist without ``detail_response_id`` is absent, so a previously
-    failed detail fetch is retried on the next run.
+    map. A playlist without ``detail_response_id`` is absent, and so is one
+    that still has member songs without metadata: placeholder rows point at
+    the detail response as their provenance, so a failed song batch keeps the
+    playlist pending and retries on the next run.
     """
     rows = connection.execute(
-        'SELECT playlist_id, track_count, track_update_time '
-        'FROM netease_playlist WHERE detail_response_id IS NOT NULL'
+        'SELECT p.playlist_id, p.track_count, p.track_update_time '
+        'FROM netease_playlist AS p '
+        'WHERE p.detail_response_id IS NOT NULL '
+        'AND NOT EXISTS ('
+        'SELECT 1 FROM netease_playlist_song AS ps '
+        'LEFT JOIN netease_song AS s ON s.song_id = ps.song_id '
+        'LEFT JOIN sync_response AS r ON r.id = s.response_id '
+        'WHERE ps.playlist_id = p.playlist_id '
+        "AND COALESCE(r.endpoint, '') != ?)",
+        (SONGS_ENDPOINT,),
     )
     return {
         int(row['playlist_id']): (

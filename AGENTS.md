@@ -156,9 +156,11 @@ by the github module. Optional notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CH
   empty page whose bottom cursor repeats the request cursor marks the list end and keeps the
   run `success`.
 - `netease` always fetches every playlist-list page; it never page-stops. It prunes playlist
-  details only when `track_count` / `track_update_time` match the previous projection and
-  `detail_response_id` is set. `--force` bypasses that pruning; recent plays and both ranks are
-  fetched every run. HTTP 429 stops the remaining requests and marks the run `partial`.
+  details only when `track_count` / `track_update_time` match the previous projection,
+  `detail_response_id` is set, and every member song already has projected song metadata;
+  a failed song batch keeps the playlist pending for the next run. `--force` bypasses that
+  pruning; recent plays and both ranks are fetched every run. HTTP 429 stops the remaining
+  requests and marks the run `partial`.
   `netease_play_record` is a rolling recent-play window (about 100 per run), so history grows
   only from the first sync onward; it never inserts into `netease_song`, and ranks stay in raw.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay

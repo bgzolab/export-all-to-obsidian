@@ -358,6 +358,23 @@ def test_playlist_state_tracks_detail_and_update_fields(monkeypatch):
     connection.close()
 
 
+def test_playlist_state_requires_song_metadata(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(connection, [_playlist(7, track_count=2, track_update_time=123)])
+    _record_detail(connection, 7, [1, 2])
+    _record_songs(connection, [_song(1, 'one')])
+    rebuild_platform(connection, 'netease')
+
+    # Song 2 is still a placeholder, so the playlist must be fetched again.
+    assert playlist_state(connection) == {}
+
+    _record_songs(connection, [_song(2, 'two')])
+    rebuild_platform(connection, 'netease')
+
+    assert playlist_state(connection) == {7: (2, 123)}
+    connection.close()
+
+
 def test_rebuild_is_idempotent(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7)])

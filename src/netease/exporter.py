@@ -42,7 +42,8 @@ def sync(uid: int | None = None, force: bool = False) -> None:
         )
 
     # The projection reflects the previous rebuild; a new playlist or a failed
-    # detail fetch is absent or has a NULL detail_response_id and gets fetched.
+    # detail/song fetch is absent, has a NULL detail_response_id or still has
+    # placeholder songs, and gets fetched again.
     states = {} if force else _playlist_states()
     try:
         own_playlists = _fetch_own_playlists(client, actual_uid)

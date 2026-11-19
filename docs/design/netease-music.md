@@ -316,9 +316,11 @@ CREATE INDEX idx_netease_play_record_play_time
 
 - 歌单列表每次完整抓取，不用本地投影做页级停止。
 - 歌单详情按 `track_count`、`track_update_time`、`detail_response_id` 判断是否未变更：
-  - 三者都存在且与当前列表一致时跳过详情和歌曲请求。
+  - 三者都存在且与当前列表一致，并且所有成员歌曲都已投影出 `netease.songs.detail`
+    元数据（没有占位行）时跳过详情和歌曲请求。
   - `--force` 跳过该判断。
-  - 新歌单、track 数变化、更新时间变化、上次详情失败（`detail_response_id IS NULL`）都会重新抓取。
+  - 新歌单、track 数变化、更新时间变化、上次详情失败（`detail_response_id IS NULL`）、
+    歌曲批次失败留下占位行，都会重新抓取。
 - 历史每次抓取固定 100 条；没有本地游标，重复记录由主键去重。
 - 排行每次抓取周榜和总榜各一次；不投影。
 - 不做删除检测：取消收藏、删除歌单、从歌单移除歌曲后，旧投影行保留到未来的删除策略实现。
