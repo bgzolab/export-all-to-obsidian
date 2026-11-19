@@ -251,17 +251,29 @@ def _creator_id(playlist: dict[str, Any]) -> int | None:
 
 
 def _unchanged(playlist: dict[str, Any], states: dict[int, tuple[int, int]]) -> bool:
-    """Return whether a playlist's metadata matches its last detail fetch."""
+    """Return whether a playlist's metadata matches its last detail fetch.
+
+    Numbers are coerced like the projection does, so a fractional upstream
+    value cannot keep a playlist pending forever.
+    """
     playlist_id = playlist.get('id')
-    track_count = playlist.get('trackCount')
-    track_update_time = playlist.get('trackUpdateTime')
+    track_count = _whole_number(playlist.get('trackCount'))
+    track_update_time = _whole_number(playlist.get('trackUpdateTime'))
     if (
         not isinstance(playlist_id, int)
-        or not isinstance(track_count, int)
-        or not isinstance(track_update_time, int)
+        or track_count is None
+        or track_update_time is None
     ):
         return False
     return states.get(playlist_id) == (track_count, track_update_time)
+
+
+def _whole_number(value: Any) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None
 
 
 def _track_ids(track_items: list[Any]) -> list[int]:

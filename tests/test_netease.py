@@ -474,6 +474,26 @@ def test_creator_id_matches_projection(playlist):
     assert exported(playlist) == projected(playlist)
 
 
+def test_sync_prunes_unchanged_playlists_with_fractional_numbers(monkeypatch):
+    client = FakeNeteaseClient(
+        pages=[
+            {
+                'code': 200,
+                'playlist': [
+                    _playlist(7, track_count=3.0, update_time=111.0),
+                ],
+                'more': False,
+            }
+        ],
+        details={7: _detail(7, [1])},
+    )
+    exporter, _ = _install_exporter(monkeypatch, client, states={7: (3, 111)})
+
+    exporter.sync()
+
+    assert ('detail', 7) not in client.calls
+
+
 def test_sync_force_bypasses_pruning(monkeypatch):
     client = FakeNeteaseClient(
         pages=[
