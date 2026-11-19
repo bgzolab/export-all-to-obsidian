@@ -19,8 +19,8 @@ Issue #8 给出的是 `https://music.163.com/#/user/songs/rank?id=xxx`，也就�
 
 网易云没有公开的完整听歌历史接口。当前可获得的只有：
 
-- 最近播放：按时间倒序的滚动窗口，默认 100 条，带 `playTime`（毫秒），没有 offset/游标。
-- 听歌排行：按周/全部时间聚合的 Top 列表，单次最多约 1000 条，只有 `playCount` / `score`，没有逐次播放时间。
+- 最近播放：按时间倒序的滚动窗口，上游返回最近约 300 条（`limit` 参数未生效），带 `playTime`（毫秒），没有 offset/游标。
+- 听歌排行：按周/全部时间聚合的 Top 列表，请求上限约 1000 条，上游实测只返回前 100 条；只有 `playCount` / `score`，没有逐次播放时间。
 
 因此本设计把“历史”定义为：**从首次同步开始，持续累积最近播放记录**；不承诺回填更早的历史。排行响应只写入 raw 层，不建投影表。
 
@@ -67,14 +67,15 @@ Issue #8 给出的是 `https://music.163.com/#/user/songs/rank?id=xxx`，也就�
 | 用户歌单 | `POST /weapi/user/playlist` | weapi | `limit` / `offset` / `more` | `playlist[]`、`more` |
 | 歌单详情 | `POST /weapi/v6/playlist/detail` | weapi | 无 | `playlist.trackIds` 完整；`playlist.tracks` 只带少量完整对象 |
 | 歌曲详情 | `POST /weapi/v3/song/detail` | weapi | `c` 为 JSON 数组，单批最多 1000 | `songs[]` |
-| 最近播放 | `POST /weapi/play-record/song/list` | weapi | `limit` 默认 100；无 offset/游标 | `data.total`、`data.list[]`；每条含 `playTime`（毫秒）、`data` 歌曲、`resourceType`、`banned`、`multiTerminalInfo` |
-| 听歌排行 | `POST /weapi/v1/play/record` | weapi | `type=0/1`、`limit` 最多约 1000、`offset`、`total` | `allData` / `weekData`、`allDataSize` / `weekDataSize`；每行 `{playCount, score, song}` |
+| 最近播放 | `POST /weapi/play-record/song/list` | weapi | `limit` 默认 100，但上游忽略该参数（实测返回 300 条）；无 offset/游标 | `data.total`、`data.list[]`；每条含 `playTime`（毫秒）、`data` 歌曲、`resourceType`、`banned`、`multiTerminalInfo` |
+| 听歌排行 | `POST /weapi/v1/play/record` | weapi | `type=0/1`、`limit` 最多约 1000（上游实测返回前 100 条）、`offset`、`total` | `allData` / `weekData`、`allDataSize` / `weekDataSize`；每行 `{playCount, score, song}` |
 
 实测补充：
 
 - 2026-11-17 用仓库根目录 `cookies.txt` 做只读探测，公开歌单、歌单详情、歌曲详情接口均可用，weapi 加密路径正确。
 - 一个 `trackCount=1273` 的大型歌单，`playlist.trackIds` 返回 1273 条，`playlist.tracks` 只返回 6 条完整歌曲对象。因此歌曲详情必须用 `trackIds` 再调 `/weapi/v3/song/detail` 分批补全。
 - 当前 `cookies.txt` 中的 `MUSIC_U` 未通过登录态校验：账号接口返回空的 `account` / `profile`，最近播放返回 `total=0`。实现后的端到端验证需要重新登录 `music.163.com` 并导出 Cookie。
+- 2026-11-19 重新登录后完成真实全量同步：34 个自建歌单、4365 首歌曲、5332 条成员关系、300 条最近播放；最近播放接口忽略 `limit=100` 返回 300 条，排行接口忽略 `limit=1000` 返回前 100 条。
 
 ### 鉴权
 
@@ -141,7 +142,7 @@ client.get_play_rank(uid, 'all', limit=1000)
 - `creator_id(p)` 取 `p.creator.userId`，缺失时回退到 `p.userId`；只保留等于当前 uid 的歌单。“我喜欢的音乐”是 `specialType=5`、creator 为自己的歌单，因此包含在内。
 - 歌单列表每页 1000 条；`MAX_PLAYLIST_PAGES=20` 是防御性上限，超过时打印提示并标记 `partial`。
 - 歌曲详情每批 500 个 id，低于上游单批 1000 的上限，减少单次响应体积。
-- 历史固定请求 100 条；排行固定请求 1000 条，`type=0` 为全部时间，`type=1` 为最近一周。
+- 历史固定请求 100 条（上游实际返回最近 300 条）；排行固定请求 1000 条（上游实际返回前 100 条），`type=0` 为全部时间，`type=1` 为最近一周。
 - 所有数据请求都走 `export_runtime.http`，endpoint 固定为：
   - `netease.playlists.page`
   - `netease.playlist.detail`
@@ -326,7 +327,7 @@ CREATE INDEX idx_netease_play_record_play_time
   - `--force` 跳过该判断。
   - 新歌单、track 数变化、更新时间变化、上次详情失败（`detail_response_id IS NULL`）、
     歌曲批次失败留下占位行，都会重新抓取。
-- 历史每次抓取固定 100 条；没有本地游标，重复记录由主键去重。
+- 历史每次请求 100 条，上游实际返回最近 300 条；没有本地游标，重复记录由主键去重。
 - 排行每次抓取周榜和总榜各一次；不投影。
 - 不做删除检测：取消收藏、删除歌单、从歌单移除歌曲后，旧投影行保留到未来的删除策略实现。
 - `--force` 不改变历史/排行的抓取范围，只影响歌单详情剪枝。

@@ -162,7 +162,7 @@ by the github module. Optional notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CH
   batch keeps the playlist pending for the next run. `--force` bypasses that pruning; recent
   plays and both ranks are fetched every run. HTTP 429 stops the remaining requests and marks
   the run `partial`.
-  `netease_play_record` is a rolling recent-play window (about 100 per run), so history grows
+  `netease_play_record` is a rolling recent-play window (about 300 per run), so history grows
   only from the first sync onward; it never inserts into `netease_song`, and ranks stay in raw.
 - Projection tables are rebuilt inside one transaction: delete the platform's rows, replay
   raw responses in fixed endpoint order, then commit. Transport errors (`body IS NULL` or
