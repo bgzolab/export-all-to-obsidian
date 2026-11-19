@@ -272,7 +272,8 @@ def _replace_members(
     A malformed response never deletes existing members: validation happens
     before the delete so an upstream error cannot empty a playlist. A valid
     empty ``trackIds`` list does replace members, which is how an emptied
-    playlist is represented.
+    playlist is represented. Malformed entries are dropped like the exporter
+    drops them, so both sides agree on what was fetched.
     """
     if not isinstance(payload, dict) or payload.get('code') != 200:
         raise SkipResponse('invalid playlist detail payload')
@@ -286,9 +287,14 @@ def _replace_members(
     if not isinstance(track_items, list):
         raise SkipResponse('missing trackIds')
 
-    members = _member_ids(track_items)
-    if members is None:
-        raise SkipResponse('invalid trackIds entry')
+    members, invalid = _member_ids(track_items)
+    if invalid:
+        print(
+            '投影忽略无效 trackIds 条目: '
+            f'{DETAIL_ENDPOINT} (id={response["id"]}): {invalid} 条'
+        )
+    if track_items and not members:
+        raise SkipResponse('no valid trackIds entries')
 
     exists = connection.execute(
         'SELECT 1 FROM netease_playlist WHERE playlist_id = ?',
@@ -464,19 +470,24 @@ def _integer(value: Any) -> int:
     return 0
 
 
-def _member_ids(track_items: list[Any]) -> list[tuple[int, int]] | None:
-    """Return ``(position, song_id)`` pairs, keeping the first duplicate."""
+def _member_ids(track_items: list[Any]) -> tuple[list[tuple[int, int]], int]:
+    """Return ``(position, song_id)`` pairs and the malformed entry count.
+
+    Duplicate song ids keep the first position.
+    """
     members = []
+    invalid = 0
     seen = set()
     for position, item in enumerate(track_items):
         song_id = item.get('id') if isinstance(item, dict) else None
         if not isinstance(song_id, int):
-            return None
+            invalid += 1
+            continue
         if song_id in seen:
             continue
         seen.add(song_id)
         members.append((position, song_id))
-    return members
+    return members, invalid
 
 
 def _song_artists(song: dict[str, Any]) -> Any:

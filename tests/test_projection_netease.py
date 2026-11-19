@@ -454,6 +454,64 @@ def test_bad_detail_keeps_existing_members(monkeypatch):
     connection.close()
 
 
+def test_rebuild_drops_malformed_track_ids_entries(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(connection, [_playlist(7, track_count=2, track_update_time=5)])
+    record_json(
+        connection,
+        'netease.playlist.detail',
+        {
+            'code': 200,
+            'playlist': {
+                'id': 7,
+                'trackIds': [{'id': 1}, {'bad': 2}, 'oops', {'id': 2}],
+            },
+        },
+    )
+    _record_songs(connection, [_song(1, 'one'), _song(2, 'two')])
+
+    result = rebuild_platform(connection, 'netease')
+
+    members = [
+        row['song_id']
+        for row in connection.execute(
+            'SELECT song_id FROM netease_playlist_song ORDER BY position'
+        )
+    ]
+    # The exporter fetches the same subset, so the detail is accepted and the
+    # playlist converges instead of being refetched forever.
+    assert members == [1, 2]
+    assert playlist_state(connection) == {7: (2, 5)}
+    assert result.skipped == 0
+    connection.close()
+
+
+def test_rebuild_all_malformed_track_ids_keeps_members(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(connection, [_playlist(7)])
+    first_detail = _record_detail(connection, 7, [1])
+    rebuild_platform(connection, 'netease')
+
+    record_json(
+        connection,
+        'netease.playlist.detail',
+        {'code': 200, 'playlist': {'id': 7, 'trackIds': [{'foo': 1}, 'bad']}},
+    )
+    result = rebuild_platform(connection, 'netease')
+
+    members = [
+        row['song_id']
+        for row in connection.execute('SELECT song_id FROM netease_playlist_song')
+    ]
+    assert members == [1]
+    playlist = connection.execute(
+        'SELECT detail_response_id FROM netease_playlist'
+    ).fetchone()
+    assert playlist['detail_response_id'] == first_detail
+    assert result.skipped == 1
+    connection.close()
+
+
 def test_business_no_data_playlist_page_is_skipped(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7)])
