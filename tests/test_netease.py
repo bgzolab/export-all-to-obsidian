@@ -595,6 +595,22 @@ def test_sync_all_malformed_track_ids_marks_partial(monkeypatch):
     assert partial
 
 
+def test_sync_deduplicates_playlist_across_pages(monkeypatch):
+    client = FakeNeteaseClient(
+        pages=[
+            {'code': 200, 'playlist': [_playlist(7)], 'more': True},
+            {'code': 200, 'playlist': [_playlist(7)], 'more': False},
+        ],
+        details={7: _detail(7, [1])},
+    )
+    exporter, partial = _install_exporter(monkeypatch, client)
+
+    exporter.sync()
+
+    assert [call for call in client.calls if call[0] == 'detail'] == [('detail', 7)]
+    assert partial == []
+
+
 def test_sync_detail_without_prune_metadata_marks_partial(monkeypatch, capsys):
     detail = _detail(7, [1])
     detail['playlist'].pop('trackCount')

@@ -147,12 +147,17 @@ def _sync_playlist_details(
     # Track ids are collected across playlists so a song shared by several
     # playlists is requested once per run instead of once per playlist.
     song_ids: dict[int, None] = {}
+    seen: set[int] = set()
     for playlist in playlists:
         playlist_id = playlist.get('id')
         if not isinstance(playlist_id, int):
             mark_run_partial()
             print('歌单缺少 id，跳过该歌单')
             continue
+        if playlist_id in seen:
+            # The list can shift between pages; fetch each playlist once.
+            continue
+        seen.add(playlist_id)
         if not force and _unchanged(playlist, states):
             continue
 
