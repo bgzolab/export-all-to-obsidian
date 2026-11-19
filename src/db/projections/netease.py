@@ -95,6 +95,7 @@ def rebuild(connection: sqlite3.Connection) -> RebuildResult:
                 payload,
                 response,
                 now,
+                result,
             )
         except SkipResponse as exc:
             skip_handler_response(result, PLAYLISTS_ENDPOINT, response, str(exc))
@@ -167,6 +168,7 @@ def _upsert_playlists(
     payload: dict[str, Any],
     response: dict[str, Any],
     now: str,
+    result: RebuildResult,
 ) -> int:
     """Upsert own playlists from one list page.
 
@@ -222,13 +224,18 @@ def _upsert_playlists(
                 response['id'],
                 'invalid playlist item',
             )
+        playlist_id = playlist.get('id')
+        if not isinstance(playlist_id, int):
+            # One dirty list item must not make every later rebuild fail.
+            skip_response(result, PLAYLISTS_ENDPOINT, response, 'playlist missing id')
+            continue
         creator_id = _creator_id(playlist)
         if creator_id != uid:
             continue
         rows += upsert(
             connection,
             'netease_playlist',
-            {'playlist_id': playlist['id']},
+            {'playlist_id': playlist_id},
             {
                 'name': playlist.get('name') or '',
                 'cover_img_url': playlist.get('coverImgUrl') or '',

@@ -129,6 +129,21 @@ def test_rebuild_keeps_only_own_playlists(monkeypatch):
     connection.close()
 
 
+def test_rebuild_skips_playlist_items_without_id(monkeypatch):
+    connection = connect(':memory:')
+    _record_page(
+        connection,
+        [_playlist(7), {'name': 'broken', 'creator': {'userId': UID}}],
+    )
+
+    result = rebuild_platform(connection, 'netease')
+
+    rows = connection.execute('SELECT playlist_id FROM netease_playlist').fetchall()
+    assert [row['playlist_id'] for row in rows] == [7]
+    assert result.skipped == 1
+    connection.close()
+
+
 def test_rebuild_replaces_members_and_keeps_placeholders(monkeypatch):
     connection = connect(':memory:')
     _record_page(connection, [_playlist(7)])
