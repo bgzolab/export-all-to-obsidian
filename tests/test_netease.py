@@ -575,6 +575,24 @@ def test_sync_missing_track_ids_marks_partial(monkeypatch):
     assert partial
 
 
+def test_sync_all_malformed_track_ids_marks_partial(monkeypatch):
+    client = FakeNeteaseClient(
+        pages=[{'code': 200, 'playlist': [_playlist(7)], 'more': False}],
+        details={
+            7: {
+                'code': 200,
+                'playlist': {'id': 7, 'trackIds': [{'bad': 1}, 'oops']},
+            }
+        },
+    )
+    exporter, partial = _install_exporter(monkeypatch, client)
+
+    exporter.sync()
+
+    assert not [call for call in client.calls if call[0] == 'songs']
+    assert partial
+
+
 def test_sync_rate_limit_stops_remaining_requests(monkeypatch, capsys):
     client = FakeNeteaseClient(
         pages=[{'code': 200, 'playlist': [_playlist(7)], 'more': False}],

@@ -176,7 +176,14 @@ def _sync_playlist_details(
             print(f'歌单详情 {playlist_id} 缺少 trackIds，跳过')
             continue
 
-        song_ids.update(dict.fromkeys(_track_ids(track_items)))
+        song_ids_for_playlist = _track_ids(track_items)
+        if track_items and not song_ids_for_playlist:
+            # The detail is already recorded, but the projection will reject
+            # it; surface the gap instead of reporting a clean success.
+            mark_run_partial()
+            print(f'歌单详情 {playlist_id} 的 trackIds 没有有效条目，跳过歌曲抓取')
+            continue
+        song_ids.update(dict.fromkeys(song_ids_for_playlist))
 
     _fetch_song_details(client, list(song_ids))
 
