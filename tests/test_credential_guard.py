@@ -724,19 +724,6 @@ def test_probe_netease_non_json_unknown(monkeypatch):
     assert '响应解析失败' in result.reason
 
 
-def test_probe_netease_request_exception_unknown(monkeypatch):
-    import requests
-
-    guard = _fake_netease_probe(
-        monkeypatch,
-        error=requests.RequestException('network down'),
-    )
-    result = guard.probe_netease_credentials()
-
-    assert result.status == 'unknown'
-    assert 'network down' in result.reason
-
-
 def test_probe_netease_missing_domain_cookie_invalid(monkeypatch):
     guard = _fake_netease_probe(
         monkeypatch,

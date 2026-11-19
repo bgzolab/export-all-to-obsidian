@@ -434,8 +434,6 @@ def probe_netease_credentials() -> CredentialProbeResult:
                 'MUSIC_U 已过期或无效',
             )
         return CredentialProbeResult.unknown(module, str(exc))
-    except requests.RequestException as exc:
-        return CredentialProbeResult.unknown(module, f'验活请求失败: {exc}')
 
     code = payload.get('code')
     if code in {301, 401, 403}:
