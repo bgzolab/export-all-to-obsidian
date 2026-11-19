@@ -341,6 +341,9 @@ CREATE INDEX idx_netease_play_record_play_time
 - 301 / 401 / 403：`invalid`。
 - 非 200、非 JSON、非对象、请求异常：`unknown`。
 - `MUSIC_U` 缺失：`get_cookie_header` 抛 `ValueError`，按现有规则判为 `invalid`；`cookies.txt` 不存在/不可读则 `CookiesConfigError` 转 `ClickException`。
+- 探针与 `sync` 各调用一次账号接口：探针在 `sync_run` 创建前决定是否开始本轮，`sync`
+  再读取 uid 做覆盖校验；两次结果不一致时以 `sync` 为准并中止本轮。该重复请求是有意
+  保留的：探针不写 raw，也不向调用方传递状态。
 
 运行期错误：
 
