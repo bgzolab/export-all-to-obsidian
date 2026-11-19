@@ -441,6 +441,39 @@ def test_sync_prunes_unchanged_playlists(monkeypatch):
     assert ('songs', [2]) in client.calls
 
 
+def test_sync_fetches_playlist_selected_by_top_level_user_id(monkeypatch):
+    playlist = _playlist(7)
+    playlist['creator'] = {'userId': '42'}
+    playlist['userId'] = 42
+    client = FakeNeteaseClient(
+        pages=[{'code': 200, 'playlist': [playlist], 'more': False}],
+        details={7: _detail(7, [1])},
+    )
+    exporter, _ = _install_exporter(monkeypatch, client)
+
+    exporter.sync()
+
+    assert ('detail', 7) in client.calls
+
+
+@pytest.mark.parametrize(
+    'playlist',
+    [
+        {'creator': {'userId': 42}, 'userId': 1},
+        {'creator': {'userId': '42'}, 'userId': 42},
+        {'creator': {'userId': '42'}},
+        {'userId': 42},
+        {'creator': None, 'userId': '42'},
+        {},
+    ],
+)
+def test_creator_id_matches_projection(playlist):
+    from db.projections.netease import _creator_id as projected
+    from netease.exporter import _creator_id as exported
+
+    assert exported(playlist) == projected(playlist)
+
+
 def test_sync_force_bypasses_pruning(monkeypatch):
     client = FakeNeteaseClient(
         pages=[

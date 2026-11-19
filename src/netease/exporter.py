@@ -244,7 +244,7 @@ def _check_code(payload: dict[str, Any], label: str) -> bool:
 
 def _creator_id(playlist: dict[str, Any]) -> int | None:
     creator = playlist.get('creator')
-    if isinstance(creator, dict) and creator.get('userId') is not None:
+    if isinstance(creator, dict) and isinstance(creator.get('userId'), int):
         return creator['userId']
     user_id = playlist.get('userId')
     return user_id if isinstance(user_id, int) else None
