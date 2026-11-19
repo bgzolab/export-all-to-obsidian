@@ -598,15 +598,24 @@ def test_sync_all_malformed_track_ids_marks_partial(monkeypatch):
 def test_sync_deduplicates_playlist_across_pages(monkeypatch):
     client = FakeNeteaseClient(
         pages=[
-            {'code': 200, 'playlist': [_playlist(7)], 'more': True},
-            {'code': 200, 'playlist': [_playlist(7)], 'more': False},
+            {
+                'code': 200,
+                'playlist': [_playlist(7, track_count=3, update_time=1)],
+                'more': True,
+            },
+            {
+                'code': 200,
+                'playlist': [_playlist(7, track_count=4, update_time=2)],
+                'more': False,
+            },
         ],
         details={7: _detail(7, [1])},
     )
-    exporter, partial = _install_exporter(monkeypatch, client)
+    exporter, partial = _install_exporter(monkeypatch, client, states={7: (3, 1)})
 
     exporter.sync()
 
+    # The later snapshot is newer; it must be the one that drives pruning.
     assert [call for call in client.calls if call[0] == 'detail'] == [('detail', 7)]
     assert partial == []
 
