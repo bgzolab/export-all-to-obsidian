@@ -134,6 +134,32 @@ def test_v2ex_non_200_raises(monkeypatch):
         get_fav_html_with_page(1)
 
 
+def test_v2ex_balance_endpoint(monkeypatch):
+    from v2ex.tipped import get_balance_page
+
+    endpoints = []
+    html = (
+        '<input class="page_input" type="number" max="3">'
+        '<table class="data">'
+        '<tr><th>time</th><th>type</th><th>amount</th><th>balance</th>'
+        '<th>description</th></tr>'
+        '<tr><td>2026-01-01 00:00:00 +08:00</td><td>发送谢意</td>'
+        '<td>-10.0</td><td>90.0</td>'
+        '<td>感谢 <a href="/member/alice">alice</a> 的回复 '
+        '<a href="/t/1">topic</a></td></tr>'
+        '</table>'
+    )
+    client = FakeClient(FakeResponse(text=html))
+    monkeypatch.setattr('v2ex.tipped.V2exClient', lambda: client)
+    _patch_get(monkeypatch, 'v2ex.tipped', client.session.response, endpoints)
+
+    page = get_balance_page(1)
+
+    assert page.max_page == 3
+    assert [entry.topic_id for entry in page.thanks] == [1]
+    assert endpoints == ['v2ex.balance.page']
+
+
 def test_v2ex_topic_endpoint(monkeypatch):
     from v2ex.topic import get_v2ex_topic_info
 

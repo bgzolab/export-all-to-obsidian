@@ -165,7 +165,7 @@ design: docs/design/netease-music.md
   - **修改**: 计划 front matter 收尾；`docs/design/netease-music.md` 状态改为已实现并更新 `RISK-014`。
 - **相关代码**: `netease.exporter.sync`、`db.projections.netease.rebuild`、`app.cli.netease`。
 - **验证结果**: `PYTHONPATH=src pytest tests -q` 490 passed / 2 skipped；ruff check/format 通过。用仓库根目录 `cookies.txt` 在临时库执行：首次同步 `success`，34 个歌单、4360 首歌、5327 条成员关系、300 条历史，raw 含 6 类数据 endpoint 与周榜/总榜；`--force` 再次同步成功；`db rebuild netease` 连续两次输出一致，业务列逐列相等。
-- **环境备注**: 本地 `data/eto.db` 的 `user_version` 已被未合并的 `feature/v2ex-tipped-topics` 分支占为 4，导致本分支 `004_netease.sql` 不会自动应用；端到端改用 `/tmp/opencode/netease-e2e.db`。合并前需要先解决 004 迁移编号冲突。
+- **环境备注**: `main` 合入 v2ex 投币功能后,`004` 被 `004_v2ex_thanks.sql` 占用;本分支的网易云迁移已重命名为 `005_netease.sql`,`user_version` 断言更新为 5。在 `data/eto.db` 副本上验证迁移 4 → 5 正常,4 张网易云表与 `v2ex_thanks` 共存;端到端验证使用 `/tmp/opencode/netease-e2e.db`。
 
 ## 涉及文件
 

@@ -11,8 +11,8 @@
 从 raw 层解析出平台实体，落成可查询、可导出、可幂等重建的投影表。投影层是 Markdown
 导出的主要数据源；raw 层只负责保存、灾难恢复和全量重放。
 
-本层不做统一模型，不为一个平台建立超过三张表（网易云的历史日志是唯一例外，见 3.10），
-不引入 ORM。
+本层不做统一模型，一般不为一个平台建立超过三张表（V2EX 投币流水见 3.7、网易云历史
+日志见 3.10 是有意例外），不引入 ORM。
 
 非目标：
 
@@ -129,6 +129,7 @@ db_updated_at TEXT NOT NULL
 | `v2ex_topic` | `created`, `last_modified`, `last_touched` |
 | `v2ex_reply` | `created`, `last_modified`（接口提供时） |
 | `v2ex_favorite` | 无 |
+| `v2ex_thanks` | `thanked_at` |
 | `weibo_post` | `created_at` |
 | `zhihu_content` | `created_time`, `updated_time` |
 | `zhihu_collection_item` | `created` |
@@ -145,7 +146,8 @@ db_updated_at TEXT NOT NULL
 
 迁移 `002_projection_layer.sql` 一次建好下列 17 张表和索引；解析器已覆盖全部平台。
 后续 `003_twitter_sources.sql` 新增 `twitter_like`、`twitter_bookmark` 两张来源关系表，
-`004_netease.sql` 新增 4 张网易云表。
+`004_v2ex_thanks.sql` 新增 V2EX 投币流水表 `v2ex_thanks`，
+`005_netease.sql` 新增 4 张网易云表。
 
 ### 3.1 Bangumi（pilot）
 
@@ -549,15 +551,24 @@ CREATE TABLE twitter_bookmark (
 来源接口：
 
 - `v2ex.fav.page` -> `v2ex_favorite`
+- `v2ex.balance.page` -> `v2ex_thanks`
 - `v2ex.topic.detail` -> `v2ex_topic`
 - `v2ex.topic.replies.page` -> `v2ex_reply`
 
 说明：
 
 - 收藏列表是 HTML，没有对应实体 JSON；`v2ex_favorite` 只保存 membership 和 `response_id`。
+- 投币流水来自登录后的 `/balance` HTML 表格，只保留 `发送谢意` 交易。余额页不提供回复
+  ID，因此 `v2ex_thanks` 只记录到主题级，并用 `content_kind` 区分“感谢回复”和“感谢主题”。
+- `v2ex_thanks` 是交易级表：`thanked_at`、`amount`、`balance`、`member`、`description`
+  原样保留，支持按页判断“整页已入库”和未来对账。`balance` 进入主键，用于区分同一秒、
+  同一成员、同一主题的两笔感谢。
+- 不建 `v2ex_thanks.topic_id -> v2ex_topic.topic_id` 外键：感谢记录先到，主题详情可能
+  抓取失败或主题已删除。
 - 不建 `v2ex_favorite.topic_id -> v2ex_topic.topic_id` 外键：收藏列表先到，主题详情可能
   抓取失败，外键会让合法收藏无法入库。
-- 平台时间 `created`、`last_modified`、`last_touched` 全部保留。
+- 平台时间 `created`、`last_modified`、`last_touched` 全部保留；投币时间保留为
+  `thanked_at`（原字符串，含时区）。
 - `member_json` / `node_json` / `supplements_json` 保存嵌套结构。
 - 回复用独立的分页接口 `GET /api/v2/topics/{topic_id}/replies?p=N`（每页 20 条），
   每个主题最多抓前 200 条（约 10 页），超过部分不抓；后续按 `v2ex_reply.thanks`
@@ -572,7 +583,9 @@ CREATE TABLE twitter_bookmark (
 3. 回复走独立分页接口，有独立 `response_id` 和失败边界；主题详情失败不影响已抓到的回复入库。
 4. 先全量入库，再按 `thanks` 取热门；只存热门会丢数据，无法重算。
 
-V2EX 因此是 3 张表，仍在“每平台 1-3 张表”的预算内。
+V2EX 因此是 4 张表，是“每平台 1-3 张表”预算的有意例外：投币流水是独立来源关系，
+既不能塞进收藏、主题或回复表，也需要交易级字段支持页级增量判断。例外只适用于
+`v2ex_thanks` 与网易云历史表（见 3.10），其他平台仍保持 1-3 张表。
 
 ```sql
 CREATE TABLE v2ex_topic (
@@ -623,6 +636,24 @@ CREATE TABLE v2ex_favorite (
     db_created_at TEXT NOT NULL,
     db_updated_at TEXT NOT NULL
 ) STRICT;
+
+CREATE TABLE v2ex_thanks (
+    thanked_at TEXT NOT NULL,
+    topic_id INTEGER NOT NULL,
+    content_kind TEXT NOT NULL CHECK (content_kind IN ('reply', 'topic')),
+    member TEXT NOT NULL DEFAULT '',
+    amount REAL NOT NULL,
+    balance REAL NOT NULL,
+    topic_title TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    response_id INTEGER NOT NULL REFERENCES sync_response(id),
+    db_created_at TEXT NOT NULL,
+    db_updated_at TEXT NOT NULL,
+    PRIMARY KEY (thanked_at, topic_id, content_kind, member, balance)
+) STRICT;
+
+CREATE INDEX idx_v2ex_thanks_topic
+    ON v2ex_thanks(topic_id);
 ```
 
 ### 3.8 Weibo
@@ -880,7 +911,7 @@ rebuild_platform(conn, platform):
 | netease | `netease.playlists.page` -> `netease.playlist.detail` -> `netease.songs.detail` -> `netease.play.recent` |
 | qireader | `qireader.readlater.page` -> `qireader.article` |
 | twitter | `twitter.likes.page` -> `twitter.bookmarks.page` |
-| v2ex | `v2ex.fav.page` -> `v2ex.topic.detail` -> `v2ex.topic.replies.page` |
+| v2ex | `v2ex.fav.page` -> `v2ex.balance.page` -> `v2ex.topic.detail` -> `v2ex.topic.replies.page` |
 | weibo | `weibo.likes.page` -> `weibo.longtext` |
 | zhihu | `zhihu.collection.page` |
 
@@ -933,9 +964,9 @@ WHERE <natural key> = ?;
   `content` 时也跳过，不把错误页写进 `readme`。
 - 辅助数据按自然键关联不唯一或未命中时跳过并计入 `aux_missed`，摘要里输出数量。
   GitHub README 只在 `full_name` 唯一命中时更新，避免 slug 歧义写错仓库。
-- V2EX 收藏页返回 signin 表单时视为抓取失败，回滚 `v2ex_favorite`，避免把登录页
-  当成“空收藏”清空读模型。已写入 raw 的 signin 行会持续阻塞 rebuild，需要按
-  `docs/usages/db.md` 的坏行处置步骤手动废弃。
+- V2EX 收藏页或余额页返回 signin 表单时视为抓取失败，回滚 `v2ex_favorite` /
+  `v2ex_thanks`，避免把登录页当成“空收藏/空流水”清空读模型。已写入 raw 的 signin
+  行会持续阻塞 rebuild，需要按 `docs/usages/db.md` 的坏行处置步骤手动废弃。
 - 列表页的 `data` / `entries` 值为 `null` 时按空页处理；键缺失仍视为响应结构错误并回滚。
   这是有意区分：`null` 是合法的空页，缺键通常意味着上游返回了非预期负载。
 - 网易云 `netease.playlists.page` 的 301/401/403 视为登录失效，抛 `ProjectionError`
@@ -1028,8 +1059,9 @@ v1 不删除。以后实现时不需要新增列，用 `response_id` 回查即�
 
 1. `002_projection_layer.sql`：一次创建 17 张表、索引，全部使用 `STRICT`。
    后续 `003_twitter_sources.sql` 新增 Twitter 点赞/书签关系表并回填历史点赞；
-   `004_netease.sql` 新增网易云 4 张表。
-2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 4）；增加建表、JSON 约束、
+   `004_v2ex_thanks.sql` 新增 V2EX 投币流水表；
+   `005_netease.sql` 新增网易云 4 张表。
+2. 更新 `tests/test_db_schema.py` 的 `user_version` 断言（当前为 5）；增加建表、JSON 约束、
    外键约束测试。
 3. pilot：Bangumi 解析器 + `rebuild_platform` + 幂等测试。
 4. CLI：`eto --db data/eto.db db rebuild bangumi`，输出处理响应数和行数。

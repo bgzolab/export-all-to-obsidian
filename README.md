@@ -77,6 +77,12 @@ Ingest NetEase playlists and recent listening history (database only):
 eto --cookies-file ./cookies.txt --db-only netease
 ```
 
+Ingest V2EX topics you sent thanks for (tipped) into the database:
+
+```shell
+eto --db-only v2ex --tipped
+```
+
 Rebuild a platform's projection from existing raw responses:
 
 ```shell

@@ -22,7 +22,7 @@ eto [全局参数] db rebuild PLATFORM
 | `bilibili` | `bilibili_fav`、`bilibili_media`、`bilibili_fav_item` |
 | `github` | `github_star` |
 | `zhihu` | `zhihu_content`、`zhihu_collection_item` |
-| `v2ex` | `v2ex_topic`、`v2ex_reply`、`v2ex_favorite` |
+| `v2ex` | `v2ex_topic`、`v2ex_reply`、`v2ex_favorite`、`v2ex_thanks` |
 | `weibo` | `weibo_post` |
 | `qireader` | `qireader_entry`、`qireader_article` |
 | `cnblog` | `cnblog_bookmark`、`cnblog_post` |
@@ -44,6 +44,9 @@ eto [全局参数] db rebuild PLATFORM
 
 Twitter 先回放 `twitter.likes.page`，再回放 `twitter.bookmarks.page`；`twitter_tweet`
 是共享实体，`twitter_like` / `twitter_bookmark` 分别记录来源关系。
+
+V2EX 收藏页或余额页的 signin 表单会让整个 `v2ex` 投影回滚（不会清空已有收藏/感谢行），
+处置步骤见 [v2ex.md](./v2ex.md)。
 
 网易云先回放 `netease.playlists.page`、`netease.playlist.detail`、
 `netease.songs.detail`，最后回放 `netease.play.recent`。歌单列表按 raw request 的

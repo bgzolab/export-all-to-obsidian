@@ -36,6 +36,7 @@ from qireader.exporter import export as export_qireader
 from twitter.exporter import TWITTER_MAX_PAGES, ingest_bookmarks
 from twitter.exporter import export as export_twitter
 from v2ex.exporter import export as export_v2ex
+from v2ex.exporter import export_tipped
 from weibo.exporter import export as export_weibo
 from zhihu.exporter import export as export_zhihu
 
@@ -195,17 +196,32 @@ def qireader(tag: str, output: str | None, force: bool) -> None:
 @eto.command()
 @click.option('--output', '-o', required=False, help='输出目录')
 @click.option('--force', required=False, is_flag=True, help='是否强制覆盖')
-def v2ex(output: str | None, force: bool) -> None:
-    """导出 V2EX 收藏主题。"""
+@click.option(
+    '--tipped',
+    is_flag=True,
+    help='把余额流水中感谢过的主题写入数据库，必须与 --db-only 一起使用',
+)
+def v2ex(output: str | None, force: bool, tipped: bool) -> None:
+    """导出 V2EX 收藏主题，或把投币主题写入数据库。"""
+    # Tipped mode replaces the favourites source and is DB-only by design:
+    # there is no Markdown contract for it yet, so reject it early instead of
+    # silently producing no output.
+    if tipped and not is_db_only():
+        raise click.UsageError('--tipped requires --db-only')
+
     output = _output_dir(output)
     run_with_credential_guard(
         'v2ex',
         probe_v2ex_credentials,
         lambda: run_action(
             'v2ex',
-            'favorites',
+            'tipped' if tipped else 'favorites',
             None,
-            lambda: export_v2ex(output, get_index_writer(), force),
+            lambda: (
+                export_tipped(force)
+                if tipped
+                else export_v2ex(output, get_index_writer(), force)
+            ),
         ),
     )
 

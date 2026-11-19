@@ -29,6 +29,7 @@ PROJECTION_TABLES = {
     'v2ex_topic',
     'v2ex_reply',
     'v2ex_favorite',
+    'v2ex_thanks',
     'weibo_post',
     'zhihu_content',
     'zhihu_collection_item',
@@ -54,6 +55,7 @@ PROJECTION_INDEXES = {
     'idx_v2ex_topic_last_touched',
     'idx_v2ex_reply_topic_thanks',
     'idx_v2ex_reply_created',
+    'idx_v2ex_thanks_topic',
     'idx_weibo_post_created_at',
     'idx_zhihu_content_type',
     'idx_zhihu_content_updated_time',
@@ -83,6 +85,7 @@ PLATFORM_TIME_COLUMNS = {
     'v2ex_topic': {'created', 'last_modified', 'last_touched'},
     'v2ex_reply': {'created', 'last_modified'},
     'v2ex_favorite': set(),
+    'v2ex_thanks': {'thanked_at'},
     'weibo_post': {'created_at'},
     'zhihu_content': {'created_time', 'updated_time'},
     'zhihu_collection_item': {'created'},
@@ -132,7 +135,7 @@ def test_migration_creates_projection_tables_and_indexes():
 
     assert PROJECTION_TABLES <= _table_names(connection)
     assert PROJECTION_INDEXES <= _index_names(connection)
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 5
     connection.close()
 
 
@@ -279,7 +282,7 @@ def test_migrates_existing_layer1_database(tmp_path):
 
     connection = connect(db_path)
 
-    assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+    assert connection.execute('PRAGMA user_version').fetchone()[0] == 5
     assert connection.execute('SELECT count(*) FROM sync_run').fetchone()[0] == 1
     assert PROJECTION_TABLES <= _table_names(connection)
     connection.close()

@@ -87,12 +87,15 @@ ruff format src tests                          # apply formatting
   to `data/eto.db`; the database file is treated as a credential file.
   `--index-file` and `--db-only` are mutually exclusive.
 - Subcommands: `cnblog(-o [--force])`, `bangumi(-t -s -o [-c] [--force])`,
-  `qireader(-t -o [--force])`, `v2ex(-o [--force])`,
+  `qireader(-t -o [--force])`, `v2ex(-o [--force] [--tipped])`,
   `twitter(-o [--force] [--max-pages] [--bookmarks] [--full])`, `zhihu(-c -o [--force])`,
   `weibo(-u -o [--force])`, `bilibili(-f -o [--force])`, `github(-t -o [--force])`,
   `netease(-u [--force])`, `import-markdown(<path>)`, `db rebuild(<platform>)`.
 - `-o` is required unless `--db-only`; `-t` is required for bangumi/github unless
   `--db-only`. Missing values raise `UsageError`.
+- `v2ex --tipped` requires `--db-only`; it replaces the favourites source, ingests sent-thanks
+  transactions from `/balance`, and writes no Markdown or index. Its run operation is
+  `tipped` instead of `favorites`.
 - `twitter --bookmarks` requires `--db-only` and only ingests data (no bookmark Markdown in
   this phase); `--full` requires `--bookmarks`. Both invalid combinations raise `UsageError`.
   Bookmark mode uses a separate `count=1` Bookmarks probe instead of the Likes probe.
@@ -123,15 +126,27 @@ by the github module. Optional notifications: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CH
 - API responses and imported Markdown are appended to `sync_response`. `--db-only` uses the
   projection tables as a detail/aux pruning hint (list pages are still fetched); `--force`
   disables that pruning. Detail/aux pruning keeps the run `success` because the list is
-  complete. All platforms except v2ex also stop pagination when a whole page is already known
-  (optimistic ordering assumption: lists are stable and newest-first); those runs are `partial`
-  and must not drive deletion detection. github/weibo/bangumi/qireader only page-stop when
-  their detail/aux pending count is zero, so missing details are repaired before pruning
-  resumes. cnblog page-stops when no bookmark unseen in the current run still lacks a post
-  body; pending only counts bookmarks whose URL yields a post id, so empty and slug-only URLs
-  never block the stop. v2ex stays `success` when it stops on a repeated favorites page
-  (out-of-range pagination), but has no whole-page-known stop: that would need a global
-  replies-pending gate. V2EX replies are capped at 200 per topic.
+  complete. All platforms except v2ex favourites also stop pagination when a whole page is
+  already known (optimistic ordering assumption: lists are stable and newest-first); those
+  runs are `partial` and must not drive deletion detection. github/weibo/bangumi/qireader
+  only page-stop when their detail/aux pending count is zero, so missing details are repaired
+  before pruning resumes. cnblog page-stops when no bookmark unseen in the current run still
+  lacks a post body; pending only counts bookmarks whose URL yields a post id, so empty and
+  slug-only URLs never block the stop. v2ex favourites stays `success` when it stops on a
+  repeated favorites page (out-of-range pagination), but has no whole-page-known stop: that
+  would need a global replies-pending gate. V2EX replies are capped at 200 per topic.
+- `v2ex --tipped` pages `/balance` and stops when a whole page of sent-thanks transactions is
+  already in `v2ex_thanks`; that run is `partial`. After the page stop it still scans every
+  tipped topic from `v2ex_thanks` and repairs missing details/replies, so earlier
+  quota-truncated runs converge; `--force` disables the page stop and re-fetches the full
+  balance history plus every topic. Balance pages are HTML and do not consume the API 2.0
+  quota; topic details/replies do. Ten consecutive topic fetch failures abort the rest of the
+  scan (the run is already `partial`): each failure has already burned the client retry
+  backoff, so continuing would only hammer the throttled endpoint; remaining topics converge
+  on a later run. The threshold does not distinguish 429 from permanently missing topics, so a
+  run of ten distinct deleted topics can end every scan at the same point. A balance page
+  without the flow table stops paging (`partial`) but still scans the tipped topics: a broken
+  HTML page does not imply a broken API.
 - `twitter --bookmarks` (default incremental) starts at the top and stops when a whole page is
   already in `twitter_bookmark`; that run is `partial`. `--full` derives its resume cursor from
   the latest `sync_run.scope='full'` bookmark response, never page-stops, and is `partial` on
@@ -200,5 +215,6 @@ known-vector suite in `tests/test_netease_weapi.py`.
 - No Twitter bookmark Markdown export yet; `--bookmarks` only ingests data.
 - No NetEase Markdown export yet and no NetEase play-rank projection; `netease` is
   `--db-only` and ranks stay in the raw layer.
+- No Markdown or index export for `v2ex --tipped` yet; it only ingests data.
 - No deletion detection, multi-account support, message queue / async task system, web
   service or plugin framework yet.

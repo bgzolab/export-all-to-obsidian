@@ -83,9 +83,8 @@ def _playlist_states() -> dict[int, tuple[int, int]]:
     Imported lazily so client/exporter tests do not need the projection module
     or a migrated database.
     """
-    from db.projections.netease import playlist_state
-
     from app.context import get_database
+    from db.projections.netease import playlist_state
 
     return playlist_state(get_database())
 

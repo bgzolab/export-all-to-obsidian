@@ -6,6 +6,8 @@
 
 V2EX_FAV = 'https://www.v2ex.com/my/topics'
 
+V2EX_BALANCE = 'https://www.v2ex.com/balance'
+
 V2EX_API_TOPICS = 'https://www.v2ex.com/api/v2/topics/{topic_id}'
 
 V2EX_API_REPLIES = 'https://www.v2ex.com/api/v2/topics/{topic_id}/replies'

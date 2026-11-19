@@ -49,7 +49,7 @@ Issue #8 给出的是 `https://music.163.com/#/user/songs/rank?id=xxx`，也就�
   - 自建歌单列表、歌单详情、歌曲详情分批抓取。
   - 最近播放抓取与历史投影表。
   - 周榜/总榜抓取与 raw 记录。
-  - 迁移 `004_netease.sql`、投影解析器、凭证探针、CLI、测试与文档。
+  - 迁移 `005_netease.sql`、投影解析器、凭证探针、CLI、测试与文档。
 - 不包含：
   - Markdown、索引、`--output-only`。
   - 排行投影表。
@@ -170,7 +170,7 @@ client.get_play_rank(uid, 'all', limit=1000)
 
 ### 数据模型
 
-新增迁移 `004_netease.sql`，创建 4 张 `STRICT` 表：
+新增迁移 `005_netease.sql`，创建 4 张 `STRICT` 表：
 
 ```sql
 CREATE TABLE netease_playlist (
@@ -367,7 +367,7 @@ src/netease/
     weapi.py              # weapi 加密
     client.py             # Cookie、Session、账号/歌单/歌曲/历史/排行请求
     exporter.py           # 抓取编排、剪枝、partial 标记
-src/db/migrations/004_netease.sql
+src/db/migrations/005_netease.sql
 src/db/projections/netease.py
 docs/usages/netease.md
 ```
@@ -424,7 +424,7 @@ docs/usages/netease.md
 
 - **TEST-001**：weapi 加密对固定 payload + 固定 secret 生成已知 `params` / `encSecKey`；并用 AES 解密两层验证明文 round-trip。
 - **TEST-002**：客户端对账号、歌单列表、歌单详情、歌曲详情、最近播放、周榜/总榜发出正确的 endpoint、加密表单和 `request_meta`；账号请求不写 raw，数据请求写 raw。
-- **TEST-003**：迁移后 `user_version=4`，存在 4 张网易云投影表和 4 个索引；JSON / STRICT / 外键约束生效。
+- **TEST-003**：迁移后 `user_version=5`，存在 4 张网易云投影表和 4 个索引；JSON / STRICT / 外键约束生效。
 - **TEST-004**：投影只保留 `meta.uid` 对应的自建歌单；歌曲按详情 upsert；成员按详情替换；缺失歌曲生成占位；历史按 `(song_id, play_time)` 去重。
 - **TEST-005**：同一份 raw 连续重建两次，除 `db_created_at` / `db_updated_at` 外逐列相等。
 - **TEST-006**：歌单列表 301 在重建时回滚；辅助响应坏 JSON 跳过并计数；历史单条缺 `playTime` 跳过并计数。
